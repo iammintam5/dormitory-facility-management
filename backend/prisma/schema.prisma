@@ -1,0 +1,503 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserStatus {
+  ACTIVE @map("active")
+  LOCKED @map("locked")
+}
+
+enum AssetStatus {
+  AVAILABLE           @map("available")
+  IN_USE              @map("in_use")
+  UNDER_MAINTENANCE   @map("under_maintenance")
+  DAMAGED             @map("damaged")
+  PENDING_LIQUIDATION @map("pending_liquidation")
+  LIQUIDATED          @map("liquidated")
+}
+
+enum ApprovalStatus {
+  DRAFT     @map("draft")
+  PENDING   @map("pending")
+  APPROVED  @map("approved")
+  REJECTED  @map("rejected")
+  COMPLETED @map("completed")
+  CANCELLED @map("cancelled")
+}
+
+enum DamageReportStatus {
+  SUBMITTED   @map("submitted")
+  REVIEWING   @map("reviewing")
+  APPROVED    @map("approved")
+  REJECTED    @map("rejected")
+  IN_PROGRESS @map("in_progress")
+  COMPLETED   @map("completed")
+}
+
+enum MaintenanceType {
+  SCHEDULED       @map("scheduled")
+  AD_HOC          @map("ad_hoc")
+  AFTER_INVENTORY @map("after_inventory")
+}
+
+enum MaintenanceResultStatus {
+  GOOD                  @map("good")
+  NEED_MONITORING       @map("need_monitoring")
+  NEED_REPAIR           @map("need_repair")
+  RECOMMEND_LIQUIDATION @map("recommend_liquidation")
+}
+
+enum NotificationStatus {
+  UNREAD @map("unread")
+  READ   @map("read")
+}
+
+enum BackupStatus {
+  SUCCESS @map("success")
+  FAILED  @map("failed")
+}
+
+model Role {
+  id          Int       @id @default(autoincrement())
+  code        String    @unique @db.VarChar(50)
+  name        String    @db.VarChar(100)
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id           Int        @id @default(autoincrement())
+  roleId       Int        @map("role_id")
+  fullName     String     @map("full_name") @db.VarChar(150)
+  userCode     String     @unique @map("user_code") @db.VarChar(50)
+  email        String?    @unique @db.VarChar(150)
+  phone        String?    @db.VarChar(20)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?  @map("last_login_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime?  @updatedAt @map("updated_at")
+
+  role               Role                @relation(fields: [roleId], references: [id])
+  roomStudents       RoomStudent[]
+  studentHandovers   Handover[]          @relation("StudentHandovers")
+  createdHandovers   Handover[]          @relation("CreatedHandovers")
+  inventoryChecks    InventoryCheck[]
+  damageReports      DamageReport[]
+  damageReportLogs   DamageReportLog[]
+  liquidationRecords LiquidationRecord[]
+  maintenancePlans   MaintenancePlan[]
+  maintenanceRecords MaintenanceRecord[]
+  notifications      Notification[]
+  auditLogs          AuditLog[]
+  backupRecords      BackupRecord[]
+
+  inventoryCouncilMembers   InventoryCouncilMember[]
+  liquidationCouncilMembers LiquidationCouncilMember[]
+
+  @@index([roleId])
+  @@map("users")
+}
+
+model DormBuilding {
+  id        Int       @id @default(autoincrement())
+  code      String    @unique @db.VarChar(50)
+  name      String    @db.VarChar(100)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  floors Floor[]
+
+  @@map("dorm_buildings")
+}
+
+model Floor {
+  id          Int     @id @default(autoincrement())
+  buildingId  Int     @map("building_id")
+  floorNumber Int     @map("floor_number")
+  name        String? @db.VarChar(100)
+
+  building DormBuilding @relation(fields: [buildingId], references: [id])
+  rooms    Room[]
+
+  @@unique([buildingId, floorNumber])
+  @@map("floors")
+}
+
+model Room {
+  id        Int       @id @default(autoincrement())
+  floorId   Int       @map("floor_id")
+  roomCode  String    @unique @map("room_code") @db.VarChar(50)
+  capacity  Int?
+  note      String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime? @updatedAt @map("updated_at")
+
+  floor           Floor            @relation(fields: [floorId], references: [id])
+  roomStudents    RoomStudent[]
+  assets          Asset[]
+  handovers       Handover[]
+  inventoryChecks InventoryCheck[]
+  damageReports   DamageReport[]
+
+  @@unique([floorId, roomCode], name: "unique_floor_room")
+  @@map("rooms")
+}
+
+model RoomStudent {
+  id        Int       @id @default(autoincrement())
+  roomId    Int       @map("room_id")
+  studentId Int       @map("student_id")
+  startDate DateTime  @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+  isActive  Boolean   @default(true) @map("is_active")
+
+  room    Room @relation(fields: [roomId], references: [id])
+  student User @relation(fields: [studentId], references: [id])
+
+  @@unique([roomId, studentId, startDate])
+  @@map("room_students")
+}
+
+model AssetCategory {
+  id                     Int       @id @default(autoincrement())
+  code                   String    @unique @db.VarChar(50)
+  name                   String    @db.VarChar(100)
+  description            String?
+  maintenanceCycleMonths Int?      @map("maintenance_cycle_months")
+  createdAt              DateTime  @default(now()) @map("created_at")
+  updatedAt              DateTime? @updatedAt @map("updated_at")
+
+  assets Asset[]
+
+  @@map("asset_categories")
+}
+
+model Asset {
+  id          Int         @id @default(autoincrement())
+  categoryId  Int         @map("category_id")
+  roomId      Int?        @map("room_id")
+  assetCode   String      @unique @map("asset_code") @db.VarChar(50)
+  assetName   String      @map("asset_name") @db.VarChar(150)
+  status      AssetStatus @default(AVAILABLE)
+  yearInUse   Int?        @map("year_in_use")
+  description String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime?   @updatedAt @map("updated_at")
+
+  category            AssetCategory        @relation(fields: [categoryId], references: [id])
+  room                Room?                @relation(fields: [roomId], references: [id])
+  handoverItems       HandoverItem[]
+  inventoryCheckItems InventoryCheckItem[]
+  damageReports       DamageReport[]
+  liquidationItems    LiquidationItem[]
+  maintenancePlans    MaintenancePlan[]
+  maintenanceRecords  MaintenanceRecord[]
+  assetHistories      AssetHistory[]
+
+  @@index([categoryId])
+  @@index([roomId])
+  @@map("assets")
+}
+
+model AssetHistory {
+  id        Int          @id @default(autoincrement())
+  assetId   Int          @map("asset_id")
+  action    String       @db.VarChar(100)
+  oldStatus AssetStatus? @map("old_status")
+  newStatus AssetStatus? @map("new_status")
+  oldRoomId Int?         @map("old_room_id")
+  newRoomId Int?         @map("new_room_id")
+  note      String?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  asset Asset @relation(fields: [assetId], references: [id])
+
+  @@index([assetId])
+  @@map("asset_histories")
+}
+
+model Handover {
+  id           Int            @id @default(autoincrement())
+  handoverCode String         @unique @map("handover_code") @db.VarChar(50)
+  roomId       Int            @map("room_id")
+  studentId    Int            @map("student_id")
+  createdBy    Int            @map("created_by")
+  handoverDate DateTime       @map("handover_date") @db.Date
+  status       ApprovalStatus @default(DRAFT)
+  returnedAt   DateTime?      @map("returned_at")
+  note         String?
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime?      @updatedAt @map("updated_at")
+
+  room          Room           @relation(fields: [roomId], references: [id])
+  student       User           @relation("StudentHandovers", fields: [studentId], references: [id])
+  createdByUser User           @relation("CreatedHandovers", fields: [createdBy], references: [id])
+  handoverItems HandoverItem[]
+
+  @@index([roomId])
+  @@index([studentId])
+  @@index([createdBy])
+  @@map("handovers")
+}
+
+model HandoverItem {
+  id                  Int     @id @default(autoincrement())
+  handoverId          Int     @map("handover_id")
+  assetId             Int     @map("asset_id")
+  quantity            Int     @default(1)
+  conditionAtHandover String  @map("condition_at_handover") @db.VarChar(255)
+  conditionAtReturn   String? @map("condition_at_return") @db.VarChar(255)
+  note                String?
+
+  handover Handover @relation(fields: [handoverId], references: [id])
+  asset    Asset    @relation(fields: [assetId], references: [id])
+
+  @@unique([handoverId, assetId])
+  @@map("handover_items")
+}
+
+model InventoryCheck {
+  id            Int            @id @default(autoincrement())
+  inventoryCode String         @unique @map("inventory_code") @db.VarChar(50)
+  roomId        Int?           @map("room_id")
+  checkedBy     Int            @map("checked_by")
+  checkDate     DateTime       @map("check_date") @db.Date
+  status        ApprovalStatus @default(DRAFT)
+  generalNote   String?        @map("general_note")
+  completedAt   DateTime?      @map("completed_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime?      @updatedAt @map("updated_at")
+
+  room                Room?                    @relation(fields: [roomId], references: [id])
+  checkedByUser       User                     @relation(fields: [checkedBy], references: [id])
+  inventoryCheckItems InventoryCheckItem[]
+  councilMembers      InventoryCouncilMember[]
+
+  @@index([roomId])
+  @@index([checkedBy])
+  @@map("inventory_checks")
+}
+
+model InventoryCouncilMember {
+  id               Int    @id @default(autoincrement())
+  inventoryCheckId Int    @map("inventory_check_id")
+  userId           Int    @map("user_id")
+  roleInCouncil    String @map("role_in_council") @db.VarChar(100)
+
+  inventoryCheck InventoryCheck @relation(fields: [inventoryCheckId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+
+  @@unique([inventoryCheckId, userId])
+  @@map("inventory_council_members")
+}
+
+model InventoryCheckItem {
+  id               Int     @id @default(autoincrement())
+  inventoryCheckId Int     @map("inventory_check_id")
+  assetId          Int     @map("asset_id")
+  systemQuantity   Int     @default(1) @map("system_quantity")
+  actualQuantity   Int     @default(1) @map("actual_quantity")
+  difference       Int     @default(0)
+  actualCondition  String? @map("actual_condition") @db.VarChar(255)
+  note             String?
+
+  inventoryCheck InventoryCheck @relation(fields: [inventoryCheckId], references: [id])
+  asset          Asset          @relation(fields: [assetId], references: [id])
+
+  @@unique([inventoryCheckId, assetId])
+  @@map("inventory_check_items")
+}
+
+model DamageReport {
+  id          Int                @id @default(autoincrement())
+  reportCode  String             @unique @map("report_code") @db.VarChar(50)
+  reporterId  Int                @map("reporter_id")
+  assetId     Int                @map("asset_id")
+  roomId      Int                @map("room_id")
+  description String
+  status      DamageReportStatus @default(SUBMITTED)
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime?          @updatedAt @map("updated_at")
+
+  reporter         User              @relation(fields: [reporterId], references: [id])
+  asset            Asset             @relation(fields: [assetId], references: [id])
+  room             Room              @relation(fields: [roomId], references: [id])
+  damageReportLogs DamageReportLog[]
+
+  @@index([reporterId])
+  @@index([assetId])
+  @@index([roomId])
+  @@map("damage_reports")
+}
+
+model DamageReportLog {
+  id        Int                 @id @default(autoincrement())
+  reportId  Int                 @map("report_id")
+  action    String              @db.VarChar(100)
+  oldStatus DamageReportStatus? @map("old_status")
+  newStatus DamageReportStatus? @map("new_status")
+  note      String?
+  createdBy Int                 @map("created_by")
+  createdAt DateTime            @default(now()) @map("created_at")
+
+  report        DamageReport @relation(fields: [reportId], references: [id])
+  createdByUser User         @relation(fields: [createdBy], references: [id])
+
+  @@index([reportId])
+  @@index([createdBy])
+  @@map("damage_report_logs")
+}
+
+model LiquidationRecord {
+  id              Int            @id @default(autoincrement())
+  liquidationCode String         @unique @map("liquidation_code") @db.VarChar(50)
+  createdBy       Int            @map("created_by")
+  liquidationDate DateTime       @map("liquidation_date") @db.Date
+  status          ApprovalStatus @default(DRAFT)
+  note            String?
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime?      @updatedAt @map("updated_at")
+
+  createdByUser    User                       @relation(fields: [createdBy], references: [id])
+  liquidationItems LiquidationItem[]
+  councilMembers   LiquidationCouncilMember[]
+
+  @@index([createdBy])
+  @@map("liquidation_records")
+}
+
+model LiquidationItem {
+  id                      Int      @id @default(autoincrement())
+  liquidationRecordId     Int      @map("liquidation_record_id")
+  assetId                 Int      @map("asset_id")
+  assetCondition          String   @map("asset_condition") @db.VarChar(255)
+  reason                  String
+  estimatedRemainingValue Decimal? @map("estimated_remaining_value") @db.Decimal(12, 2)
+
+  liquidationRecord LiquidationRecord @relation(fields: [liquidationRecordId], references: [id])
+  asset             Asset             @relation(fields: [assetId], references: [id])
+
+  @@unique([liquidationRecordId, assetId])
+  @@map("liquidation_items")
+}
+
+model LiquidationCouncilMember {
+  id                  Int    @id @default(autoincrement())
+  liquidationRecordId Int    @map("liquidation_record_id")
+  userId              Int    @map("user_id")
+  roleInCouncil       String @map("role_in_council") @db.VarChar(100)
+
+  liquidationRecord LiquidationRecord @relation(fields: [liquidationRecordId], references: [id])
+  user              User              @relation(fields: [userId], references: [id])
+
+  @@unique([liquidationRecordId, userId])
+  @@map("liquidation_council_members")
+}
+
+model MaintenancePlan {
+  id          Int       @id @default(autoincrement())
+  assetId     Int       @map("asset_id")
+  createdBy   Int       @map("created_by")
+  cycleMonths Int       @map("cycle_months")
+  nextDueDate DateTime  @map("next_due_date") @db.Date
+  isActive    Boolean   @default(true) @map("is_active")
+  note        String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime? @updatedAt @map("updated_at")
+
+  asset              Asset               @relation(fields: [assetId], references: [id])
+  createdByUser      User                @relation(fields: [createdBy], references: [id])
+  maintenanceRecords MaintenanceRecord[]
+
+  @@index([assetId, isActive])
+  @@index([createdBy])
+  @@map("maintenance_plans")
+}
+
+model MaintenanceRecord {
+  id                  Int                     @id @default(autoincrement())
+  maintenanceCode     String                  @unique @map("maintenance_code") @db.VarChar(50)
+  planId              Int?                    @map("plan_id")
+  assetId             Int                     @map("asset_id")
+  performedBy         Int                     @map("performed_by")
+  maintenanceDate     DateTime                @map("maintenance_date") @db.Date
+  maintenanceType     MaintenanceType         @map("maintenance_type")
+  content             String
+  resultStatus        MaintenanceResultStatus @map("result_status")
+  nextMaintenanceDate DateTime?               @map("next_maintenance_date") @db.Date
+  cost                Decimal?                @db.Decimal(12, 2)
+  materialNote        String?                 @map("material_note")
+  note                String?
+  createdAt           DateTime                @default(now()) @map("created_at")
+  updatedAt           DateTime?               @updatedAt @map("updated_at")
+
+  plan            MaintenancePlan? @relation(fields: [planId], references: [id])
+  asset           Asset            @relation(fields: [assetId], references: [id])
+  performedByUser User             @relation(fields: [performedBy], references: [id])
+
+  @@index([planId])
+  @@index([assetId])
+  @@index([performedBy])
+  @@map("maintenance_records")
+}
+
+model Notification {
+  id           Int                @id @default(autoincrement())
+  userId       Int                @map("user_id")
+  title        String             @db.VarChar(255)
+  content      String
+  status       NotificationStatus @default(UNREAD)
+  relatedTable String?            @map("related_table") @db.VarChar(100)
+  relatedId    Int?               @map("related_id")
+  createdAt    DateTime           @default(now()) @map("created_at")
+  readAt       DateTime?          @map("read_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("notifications")
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int?     @map("user_id")
+  action    String   @db.VarChar(100)
+  tableName String   @map("table_name") @db.VarChar(100)
+  recordId  Int?     @map("record_id")
+  oldValue  String?  @map("old_value") @db.Text
+  newValue  String?  @map("new_value") @db.Text
+  ipAddress String?  @map("ip_address") @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("audit_logs")
+}
+
+model BackupRecord {
+  id             Int          @id @default(autoincrement())
+  backupCode     String       @unique @map("backup_code") @db.VarChar(50)
+  createdBy      Int?         @map("created_by")
+  backupFilePath String       @map("backup_file_path") @db.VarChar(255)
+  status         BackupStatus
+  note           String?
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  createdByUser User? @relation(fields: [createdBy], references: [id])
+
+  @@index([createdBy])
+  @@map("backup_records")
+}
