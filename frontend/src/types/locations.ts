@@ -1,6 +1,6 @@
 import { User } from './users';
 
-export type DormBlock = {
+export type DormBuilding = {
   id: number;
   code: string;
   name: string;
@@ -10,10 +10,10 @@ export type DormBlock = {
 
 export type Floor = {
   id: number;
-  blockId: number;
+  buildingId: number;
   floorNumber: number;
   name?: string | null;
-  block?: DormBlock;
+  building?: DormBuilding;
 };
 
 export type Room = {
@@ -25,7 +25,7 @@ export type Room = {
   createdAt: string;
   updatedAt?: string | null;
   floor?: Floor & {
-    block?: DormBlock;
+    building?: DormBuilding;
   };
   roomStudents?: RoomStudentAssignment[];
 };

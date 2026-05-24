@@ -245,7 +245,7 @@ export class LocationsService {
     });
 
     if (!room) {
-      throw new NotFoundException('Khong tim thay phong.');
+      throw new NotFoundException('Không tìm thấy phòng.');
     }
 
     const student = await this.prismaService.user.findUnique({
@@ -254,15 +254,15 @@ export class LocationsService {
     });
 
     if (!student) {
-      throw new NotFoundException('Khong tim thay sinh vien.');
+      throw new NotFoundException('Không tìm thấy sinh viên.');
     }
 
     if (student.role.code !== 'STUDENT') {
-      throw new BadRequestException('Nguoi dung duoc gan vao phong phai co role STUDENT.');
+      throw new BadRequestException('Người dùng được gán vào phòng phải là Sinh viên.');
     }
 
     if (student.status !== UserStatus.ACTIVE) {
-      throw new BadRequestException('Sinh vien dang bi khoa, khong the gan vao phong.');
+      throw new BadRequestException('Sinh viên này đang bị khóa, không thể gán vào phòng.');
     }
 
     const existingAssignment = await this.prismaService.roomStudent.findFirst({
@@ -270,14 +270,17 @@ export class LocationsService {
         studentId: dto.studentId,
         isActive: true,
       },
+      include: {
+        room: true,
+      }
     });
 
     if (existingAssignment) {
-      throw new ConflictException('Sinh vien dang o mot phong khac.');
+      throw new ConflictException(`Sinh viên ${student.fullName} hiện đang ở phòng ${existingAssignment.room.roomCode}. Vui lòng trả phòng cũ trước khi gán phòng mới.`);
     }
 
     if (room.capacity && room.roomStudents.length >= room.capacity) {
-      throw new BadRequestException('Phong da du suc chua.');
+      throw new BadRequestException('Phòng này đã đủ sức chứa, không thể gán thêm.');
     }
 
     return this.prismaService.roomStudent.create({
@@ -356,6 +359,35 @@ export class LocationsService {
     return floor;
   }
 
+  async unassignStudentFromRoom(roomId: number, studentId: number) {
+    const existingAssignment = await this.prismaService.roomStudent.findFirst({
+      where: {
+        roomId,
+        studentId,
+        isActive: true,
+      },
+    });
+
+    if (!existingAssignment) {
+      throw new BadRequestException('Sinh vien hien khong o trong phong nay hoac da tra phong.');
+    }
+
+    return this.prismaService.roomStudent.update({
+      where: { id: existingAssignment.id },
+      data: {
+        isActive: false,
+        endDate: new Date(),
+      },
+      include: {
+        student: {
+          include: {
+            role: true,
+          },
+        },
+      },
+    });
+  }
+
   private async ensureFloorUnique(buildingId: number, floorNumber: number, excludeId?: number) {
     const floor = await this.prismaService.floor.findFirst({
       where: {
@@ -383,14 +415,13 @@ export class LocationsService {
   private async ensureRoomUnique(floorId: number, roomCode: string, excludeId?: number) {
     const room = await this.prismaService.room.findFirst({
       where: {
-        floorId,
         roomCode: roomCode.trim(),
         NOT: excludeId ? { id: excludeId } : undefined,
       },
     });
 
     if (room) {
-      throw new ConflictException('Ma phong da ton tai trong tang nay.');
+      throw new ConflictException('Mã phòng này đã tồn tại trong hệ thống (có thể ở tầng/khu khác).');
     }
   }
 }
