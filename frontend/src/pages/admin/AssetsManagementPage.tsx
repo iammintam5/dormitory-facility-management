@@ -61,7 +61,7 @@ const bulkSchema = z.object({
 
 type BulkFormValues = z.infer<typeof bulkSchema>;
 
-const defaultBulkValues: BulkFormValues = {
+const defaultBulkValues: any = {
   categoryId: '',
   roomId: '',
   prefix: '',
@@ -850,7 +850,7 @@ export function AssetsManagementPage() {
               <h3 className="text-lg font-bold text-slate-900 mb-4">Chuyển phòng ({selectedAssetIds.length} tài sản)</h3>
               <select 
                 value={bulkRoomId} 
-                onChange={e => setBulkRoomId(e.target.value)}
+                onChange={e => setBulkRoomId(e.target.value ? Number(e.target.value) : '')}
                 className={inputClassName}
               >
                 <option value="">Không gán phòng</option>
