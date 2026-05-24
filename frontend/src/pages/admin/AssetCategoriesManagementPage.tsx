@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { useToast } from '../../toast/toast-context';
 import { EmptyState } from '../../components/admin/EmptyState';
 import { SectionCard } from '../../components/admin/SectionCard';
 import { apiClient } from '../../lib/axios';
@@ -27,12 +28,11 @@ const defaultValues: CategoryFormValues = {
 };
 
 export function AssetCategoriesManagementPage() {
+  const { showToast } = useToast();
   const [categories, setCategories] = useState<AssetCategory[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [feedback, setFeedback] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
 
   const {
     register,
@@ -50,13 +50,12 @@ export function AssetCategoriesManagementPage() {
 
   const fetchCategories = async () => {
     setIsLoading(true);
-    setErrorMessage('');
 
     try {
       const response = await apiClient.get<AssetCategory[]>('/asset-categories');
       setCategories(response.data);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai danh sach loai tai san.'));
+      showToast(getApiErrorMessage(error, 'Khong the tai danh sach loai tai san.'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -64,8 +63,6 @@ export function AssetCategoriesManagementPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     setIsSaving(true);
-    setFeedback('');
-    setErrorMessage('');
 
     try {
       const payload = {
@@ -80,17 +77,17 @@ export function AssetCategoriesManagementPage() {
 
       if (selectedCategory) {
         await apiClient.patch(`/asset-categories/${selectedCategory.id}`, payload);
-        setFeedback('Cap nhat loai tai san thanh cong.');
+        showToast('Cap nhat loai tai san thanh cong.', 'success');
       } else {
         await apiClient.post('/asset-categories', payload);
-        setFeedback('Tao loai tai san thanh cong.');
+        showToast('Tao loai tai san thanh cong.', 'success');
       }
 
       setSelectedCategory(null);
       reset(defaultValues);
       await fetchCategories();
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the luu loai tai san.'));
+      showToast(getApiErrorMessage(error, 'Khong the luu loai tai san.'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -98,8 +95,6 @@ export function AssetCategoriesManagementPage() {
 
   const handleEdit = (category: AssetCategory) => {
     setSelectedCategory(category);
-    setFeedback('');
-    setErrorMessage('');
     reset({
       code: category.code,
       name: category.name,
@@ -109,15 +104,12 @@ export function AssetCategoriesManagementPage() {
   };
 
   const handleDelete = async (categoryId: number) => {
-    setFeedback('');
-    setErrorMessage('');
-
     try {
       await apiClient.delete(`/asset-categories/${categoryId}`);
-      setFeedback('Xoa loai tai san thanh cong.');
+      showToast('Xoa loai tai san thanh cong.', 'success');
       await fetchCategories();
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the xoa loai tai san.'));
+      showToast(getApiErrorMessage(error, 'Khong the xoa loai tai san.'), 'error');
     }
   };
 
@@ -139,8 +131,6 @@ export function AssetCategoriesManagementPage() {
                   onClick={() => {
                     setSelectedCategory(null);
                     reset(defaultValues);
-                    setFeedback('');
-                    setErrorMessage('');
                   }}
                   className="text-sm font-medium text-slate-600 hover:text-slate-900"
                 >
@@ -167,9 +157,6 @@ export function AssetCategoriesManagementPage() {
             >
               <input type="number" {...register('maintenanceCycleMonths')} className={inputClassName} />
             </Field>
-
-            {feedback && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{feedback}</p>}
-            {errorMessage && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>}
 
             <button
               type="submit"

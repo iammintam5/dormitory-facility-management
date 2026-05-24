@@ -21,6 +21,7 @@ export class UsersController {
   }
 
   @Get()
+  @Roles('ADMIN', 'QL_CSVC')
   findAll(@Query() query: QueryUsersDto) {
     return this.usersService.findAll(query);
   }
@@ -31,6 +32,7 @@ export class UsersController {
   }
 
   @Get(':id')
+  @Roles('ADMIN', 'QL_CSVC')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.usersService.findOne(id);
   }
