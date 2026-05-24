@@ -17,22 +17,22 @@ import { LocationsService } from './locations.service';
 export class LocationsController {
   constructor(private readonly locationsService: LocationsService) {}
 
-  @Post('blocks')
+  @Post('buildings')
   createDormBuilding(@Body() dto: CreateDormBuildingDto) {
     return this.locationsService.createDormBuilding(dto);
   }
 
-  @Get('blocks')
+  @Get('buildings')
   findDormBuildings() {
     return this.locationsService.findDormBuildings();
   }
 
-  @Patch('blocks/:id')
+  @Patch('buildings/:id')
   updateDormBuilding(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateDormBuildingDto) {
     return this.locationsService.updateDormBuilding(id, dto);
   }
 
-  @Delete('blocks/:id')
+  @Delete('buildings/:id')
   removeDormBuilding(@Param('id', ParseIntPipe) id: number) {
     return this.locationsService.removeDormBuilding(id);
   }
@@ -88,5 +88,13 @@ export class LocationsController {
     @Body() dto: AssignStudentRoomDto,
   ) {
     return this.locationsService.assignStudentToRoom(id, dto);
+  }
+
+  @Patch('rooms/:roomId/students/:studentId/unassign')
+  unassignStudentFromRoom(
+    @Param('roomId', ParseIntPipe) roomId: number,
+    @Param('studentId', ParseIntPipe) studentId: number,
+  ) {
+    return this.locationsService.unassignStudentFromRoom(roomId, studentId);
   }
 }

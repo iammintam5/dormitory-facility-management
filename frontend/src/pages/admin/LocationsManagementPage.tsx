@@ -1,22 +1,23 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { useToast } from '../../toast/toast-context';
 import { EmptyState } from '../../components/admin/EmptyState';
 import { SectionCard } from '../../components/admin/SectionCard';
 import { apiClient } from '../../lib/axios';
 import { formatDate } from '../../lib/format';
-import { DormBlock, Floor, Room, RoomStudentAssignment } from '../../types/locations';
+import { DormBuilding, Floor, Room, RoomStudentAssignment } from '../../types/locations';
 import { User } from '../../types/users';
 
-const blockSchema = z.object({
+const buildingSchema = z.object({
   code: z.string().min(1, 'Nhap ma khu.'),
-  name: z.string().min(1, 'Nhap ten khu.'),
+  name: z.string().optional(),
 });
 
 const floorSchema = z.object({
-  blockId: z.coerce.number().int().positive(),
+  buildingId: z.coerce.number().int().positive(),
   floorNumber: z.coerce.number().int().positive(),
   name: z.string().optional(),
 });
@@ -28,41 +29,78 @@ const roomSchema = z.object({
   note: z.string().optional(),
 });
 
+const bulkRoomSchema = z.object({
+  floorId: z.coerce.number().int().positive(),
+  prefix: z.string().min(1, 'Nhap tien to.'),
+  startNumber: z.coerce.number().int().min(1),
+  endNumber: z.coerce.number().int().min(1),
+  capacity: z.coerce.number().int().positive().optional(),
+  note: z.string().optional(),
+}).refine(data => data.endNumber >= data.startNumber, {
+  message: "So ket thuc phai lon hon hoac bang so bat dau",
+  path: ["endNumber"],
+});
+
 const assignSchema = z.object({
-  studentId: z.coerce.number().int().positive(),
+  studentInput: z.string().min(1, 'Gõ Mã SV hoặc Tên để chọn.'),
   startDate: z.string().min(1, 'Chon ngay bat dau.'),
 });
 
-type BlockFormValues = z.infer<typeof blockSchema>;
+type BuildingFormValues = z.infer<typeof buildingSchema>;
 type FloorFormValues = z.infer<typeof floorSchema>;
 type RoomFormValues = z.infer<typeof roomSchema>;
+type BulkRoomFormValues = z.infer<typeof bulkRoomSchema>;
 type AssignFormValues = z.infer<typeof assignSchema>;
 
 export function LocationsManagementPage() {
-  const [blocks, setBlocks] = useState<DormBlock[]>([]);
+  const { showToast } = useToast();
+  const [activeTab, setActiveTab] = useState<'structure' | 'students'>('structure');
+
+  // Data State
+  const [buildings, setBuildings] = useState<DormBuilding[]>([]);
   const [floors, setFloors] = useState<Floor[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
   const [students, setStudents] = useState<User[]>([]);
   const [roomAssignments, setRoomAssignments] = useState<Record<number, RoomStudentAssignment[]>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [feedback, setFeedback] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
 
-  const blockForm = useForm<BlockFormValues>({
-    resolver: zodResolver(blockSchema),
+  // UI State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [unassigningId, setUnassigningId] = useState<number | null>(null);
+
+  // Split-Pane State (Structure)
+  const [expandedBuildingId, setExpandedBuildingId] = useState<number | null>(null);
+  const [selectedFloorId, setSelectedFloorId] = useState<number | null>(null);
+  const [showAddBuilding, setShowAddBuilding] = useState(false);
+  const [addingFloorToBuildingId, setAddingFloorToBuildingId] = useState<number | null>(null);
+  const [showRoomForm, setShowRoomForm] = useState<'single' | 'bulk' | null>(null);
+  const [selectedRoomIds, setSelectedRoomIds] = useState<number[]>([]);
+
+  // Drill-down State (Assign Tab)
+  const [assignFilterBuildingId, setAssignFilterBuildingId] = useState<number | ''>('');
+  const [assignFilterFloorId, setAssignFilterFloorId] = useState<number | ''>('');
+  const [assignFilterRoomId, setAssignFilterRoomId] = useState<number | ''>('');
+  const [expandedAssignRoomId, setExpandedAssignRoomId] = useState<number | null>(null);
+
+  const buildingForm = useForm<BuildingFormValues>({
+    resolver: zodResolver(buildingSchema),
     defaultValues: { code: '', name: '' },
   });
   const floorForm = useForm<FloorFormValues>({
     resolver: zodResolver(floorSchema),
-    defaultValues: { blockId: 1, floorNumber: 1, name: '' },
+    defaultValues: { buildingId: 1, floorNumber: 1, name: '' },
   });
   const roomForm = useForm<RoomFormValues>({
     resolver: zodResolver(roomSchema),
-    defaultValues: { floorId: 1, roomCode: '', capacity: 4, note: '' },
+    defaultValues: { floorId: 1, roomCode: '', capacity: 8, note: '' },
+  });
+  const bulkRoomForm = useForm<BulkRoomFormValues>({
+    resolver: zodResolver(bulkRoomSchema),
+    defaultValues: { floorId: 1, prefix: '', startNumber: 1, endNumber: 10, capacity: 8, note: '' },
   });
   const assignForm = useForm<AssignFormValues>({
     resolver: zodResolver(assignSchema),
-    defaultValues: { studentId: 3, startDate: new Date().toISOString().slice(0, 10) },
+    defaultValues: { studentInput: '', startDate: new Date().toISOString().slice(0, 10) },
   });
 
   useEffect(() => {
@@ -71,23 +109,18 @@ export function LocationsManagementPage() {
 
   const loadAll = async () => {
     setIsLoading(true);
-    setErrorMessage('');
 
     try {
-      const [blocksResponse, floorsResponse, roomsResponse, studentsResponse] = await Promise.all([
-        apiClient.get<DormBlock[]>('/locations/blocks'),
+      const [buildingsResponse, floorsResponse, roomsResponse, studentsResponse] = await Promise.all([
+        apiClient.get<DormBuilding[]>('/locations/buildings'),
         apiClient.get<Floor[]>('/locations/floors'),
         apiClient.get<Room[]>('/locations/rooms'),
         apiClient.get<{ items: User[] }>('/users', {
-          params: {
-            roleCode: 'STUDENT',
-            includeLocked: true,
-            pageSize: 100,
-          },
+          params: { roleCode: 'STUDENT', includeLocked: true, pageSize: 100 },
         }),
       ]);
 
-      setBlocks(blocksResponse.data);
+      setBuildings(buildingsResponse.data);
       setFloors(floorsResponse.data);
       setRooms(roomsResponse.data);
       setStudents(studentsResponse.data.items);
@@ -96,20 +129,8 @@ export function LocationsManagementPage() {
           roomsResponse.data.map((room) => [room.id, room.roomStudents ?? []]),
         ),
       );
-
-      if (blocksResponse.data[0]) {
-        floorForm.setValue('blockId', blocksResponse.data[0].id);
-      }
-
-      if (floorsResponse.data[0]) {
-        roomForm.setValue('floorId', floorsResponse.data[0].id);
-      }
-
-      if (studentsResponse.data.items[0]) {
-        assignForm.setValue('studentId', studentsResponse.data.items[0].id);
-      }
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai du lieu khu tang phong.'));
+      showToast(getApiErrorMessage(error, 'Khong the tai du lieu khu tang phong.'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -123,323 +144,706 @@ export function LocationsManagementPage() {
     }));
   };
 
-  const submitBlock = blockForm.handleSubmit(async (values) => {
+  const roomsOfSelectedFloor = useMemo(() =>
+    rooms.filter(r => r.floorId === selectedFloorId),
+    [rooms, selectedFloorId]);
+
+  useEffect(() => {
+    if (selectedFloorId) {
+      setSelectedRoomIds([]);
+      roomForm.setValue('floorId', selectedFloorId);
+      bulkRoomForm.setValue('floorId', selectedFloorId);
+
+      // Tự động điền tiền tố mã phòng dựa trên Khu và Tầng (VD: A1-1 hoặc C-1)
+      const floor = floors.find(f => f.id === selectedFloorId);
+      if (floor) {
+        const building = buildings.find(b => b.id === floor.buildingId);
+        if (building) {
+          const prefix = `${building.code}-${floor.floorNumber}`;
+
+          // Khi chuyen tang khac, bat buoc phai reset lai dung prefix cua tang do
+          roomForm.setValue('roomCode', prefix);
+          bulkRoomForm.setValue('prefix', prefix);
+
+          // Tu dong dem so phong hien co tren tang nay de tinh "Tu so" va "Den so"
+          // Khong dua rooms vao dependency array de tranh viec re-render khi dang go
+          const currentRoomsCount = rooms.filter(r => r.floorId === selectedFloorId).length;
+          const nextStart = currentRoomsCount + 1;
+          bulkRoomForm.setValue('startNumber', nextStart);
+          bulkRoomForm.setValue('endNumber', nextStart + 9);
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedFloorId, floors, buildings, roomForm, bulkRoomForm]);
+
+  // Assignment Tab Memos
+  const assignFloors = useMemo(() => floors.filter(f => assignFilterBuildingId ? f.buildingId === assignFilterBuildingId : true), [floors, assignFilterBuildingId]);
+  const assignRooms = useMemo(() => {
+    if (assignFilterFloorId) return rooms.filter(r => r.floorId === assignFilterFloorId);
+    if (assignFilterBuildingId) {
+      const validFloorIds = new Set(assignFloors.map(f => f.id));
+      return rooms.filter(r => validFloorIds.has(r.floorId));
+    }
+    return rooms;
+  }, [rooms, assignFilterFloorId, assignFilterBuildingId, assignFloors]);
+
+  // Submit Handlers
+  const submitBuilding = buildingForm.handleSubmit(async (values) => {
+    // Tu dong dien Ten Khu la Ma Khu neu bo trong
+    if (!values.name || values.name.trim() === '') {
+      values.name = values.code;
+    }
+
     await submitWithFeedback(async () => {
-      await apiClient.post('/locations/blocks', values);
-      blockForm.reset({ code: '', name: '' });
-      await loadAll();
+      const res = await apiClient.post<DormBuilding>('/locations/buildings', values);
+      setBuildings(prev => [...prev, res.data]);
+      buildingForm.reset({ code: '', name: '' });
+      setShowAddBuilding(false);
+      setExpandedBuildingId(res.data.id);
     }, 'Tao khu thanh cong.');
   });
 
   const submitFloor = floorForm.handleSubmit(async (values) => {
+    // Neu name la chuoi rong thi xoa di de khong bi loi @IsNotEmpty tren backend
+    if (!values.name || values.name.trim() === '') {
+      delete values.name;
+    }
+
     await submitWithFeedback(async () => {
-      await apiClient.post('/locations/floors', values);
-      floorForm.reset({ ...values, floorNumber: values.floorNumber + 1, name: '' });
-      await loadAll();
+      const res = await apiClient.post<Floor>('/locations/floors', values);
+      setFloors(prev => [...prev, res.data]);
+      setAddingFloorToBuildingId(null);
+      setSelectedFloorId(res.data.id);
     }, 'Tao tang thanh cong.');
   });
 
   const submitRoom = roomForm.handleSubmit(async (values) => {
     await submitWithFeedback(async () => {
-      await apiClient.post('/locations/rooms', values);
+      const res = await apiClient.post<Room>('/locations/rooms', values);
+      setRooms(prev => [...prev, res.data]);
       roomForm.reset({ ...values, roomCode: '', note: '' });
-      await loadAll();
     }, 'Tao phong thanh cong.');
   });
 
-  const submitAssignment = assignForm.handleSubmit(async (values) => {
-    const roomId = rooms[0]?.id;
+  const submitBulkRoom = bulkRoomForm.handleSubmit(async (values) => {
+    setIsGenerating(true);
+    let successCount = 0;
 
-    if (!roomId) {
-      setErrorMessage('Can co it nhat mot phong de gan sinh vien.');
+    try {
+      const newRooms: Room[] = [];
+      try {
+        for (let i = values.startNumber; i <= values.endNumber; i++) {
+          const paddedNum = i < 10 ? `0${i}` : `${i}`;
+          const roomCode = `${values.prefix}${paddedNum}`;
+          const res = await apiClient.post<Room>('/locations/rooms', {
+            floorId: values.floorId,
+            roomCode: roomCode,
+            capacity: values.capacity,
+            note: values.note
+          });
+          newRooms.push(res.data);
+          successCount++;
+        }
+        setRooms(prev => [...prev, ...newRooms]);
+        bulkRoomForm.reset({ ...values, startNumber: values.endNumber + 1, endNumber: values.endNumber + 10 });
+        showToast(`Đã tạo thành công ${successCount} phòng.`, 'success');
+      } catch (error) {
+        if (newRooms.length > 0) {
+          setRooms(prev => [...prev, ...newRooms]);
+        }
+        showToast(`Lỗi sau khi tạo được ${successCount} phòng: ` + getApiErrorMessage(error, 'Thao tác thất bại (Có thể do mất kết nối mạng hoặc lỗi server).'), 'error');
+      }
+    } finally {
+      setIsGenerating(false);
+    }
+  });
+
+  const submitAssignment = assignForm.handleSubmit(async (values) => {
+    if (!assignFilterRoomId) {
+      showToast('Vui long chon phong truoc khi gan sinh vien.', 'error');
+      return;
+    }
+
+    const match = values.studentInput.match(/^([A-Za-z0-9]+)\s*-/);
+    const userCode = match ? match[1] : values.studentInput.trim();
+    const student = students.find(s => s.userCode === userCode);
+
+    if (!student) {
+      showToast('Không tìm thấy Sinh viên từ dữ liệu bạn nhập. Vui lòng chọn từ gợi ý.', 'error');
+      return;
+    }
+
+    const room = rooms.find(r => r.id === assignFilterRoomId);
+    if (!room) return;
+
+    const currentAssigns = (roomAssignments[assignFilterRoomId] ?? []).filter(a => a.isActive);
+    if (room.capacity && currentAssigns.length >= room.capacity) {
+      showToast(`Phòng ${room.roomCode} đã đầy (${currentAssigns.length}/${room.capacity}). Không thể gán thêm người.`, 'error');
+      return;
+    }
+
+    if (currentAssigns.some(a => a.studentId === student.id)) {
+      showToast(`Sinh viên ${student.fullName} hiện đã có trong phòng này.`, 'error');
       return;
     }
 
     await submitWithFeedback(async () => {
-      await apiClient.post(`/locations/rooms/${roomId}/students`, values);
-      await loadAll();
-      await refreshRoomStudents(roomId);
-    }, 'Gan sinh vien vao phong thanh cong.');
+      const res = await apiClient.post<RoomStudentAssignment>(`/locations/rooms/${assignFilterRoomId}/students`, {
+        studentId: student.id,
+        startDate: values.startDate
+      });
+      setRoomAssignments(prev => {
+        const existing = prev[assignFilterRoomId] ?? [];
+        return {
+          ...prev,
+          [assignFilterRoomId]: [...existing, res.data]
+        };
+      });
+      assignForm.reset({ ...values, studentInput: '' });
+    }, 'Gán sinh viên vào phòng thành công.');
   });
 
-  const handleDelete = async (type: 'blocks' | 'floors' | 'rooms', id: number) => {
+  const handleDelete = async (type: 'buildings' | 'floors' | 'rooms', id: number) => {
+    if (!confirm('Ban co chac chan muon xoa khong?')) return;
     await submitWithFeedback(async () => {
       await apiClient.delete(`/locations/${type}/${id}`);
-      await loadAll();
+      if (type === 'buildings') {
+        setBuildings(prev => prev.filter(b => b.id !== id));
+        if (expandedBuildingId === id) setExpandedBuildingId(null);
+      }
+      if (type === 'floors') {
+        setFloors(prev => prev.filter(f => f.id !== id));
+        if (selectedFloorId === id) setSelectedFloorId(null);
+      }
+      if (type === 'rooms') {
+        setRooms(prev => prev.filter(r => r.id !== id));
+      }
     }, 'Xoa du lieu thanh cong.');
   };
 
+  const handleUnassign = async (roomId: number, studentId: number, studentName: string) => {
+    if (!window.confirm(`Xác nhận trả phòng cho sinh viên ${studentName}?`)) return;
+    setUnassigningId(studentId);
+    await submitWithFeedback(async () => {
+      await apiClient.patch(`/locations/rooms/${roomId}/students/${studentId}/unassign`);
+      setRoomAssignments(prev => {
+        const existing = prev[roomId] ?? [];
+        return {
+          ...prev,
+          [roomId]: existing.map(a => a.studentId === studentId ? { ...a, isActive: false } : a)
+        };
+      });
+    }, 'Trả phòng cho sinh viên thành công.');
+    setUnassigningId(null);
+  };
+
+  const handleBulkDeleteRooms = async () => {
+    if (selectedRoomIds.length === 0) return;
+    if (!confirm(`Xác nhận xóa ${selectedRoomIds.length} phòng đã chọn?`)) return;
+    await submitWithFeedback(async () => {
+      await Promise.all(selectedRoomIds.map(id => apiClient.delete(`/locations/rooms/${id}`)));
+      setRooms(prev => prev.filter(r => !selectedRoomIds.includes(r.id)));
+      setSelectedRoomIds([]);
+    }, `Đã xóa thành công ${selectedRoomIds.length} phòng.`);
+  };
+
+  const handleAddFloorClick = (buildingId: number) => {
+    setAddingFloorToBuildingId(buildingId);
+    const buildingFloors = floors.filter(f => f.buildingId === buildingId);
+    const nextFloorNum = buildingFloors.length > 0
+      ? Math.max(...buildingFloors.map(f => f.floorNumber)) + 1
+      : 1;
+    floorForm.setValue('buildingId', buildingId);
+    floorForm.setValue('floorNumber', nextFloorNum);
+  };
+
   return (
-    <div className="space-y-6">
-      {(feedback || errorMessage) && (
-        <div
-          className={`rounded-2xl px-4 py-3 text-sm ${
-            errorMessage ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'
-          }`}
-        >
-          {errorMessage || feedback}
-        </div>
-      )}
-
-      <div className="grid gap-6 xl:grid-cols-2">
-        <SectionCard title="Tao khu" description="Them khu ky tuc xa moi de to chuc cau truc toa nha.">
-          <form className="grid gap-3 md:grid-cols-2" onSubmit={submitBlock}>
-            <InputField label="Ma khu" error={blockForm.formState.errors.code?.message}>
-              <input {...blockForm.register('code')} className={inputClassName} />
-            </InputField>
-            <InputField label="Ten khu" error={blockForm.formState.errors.name?.message}>
-              <input {...blockForm.register('name')} className={inputClassName} />
-            </InputField>
-            <button className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700">
-              Tao khu
-            </button>
-          </form>
-        </SectionCard>
-
-        <SectionCard title="Tao tang" description="Gan tang vao khu tuong ung voi so tang duy nhat trong tung khu.">
-          <form className="grid gap-3 md:grid-cols-3" onSubmit={submitFloor}>
-            <InputField label="Khu" error={floorForm.formState.errors.blockId?.message}>
-              <select {...floorForm.register('blockId')} className={inputClassName}>
-                {blocks.map((block) => (
-                  <option key={block.id} value={block.id}>
-                    {block.code} - {block.name}
-                  </option>
-                ))}
-              </select>
-            </InputField>
-            <InputField label="So tang" error={floorForm.formState.errors.floorNumber?.message}>
-              <input type="number" {...floorForm.register('floorNumber')} className={inputClassName} />
-            </InputField>
-            <InputField label="Ten tang" error={floorForm.formState.errors.name?.message}>
-              <input {...floorForm.register('name')} className={inputClassName} />
-            </InputField>
-            <button className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700">
-              Tao tang
-            </button>
-          </form>
-        </SectionCard>
-
-        <SectionCard title="Tao phong" description="Phong duoc tao theo tung tang, co suc chua va ghi chu tuy chon.">
-          <form className="grid gap-3 md:grid-cols-4" onSubmit={submitRoom}>
-            <InputField label="Tang" error={roomForm.formState.errors.floorId?.message}>
-              <select {...roomForm.register('floorId')} className={inputClassName}>
-                {floors.map((floor) => (
-                  <option key={floor.id} value={floor.id}>
-                    {floor.block?.code ?? 'Khu'} - Tang {floor.floorNumber}
-                  </option>
-                ))}
-              </select>
-            </InputField>
-            <InputField label="Ma phong" error={roomForm.formState.errors.roomCode?.message}>
-              <input {...roomForm.register('roomCode')} className={inputClassName} />
-            </InputField>
-            <InputField label="Suc chua" error={roomForm.formState.errors.capacity?.message}>
-              <input type="number" {...roomForm.register('capacity')} className={inputClassName} />
-            </InputField>
-            <InputField label="Ghi chu" error={roomForm.formState.errors.note?.message}>
-              <input {...roomForm.register('note')} className={inputClassName} />
-            </InputField>
-            <button className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700">
-              Tao phong
-            </button>
-          </form>
-        </SectionCard>
-
-        <SectionCard title="Gan sinh vien vao phong" description="Ban demo nhanh hien dang gan vao phong dau tien trong danh sach.">
-          <form className="grid gap-3 md:grid-cols-3" onSubmit={submitAssignment}>
-            <InputField label="Phong dich">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                {rooms[0] ? `${rooms[0].roomCode} - Tang ${rooms[0].floor?.floorNumber ?? '--'}` : 'Chua co phong'}
-              </div>
-            </InputField>
-            <InputField label="Sinh vien" error={assignForm.formState.errors.studentId?.message}>
-              <select {...assignForm.register('studentId')} className={inputClassName}>
-                {students.map((student) => (
-                  <option key={student.id} value={student.id}>
-                    {student.userCode} - {student.fullName}
-                  </option>
-                ))}
-              </select>
-            </InputField>
-            <InputField label="Ngay bat dau" error={assignForm.formState.errors.startDate?.message}>
-              <input type="date" {...assignForm.register('startDate')} className={inputClassName} />
-            </InputField>
-            <button className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700">
-              Gan sinh vien
-            </button>
-          </form>
-        </SectionCard>
+    <div className="space-y-4 max-w-full mx-auto h-full flex flex-col">
+      {/* Tabs Menu */}
+      <div className="flex gap-2 border-b border-slate-200 pb-1 flex-shrink-0">
+        <TabButton active={activeTab === 'structure'} onClick={() => setActiveTab('structure')}>
+          Cấu trúc Khu phòng (Split-Pane)
+        </TabButton>
+        <TabButton active={activeTab === 'students'} onClick={() => setActiveTab('students')}>
+          Gán & Trả phòng
+        </TabButton>
       </div>
 
-      <SectionCard title="Cau truc khu / tang / phong" description="Theo doi nhanh cau truc dia diem va danh sach sinh vien trong phong.">
-        {isLoading ? (
-          <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-            Dang tai du lieu locations...
-          </div>
-        ) : rooms.length === 0 ? (
-          <EmptyState
-            title="Chua co phong nao"
-            description="Hay tao khu, tang va phong o cac bieu mau ben tren de bat dau."
-          />
-        ) : (
-          <div className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-3">
-              <SummaryCard label="So khu" value={String(blocks.length)} />
-              <SummaryCard label="So tang" value={String(floors.length)} />
-              <SummaryCard label="So phong" value={String(rooms.length)} />
-            </div>
+      {isLoading ? (
+        <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
+          Đang tải dữ liệu khu phòng...
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
 
-            <div className="space-y-4">
-              {rooms.map((room) => (
-                <article key={room.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900">
-                        {room.roomCode} - {room.floor?.block?.name ?? 'Khu'} / Tang {room.floor?.floorNumber ?? '--'}
-                      </h3>
-                      <p className="mt-1 text-sm text-slate-600">
-                        Suc chua: {room.capacity ?? '--'} | Ghi chu: {room.note || '--'}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => void handleDelete('rooms', room.id)}
-                      className="rounded-lg border border-rose-200 px-3 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50"
-                    >
-                      Xoa phong
-                    </button>
-                  </div>
+          {/* STRUCTURE TAB (SPLIT-PANE) */}
+          {activeTab === 'structure' && (
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 h-full flex-1 overflow-hidden">
 
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="min-w-full divide-y divide-slate-200 text-sm">
-                      <thead className="text-left text-slate-600">
-                        <tr>
-                          <th className="py-2 pr-4 font-medium">Sinh vien</th>
-                          <th className="py-2 pr-4 font-medium">Ma</th>
-                          <th className="py-2 pr-4 font-medium">Ngay vao</th>
-                          <th className="py-2 font-medium">Trang thai</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200">
-                        {(roomAssignments[room.id] ?? []).length === 0 ? (
-                          <tr>
-                            <td colSpan={4} className="py-4 text-slate-500">
-                              Chua co sinh vien nao trong phong.
-                            </td>
-                          </tr>
-                        ) : (
-                          (roomAssignments[room.id] ?? []).map((assignment) => (
-                            <tr key={assignment.id}>
-                              <td className="py-3 pr-4 font-medium text-slate-900">
-                                {assignment.student.fullName}
-                              </td>
-                              <td className="py-3 pr-4 text-slate-600">{assignment.student.userCode}</td>
-                              <td className="py-3 pr-4 text-slate-600">{formatDate(assignment.startDate)}</td>
-                              <td className="py-3">
-                                <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                                  Dang o
-                                </span>
-                              </td>
-                            </tr>
-                          ))
+              {/* LEFT COLUMN: NAVIGATOR (Tree View) */}
+              <div className="md:col-span-4 lg:col-span-3 border border-slate-200 rounded-2xl bg-white flex flex-col overflow-hidden shadow-sm">
+                <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0">
+                  <h2 className="font-bold text-slate-800">Khu</h2>
+                  <button
+                    onClick={() => setShowAddBuilding(!showAddBuilding)}
+                    className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center hover:bg-emerald-200 transition"
+                    title="Thêm Khu mới"
+                  >
+                    +
+                  </button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                  {showAddBuilding && (
+                    <form className="mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 animate-in fade-in" onSubmit={submitBuilding}>
+                      <input {...buildingForm.register('code')} className="w-full text-sm p-2 border rounded-lg" placeholder="Mã khu (VD: B1)" />
+                      <input {...buildingForm.register('name')} className="w-full text-sm p-2 border rounded-lg" placeholder="Tên khu (Tự động điền nếu để trống)" />
+                      <div className="flex gap-2">
+                        <button type="submit" className="flex-1 bg-slate-900 text-white text-xs py-2 rounded-lg">Lưu Khu</button>
+                        <button type="button" onClick={() => setShowAddBuilding(false)} className="flex-1 bg-slate-200 text-slate-700 text-xs py-2 rounded-lg">Hủy</button>
+                      </div>
+                    </form>
+                  )}
+
+                  {buildings.length === 0 ? (
+                    <p className="text-sm text-slate-500 text-center py-4">Chưa có dữ liệu Khu</p>
+                  ) : (
+                    buildings.map(b => (
+                      <div key={b.id} className="space-y-1">
+                        {/* Building Row */}
+                        <div
+                          className={`group flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors ${expandedBuildingId === b.id ? 'bg-slate-900 text-white shadow-sm' : 'hover:bg-slate-50 text-slate-700'
+                            }`}
+                          onClick={() => setExpandedBuildingId(expandedBuildingId === b.id ? null : b.id)}
+                        >
+                          <div className="flex items-center gap-2 font-medium text-sm">
+                            <span className="w-4 h-4 flex items-center justify-center">
+                              {expandedBuildingId === b.id ? '▼' : '▶'}
+                            </span>
+                            {b.code}
+                          </div>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); void handleDelete('buildings', b.id); }}
+                            className={`hidden group-hover:block text-xs px-2 rounded hover:bg-rose-500 hover:text-white transition ${expandedBuildingId === b.id ? 'text-slate-300' : 'text-slate-400'}`}
+                          >
+                            Xóa
+                          </button>
+                        </div>
+
+                        {/* Floors List (Nested) */}
+                        {expandedBuildingId === b.id && (
+                          <div className="ml-6 pl-2 border-l border-slate-200 space-y-1 mt-1 pb-2">
+                            {floors.filter(f => f.buildingId === b.id).map(f => (
+                              <div
+                                key={f.id}
+                                className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer text-sm transition-colors ${selectedFloorId === f.id ? 'bg-emerald-50 text-emerald-700 font-semibold border border-emerald-100' : 'hover:bg-slate-50 text-slate-600 border border-transparent'
+                                  }`}
+                                onClick={() => setSelectedFloorId(f.id)}
+                              >
+                                <span>Tầng {f.floorNumber} {f.name ? `(${f.name})` : ''}</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); void handleDelete('floors', f.id); }}
+                                  className="hidden group-hover:block text-xs px-1 text-rose-400 hover:text-rose-600"
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            ))}
+
+                            {/* Add Floor Inline Form */}
+                            {addingFloorToBuildingId === b.id ? (
+                              <form className="mt-2 bg-slate-50 p-2 rounded-lg border border-slate-200 space-y-2 animate-in fade-in" onSubmit={submitFloor}>
+                                <input type="hidden" {...floorForm.register('buildingId')} value={b.id} />
+                                <input type="number" {...floorForm.register('floorNumber')} className="w-full text-xs p-1.5 border rounded" placeholder="Nhập số tầng (VD: 1, 2...)" autoFocus />
+                                <div className="flex gap-2">
+                                  <button type="submit" className="flex-1 bg-emerald-600 text-white text-[10px] py-1.5 rounded">Lưu Tầng</button>
+                                  <button type="button" onClick={() => setAddingFloorToBuildingId(null)} className="flex-1 bg-slate-200 text-slate-700 text-[10px] py-1.5 rounded">Hủy</button>
+                                </div>
+                              </form>
+                            ) : (
+                              <button
+                                onClick={() => handleAddFloorClick(b.id)}
+                                className="text-xs text-emerald-600 hover:text-emerald-700 font-medium py-1 px-2 w-full text-left mt-1"
+                              >
+                                + Thêm Tầng
+                              </button>
+                            )}
+                          </div>
                         )}
-                      </tbody>
-                    </table>
-                  </div>
-                </article>
-              ))}
-            </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
 
-            <div className="grid gap-4 lg:grid-cols-2">
-              <SimpleListCard
-                title="Danh sach khu"
-                items={blocks}
-                renderLabel={(block) => `${block.code} - ${block.name}`}
-                onDelete={(block) => void handleDelete('blocks', block.id)}
-              />
-              <SimpleListCard
-                title="Danh sach tang"
-                items={floors}
-                renderLabel={(floor) =>
-                  `${floor.block?.name ?? 'Khu'} - Tang ${floor.floorNumber}${floor.name ? ` (${floor.name})` : ''}`
-                }
-                onDelete={(floor) => void handleDelete('floors', floor.id)}
-              />
+              {/* RIGHT COLUMN: WORKSPACE (Rooms) */}
+              <div className="md:col-span-8 lg:col-span-9 h-full flex flex-col min-h-0">
+                {!selectedFloorId ? (
+                  <div className="flex-1 border border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-slate-500 bg-slate-50/50">
+                    <svg className="w-16 h-16 text-slate-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                    <h3 className="text-lg font-medium text-slate-700">Chưa chọn Tầng</h3>
+                    <p className="text-sm mt-1">Vui lòng chọn một Tầng ở khu bên trái để quản lý phòng.</p>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+                    <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
+                      <div className="h-10 w-10 bg-emerald-100 text-emerald-700 rounded-xl flex items-center justify-center font-bold text-lg">
+                        {floors.find(f => f.id === selectedFloorId)?.floorNumber}
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-slate-800">
+                          Quản lý Phòng - Tầng {floors.find(f => f.id === selectedFloorId)?.floorNumber}
+                        </h2>
+                        <p className="text-sm text-slate-500">Khu {buildings.find(b => b.id === floors.find(f => f.id === selectedFloorId)?.buildingId)?.name}</p>
+                      </div>
+                    </div>
+
+                    <SectionCard
+                      title={`Danh sách Phòng (${roomsOfSelectedFloor.length})`}
+                      actions={
+                        <div className="flex gap-2 items-center">
+                          {roomsOfSelectedFloor.length > 0 && (
+                            <div className="flex items-center gap-2 mr-2 border-r border-slate-200 pr-4">
+                              <label className="text-sm flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-slate-900">
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                                  checked={selectedRoomIds.length === roomsOfSelectedFloor.length && roomsOfSelectedFloor.length > 0}
+                                  onChange={(e) => {
+                                    if (e.target.checked) setSelectedRoomIds(roomsOfSelectedFloor.map(r => r.id));
+                                    else setSelectedRoomIds([]);
+                                  }}
+                                />
+                                Chọn tất cả
+                              </label>
+                              {selectedRoomIds.length > 0 && (
+                                <button onClick={handleBulkDeleteRooms} className="text-sm font-medium text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded">
+                                  Xóa ({selectedRoomIds.length})
+                                </button>
+                              )}
+                            </div>
+                          )}
+                          <button onClick={() => setShowRoomForm(showRoomForm === 'single' ? null : 'single')} className={`px-3 py-1.5 text-sm font-medium border rounded-lg shadow-sm transition ${showRoomForm === 'single' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}>+ Tạo 1 phòng</button>
+                          <button onClick={() => setShowRoomForm(showRoomForm === 'bulk' ? null : 'bulk')} className={`px-3 py-1.5 text-sm font-medium border rounded-lg shadow-sm transition ${showRoomForm === 'bulk' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}>+ Tạo hàng loạt</button>
+                        </div>
+                      }
+                    >
+                      {showRoomForm === 'single' && (
+                        <div className="p-4 border rounded-xl bg-slate-50 shadow-sm mb-6 animate-in fade-in slide-in-from-top-4">
+                          <form className="grid gap-4" onSubmit={submitRoom}>
+                            <InputField label="Mã phòng" error={roomForm.formState.errors.roomCode?.message}>
+                              <input {...roomForm.register('roomCode')} className={inputClassName} placeholder="VD: B1-101" autoFocus />
+                            </InputField>
+                            <div className="grid grid-cols-2 gap-4">
+                              <InputField label="Sức chứa" error={roomForm.formState.errors.capacity?.message}>
+                                <input type="number" {...roomForm.register('capacity')} className={inputClassName} />
+                              </InputField>
+                              <InputField label="Ghi chú" error={roomForm.formState.errors.note?.message}>
+                                <input {...roomForm.register('note')} className={inputClassName} />
+                              </InputField>
+                            </div>
+                            <div className="flex gap-2">
+                              <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg">Lưu phòng mới</button>
+                              <button type="button" onClick={() => setShowRoomForm(null)} className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg">Hủy</button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
+
+                      {showRoomForm === 'bulk' && (
+                        <div className="p-4 border rounded-xl bg-emerald-50/50 border-emerald-200 shadow-sm mb-6 animate-in fade-in slide-in-from-top-4">
+                          <form className="grid gap-4" onSubmit={submitBulkRoom}>
+                            <InputField label="Tiền tố phòng (VD: B1-1)" error={bulkRoomForm.formState.errors.prefix?.message}>
+                              <input {...bulkRoomForm.register('prefix')} className={inputClassName} placeholder="B1-1" autoFocus />
+                            </InputField>
+                            <div className="grid grid-cols-2 gap-4">
+                              <InputField label="Từ số (VD: 01)" error={bulkRoomForm.formState.errors.startNumber?.message}>
+                                <input type="number" {...bulkRoomForm.register('startNumber')} className={inputClassName} />
+                              </InputField>
+                              <InputField label="Đến số (VD: 20)" error={bulkRoomForm.formState.errors.endNumber?.message}>
+                                <input type="number" {...bulkRoomForm.register('endNumber')} className={inputClassName} />
+                              </InputField>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <InputField label="Sức chứa chung" error={bulkRoomForm.formState.errors.capacity?.message}>
+                                <input type="number" {...bulkRoomForm.register('capacity')} className={inputClassName} />
+                              </InputField>
+                              <InputField label="Ghi chú chung" error={bulkRoomForm.formState.errors.note?.message}>
+                                <input {...bulkRoomForm.register('note')} className={inputClassName} />
+                              </InputField>
+                            </div>
+                            <div className="flex gap-2 items-center">
+                              <button type="submit" disabled={isGenerating} className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
+                                {isGenerating ? 'Đang phát sinh...' : 'Lưu hàng loạt'}
+                              </button>
+                              <button type="button" onClick={() => setShowRoomForm(null)} className="px-4 py-2 text-sm font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg">Hủy</button>
+                            </div>
+                          </form>
+                        </div>
+                      )}
+                      {roomsOfSelectedFloor.length === 0 ? (
+                        <EmptyState title="Chưa có phòng" description="Tầng này hiện chưa có phòng nào." />
+                      ) : (
+                        <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+                          {roomsOfSelectedFloor.map((room) => (
+                            <article
+                              key={room.id}
+                              onClick={() => {
+                                if (selectedRoomIds.includes(room.id)) setSelectedRoomIds(selectedRoomIds.filter(id => id !== room.id));
+                                else setSelectedRoomIds([...selectedRoomIds, room.id]);
+                              }}
+                              className={`rounded-xl border ${selectedRoomIds.includes(room.id) ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900' : 'border-slate-200 bg-white'} p-4 flex flex-col justify-between shadow-sm hover:shadow-md transition cursor-pointer`}
+                            >
+                              <div className="flex justify-between items-start mb-3">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedRoomIds.includes(room.id)}
+                                    readOnly
+                                    className="rounded border-slate-300 text-slate-900 focus:ring-slate-900 cursor-pointer"
+                                  />
+                                  <h3 className="text-lg font-bold text-slate-800">{room.roomCode}</h3>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); void handleDelete('rooms', room.id); }}
+                                  className="text-slate-300 hover:text-rose-500 transition"
+                                  title="Xóa phòng"
+                                >
+                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                </button>
+                              </div>
+                              <div className="flex gap-4 text-sm text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                <div className="flex items-center gap-1.5 font-medium">
+                                  <svg className="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                                  <span>{room.capacity ?? '--'}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 truncate" title={room.note || ''}>
+                                  <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                                  <span className="truncate">{room.note || 'Trống'}</span>
+                                </div>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </SectionCard>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </SectionCard>
+          )}
+
+          {/* STUDENTS ASSIGNMENT TAB (Kept exactly the same robust design) */}
+          {activeTab === 'students' && (
+            <div className="space-y-6 overflow-y-auto pr-2 pb-10">
+
+              <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+                  Bộ lọc Tìm kiếm Phòng
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <select
+                    value={assignFilterBuildingId}
+                    onChange={e => { setAssignFilterBuildingId(e.target.value ? Number(e.target.value) : ''); setAssignFilterFloorId(''); setAssignFilterRoomId(''); }}
+                    className={inputClassName}
+                  >
+                    <option value="">-- Tất cả Khu --</option>
+                    {buildings.map(b => <option key={b.id} value={b.id}>{b.code} - {b.name}</option>)}
+                  </select>
+
+                  <select
+                    value={assignFilterFloorId}
+                    onChange={e => { setAssignFilterFloorId(e.target.value ? Number(e.target.value) : ''); setAssignFilterRoomId(''); }}
+                    className={inputClassName}
+                    disabled={!assignFilterBuildingId}
+                  >
+                    <option value="">-- Tất cả Tầng --</option>
+                    {assignFloors.map(f => <option key={f.id} value={f.id}>Tầng {f.floorNumber}</option>)}
+                  </select>
+
+                  <select
+                    value={assignFilterRoomId}
+                    onChange={e => setAssignFilterRoomId(e.target.value ? Number(e.target.value) : '')}
+                    className={inputClassName}
+                    disabled={!assignFilterFloorId}
+                  >
+                    <option value="">-- Chọn Phòng cụ thể --</option>
+                    {assignRooms.map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {assignFilterRoomId ? (
+                <SectionCard title={`Gán sinh viên vào phòng ${rooms.find(r => r.id === assignFilterRoomId)?.roomCode}`}>
+                  <form className="grid gap-3 md:grid-cols-3" onSubmit={submitAssignment}>
+                    <InputField label="Chọn Sinh viên" error={assignForm.formState.errors.studentInput?.message}>
+                      <input
+                        list="student-options"
+                        {...assignForm.register('studentInput')}
+                        className={inputClassName}
+                        placeholder="Gõ mã SV hoặc Tên..."
+                        autoComplete="off"
+                      />
+                      <datalist id="student-options">
+                        {students.map((student) => (
+                          <option key={student.id} value={`${student.userCode} - ${student.fullName}`} />
+                        ))}
+                      </datalist>
+                    </InputField>
+                    <InputField label="Ngày bắt đầu ở" error={assignForm.formState.errors.startDate?.message}>
+                      <input type="date" {...assignForm.register('startDate')} className={inputClassName} />
+                    </InputField>
+                    <div className="flex items-end">
+                      <button
+                        type="submit"
+                        disabled={
+                          (() => {
+                            const room = rooms.find(r => r.id === assignFilterRoomId);
+                            if (!room) return false;
+                            const currentAssigns = (roomAssignments[assignFilterRoomId] ?? []).filter(a => a.isActive);
+                            return !!room.capacity && currentAssigns.length >= room.capacity;
+                          })()
+                        }
+                        className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white hover:bg-slate-700 disabled:opacity-50 disabled:bg-slate-400 disabled:cursor-not-allowed transition"
+                      >
+                        {(() => {
+                          const room = rooms.find(r => r.id === assignFilterRoomId);
+                          if (!room) return 'Xác nhận Gán';
+                          const currentAssigns = (roomAssignments[assignFilterRoomId] ?? []).filter(a => a.isActive);
+                          if (!!room.capacity && currentAssigns.length >= room.capacity) return 'Phòng đã đầy';
+                          return 'Xác nhận Gán';
+                        })()}
+                      </button>
+                    </div>
+                  </form>
+                </SectionCard>
+              ) : assignRooms.length === 0 && assignFilterFloorId ? (
+                <div className="p-4 bg-rose-50 text-rose-700 rounded-xl text-sm border border-rose-200 shadow-sm flex items-center gap-2">
+                  <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                  <span>Tầng này hiện <strong>chưa có phòng nào</strong>. Vui lòng quay lại tab <strong>Cấu trúc Khu phòng</strong> để tạo phòng trước khi gán sinh viên!</span>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50 text-amber-700 rounded-xl text-sm border border-amber-200 shadow-sm flex items-center gap-2">
+                  <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <span>Bạn đã chọn Khu và Tầng. Bây giờ hãy bấm vào ô <strong>"-- Chọn Phòng cụ thể --"</strong> ở trên để bắt đầu gán sinh viên nhé!</span>
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mt-8 mb-4">
+                  <h3 className="text-lg font-semibold text-slate-900">Danh sách người đang ở</h3>
+                  <div className="text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg">
+                    Có <span className="font-bold">{assignRooms.filter(r => ((roomAssignments[r.id] ?? []).filter(a => a.isActive)).length === 0).length}</span> phòng trống / <span className="font-bold text-emerald-700">{assignRooms.filter(r => ((roomAssignments[r.id] ?? []).filter(a => a.isActive)).length > 0).length}</span> phòng đang có người
+                  </div>
+                </div>
+                {assignRooms.filter(r => ((roomAssignments[r.id] ?? []).filter(a => a.isActive)).length > 0).length === 0 ? (
+                  <p className="text-sm text-slate-500">Không có phòng nào đang có người ở trong khu vực này.</p>
+                ) : (
+                  assignRooms.map((room) => {
+                    const roomAssigns = (roomAssignments[room.id] ?? []).filter(a => a.isActive);
+                    if (roomAssigns.length === 0) return null;
+
+                    return (
+                      <article
+                        key={room.id}
+                        className={`rounded-2xl border ${expandedAssignRoomId === room.id ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-slate-200 hover:border-slate-300'} bg-white p-4 shadow-sm cursor-pointer transition-all`}
+                        onClick={() => setExpandedAssignRoomId(expandedAssignRoomId === room.id ? null : room.id)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${expandedAssignRoomId === room.id ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                              <svg className={`w-5 h-5 transition-transform ${expandedAssignRoomId === room.id ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                            <div>
+                              <h4 className="text-base font-bold text-slate-900">Phòng {room.roomCode}</h4>
+                              <p className="text-sm text-slate-500">
+                                Đang ở: <span className="font-semibold text-slate-700">{roomAssigns.length}</span> / {room.capacity ?? '--'}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-medium">
+                            Khu {room.floor?.building?.code} - Tầng {room.floor?.floorNumber}
+                          </span>
+                        </div>
+
+                        {expandedAssignRoomId === room.id && (
+                          <div className="mt-4 pt-4 border-t border-slate-100 overflow-x-auto animate-in fade-in slide-in-from-top-2" onClick={e => e.stopPropagation()}>
+                            <table className="min-w-full divide-y divide-slate-200 text-sm">
+                              <thead className="text-left text-slate-600 bg-slate-50">
+                                <tr>
+                                  <th className="py-3 px-4 font-medium rounded-tl-lg">Sinh viên</th>
+                                  <th className="py-3 px-4 font-medium">Mã SV</th>
+                                  <th className="py-3 px-4 font-medium">Ngày vào</th>
+                                  <th className="py-3 px-4 font-medium text-right rounded-tr-lg">Thao tác</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {roomAssigns.map((assignment) => (
+                                  <tr key={assignment.id} className="hover:bg-slate-50/50 transition">
+                                    <td className="py-3 px-4 font-medium text-slate-900">{assignment.student.fullName}</td>
+                                    <td className="py-3 px-4 text-slate-600">{assignment.student.userCode}</td>
+                                    <td className="py-3 px-4 text-slate-600">{formatDate(assignment.startDate)}</td>
+                                    <td className="py-3 px-4 text-right">
+                                      <button
+                                        type="button"
+                                        disabled={unassigningId === assignment.student.id}
+                                        onClick={(e) => { e.stopPropagation(); void handleUnassign(room.id, assignment.student.id, assignment.student.fullName); }}
+                                        className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-600 hover:text-white disabled:opacity-50"
+                                      >
+                                        {unassigningId === assignment.student.id ? 'Đang trả...' : 'Trả phòng'}
+                                      </button>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </article>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
   async function submitWithFeedback(action: () => Promise<void>, successMessage: string) {
-    setFeedback('');
-    setErrorMessage('');
-
     try {
       await action();
-      setFeedback(successMessage);
+      showToast(successMessage, 'success');
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Thao tac that bai.'));
+      showToast(getApiErrorMessage(error, 'Thao tác thất bại.'), 'error');
     }
   }
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function SimpleListCard<T extends { id: number }>({
-  title,
-  items,
-  renderLabel,
-  onDelete,
-}: {
-  title: string;
-  items: T[];
-  renderLabel: (item: T) => string;
-  onDelete: (item: T) => void;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <h3 className="text-base font-semibold text-slate-900">{title}</h3>
-      <div className="mt-4 space-y-2">
-        {items.map((item) => (
-          <div key={item.id} className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3 text-sm">
-            <span className="text-slate-700">{renderLabel(item)}</span>
-            <button
-              type="button"
-              onClick={() => onDelete(item)}
-              className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50"
-            >
-              Xoa
-            </button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function InputField({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
+    <button
+      onClick={onClick}
+      className={`whitespace-nowrap px-4 py-2 font-semibold text-sm transition-all ${active
+          ? 'border-b-2 border-emerald-500 text-emerald-700 bg-emerald-50/50 rounded-t-lg'
+          : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-t-lg'
+        }`}
+    >
       {children}
-      {error && <span className="text-xs text-rose-600">{error}</span>}
+    </button>
+  );
+}
+
+function InputField({ label, error, children, className = '' }: { label: string; error?: string; children: React.ReactNode; className?: string }) {
+  return (
+    <label className={`block space-y-1.5 w-full ${className}`}>
+      <span className="text-sm font-semibold text-slate-700">{label}</span>
+      {children}
+      {error && <span className="text-xs text-rose-600 font-medium">{error}</span>}
     </label>
   );
 }
@@ -447,16 +851,11 @@ function InputField({
 function getApiErrorMessage(error: unknown, fallback: string) {
   if (axios.isAxiosError(error)) {
     const message = error.response?.data?.message;
-    if (Array.isArray(message)) {
-      return message.join(', ');
-    }
-    if (typeof message === 'string') {
-      return message;
-    }
+    if (Array.isArray(message)) return message.join(', ');
+    if (typeof message === 'string') return message;
   }
-
   return fallback;
 }
 
 const inputClassName =
-  'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500';
+  'w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10';
