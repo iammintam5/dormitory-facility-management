@@ -185,16 +185,17 @@ model AssetCategory {
 }
 
 model Asset {
-  id          Int         @id @default(autoincrement())
-  categoryId  Int         @map("category_id")
-  roomId      Int?        @map("room_id")
-  assetCode   String      @unique @map("asset_code") @db.VarChar(50)
-  assetName   String      @map("asset_name") @db.VarChar(150)
-  status      AssetStatus @default(AVAILABLE)
-  yearInUse   Int?        @map("year_in_use")
-  description String?
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime?   @updatedAt @map("updated_at")
+  id               Int         @id @default(autoincrement())
+  categoryId       Int         @map("category_id")
+  roomId           Int?        @map("room_id")
+  assetCode        String      @unique @map("asset_code") @db.VarChar(50)
+  assetName        String      @map("asset_name") @db.VarChar(150)
+  status           AssetStatus @default(AVAILABLE)
+  yearInUse        Int?        @map("year_in_use")
+  description      String?     @db.Text
+  normalizedSearch String?     @map("normalized_search") @db.Text
+  createdAt        DateTime    @default(now()) @map("created_at")
+  updatedAt        DateTime?   @updatedAt @map("updated_at")
 
   category            AssetCategory        @relation(fields: [categoryId], references: [id])
   room                Room?                @relation(fields: [roomId], references: [id])

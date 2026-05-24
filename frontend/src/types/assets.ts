@@ -43,3 +43,17 @@ export type AssetsResponse = {
     totalPages: number;
   };
 };
+
+export type AssetHistory = {
+  id: number;
+  assetId: number;
+  action: string;
+  oldStatus?: Asset['status'] | null;
+  newStatus?: Asset['status'] | null;
+  oldRoomId?: number | null;
+  newRoomId?: number | null;
+  note?: string | null;
+  createdAt: string;
+  oldRoomCode?: string | null;
+  newRoomCode?: string | null;
+};
