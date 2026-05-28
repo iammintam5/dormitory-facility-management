@@ -3,12 +3,12 @@ import { Room } from './locations';
 import { User } from './users';
 
 export type DamageReportStatus =
-  | 'PENDING'
-  | 'RECEIVED'
-  | 'PROCESSING'
-  | 'COMPLETED'
+  | 'SUBMITTED'
+  | 'REVIEWING'
+  | 'APPROVED'
   | 'REJECTED'
-  | 'CANCELLED';
+  | 'IN_PROGRESS'
+  | 'COMPLETED';
 
 export type DamageReportPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 

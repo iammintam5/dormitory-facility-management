@@ -170,16 +170,36 @@ export function StudentDamageReportsHistoryPage() {
   );
 }
 
-const damageStatuses: DamageReportStatus[] = [
-  'PENDING',
-  'RECEIVED',
-  'PROCESSING',
-  'COMPLETED',
-  'REJECTED',
-  'CANCELLED',
+const tabs: { label: string; values: DamageReportStatus[] | null }[] = [
+  { label: 'Tất cả', values: null },
+  {
+    label: 'Chờ tiếp nhận',
+    values: ['SUBMITTED'],
+  },
+  {
+    label: 'Đang xử lý',
+    values: ['REVIEWING', 'APPROVED', 'IN_PROGRESS'],
+  },
+  {
+    label: 'Hoàn tất',
+    values: ['COMPLETED'],
+  },
+  {
+    label: 'Đã huỷ',
+    values: ['REJECTED'],
+  },
 ];
 
 const damagePriorities: DamageReportPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 const inputClassName =
   'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500';
+
+const damageStatuses: DamageReportStatus[] = [
+  'SUBMITTED',
+  'REVIEWING',
+  'APPROVED',
+  'REJECTED',
+  'IN_PROGRESS',
+  'COMPLETED',
+];
