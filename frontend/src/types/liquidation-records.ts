@@ -1,5 +1,6 @@
 import { Asset } from './assets';
 import { UserSummary } from './users';
+import { CouncilMember } from './council';
 
 export type LiquidationStatus =
   | 'DRAFT'
@@ -9,21 +10,28 @@ export type LiquidationStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
-export type LiquidationRecord = {
+export type LiquidationItem = {
   id: number;
-  liquidationCode: string;
+  liquidationRecordId: number;
   assetId: number;
-  createdBy: number;
-  liquidationDate: string;
   assetCondition: string;
   reason: string;
   estimatedRemainingValue: string | number | null;
+  asset: Asset;
+};
+
+export type LiquidationRecord = {
+  id: number;
+  liquidationCode: string;
+  createdBy: number;
+  liquidationDate: string;
   status: LiquidationStatus;
   note: string | null;
   createdAt: string;
   updatedAt?: string | null;
-  asset: Asset;
+  liquidationItems: LiquidationItem[];
   createdByUser: UserSummary;
+  councilMembers?: CouncilMember[];
 };
 
 export type LiquidationRecordsResponse = {

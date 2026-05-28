@@ -1,6 +1,7 @@
 import { Asset } from './assets';
 import { Room } from './locations';
 import { User } from './users';
+import { CouncilMember } from './council';
 
 export type InventoryCheckStatus = 'DRAFT' | 'COMPLETED';
 
@@ -32,6 +33,7 @@ export type InventoryCheck = {
   room?: Room;
   checkedByUser: User;
   inventoryCheckItems: InventoryCheckItem[];
+  councilMembers?: CouncilMember[];
 };
 
 export type InventoryChecksResponse = {

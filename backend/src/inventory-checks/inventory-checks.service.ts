@@ -23,6 +23,7 @@ import { CreateMaintenancePlanFromItemDto } from './dto/create-maintenance-plan-
 import { CreateMaintenanceRecordFromItemDto } from './dto/create-maintenance-record-from-item.dto';
 import { QueryInventoryChecksDto } from './dto/query-inventory-checks.dto';
 import { UpdateInventoryCheckResultsDto } from './dto/update-inventory-check-results.dto';
+import { UpdateCouncilDto } from './dto/update-council.dto';
 
 @Injectable()
 export class InventoryChecksService {
@@ -69,6 +70,14 @@ export class InventoryChecksService {
               note: null,
             })),
           },
+          ...(dto.members && dto.members.length > 0 && {
+            councilMembers: {
+              create: dto.members.map(m => ({
+                userId: m.userId,
+                roleInCouncil: m.roleInCouncil.trim(),
+              })),
+            },
+          }),
         },
         include: this.inventoryCheckDetailInclude,
       });
@@ -87,7 +96,7 @@ export class InventoryChecksService {
       });
 
       return created;
-    });
+    }, { timeout: 15000 });
   }
 
   async findAll(currentUser: AuthUser, query: QueryInventoryChecksDto) {
@@ -263,6 +272,42 @@ export class InventoryChecksService {
       });
 
       if (hasAbnormalItems) {
+        // Update asset statuses for abnormal items
+        for (const item of updated.inventoryCheckItems) {
+          let newStatus: AssetStatus | undefined;
+          
+          const condition = item.actualCondition?.toLowerCase() ?? '';
+          if (item.difference < 0) {
+            newStatus = AssetStatus.DAMAGED; // Marked as damaged/lost
+          } else if (
+            condition.includes('hong') ||
+            condition.includes('xau') ||
+            condition.includes('bat thuong') ||
+            condition.includes('bao tri')
+          ) {
+            newStatus = AssetStatus.DAMAGED;
+          }
+
+          if (newStatus && item.asset.status !== newStatus) {
+            await tx.asset.update({
+              where: { id: item.assetId },
+              data: { status: newStatus },
+            });
+
+            await tx.assetHistory.create({
+              data: {
+                assetId: item.assetId,
+                action: 'Cap nhat tu kiem ke',
+                oldStatus: item.asset.status,
+                newStatus: newStatus,
+                oldRoomId: item.asset.roomId,
+                newRoomId: item.asset.roomId,
+                note: `Phieu ${updated.inventoryCode}. Chenh lech: ${item.difference}. Tinh trang: ${item.actualCondition || '--'}`,
+              },
+            });
+          }
+        }
+
         const facilityManagers = await tx.user.findMany({
           where: {
             role: { code: 'QL_CSVC' },
@@ -276,7 +321,7 @@ export class InventoryChecksService {
             data: facilityManagers.map((manager) => ({
               userId: manager.id,
               title: 'Kiem ke phat hien bat thuong',
-              content: `Phieu ${updated.inventoryCode} co tai san chenh lech hoac tinh trang xau.`,
+              content: `Phieu ${updated.inventoryCode} co tai san chenh lech hoac tinh trang xau, tai san da duoc chuyen sang trang thai DAMAGED.`,
               status: NotificationStatus.UNREAD,
               relatedTable: 'inventory_checks',
               relatedId: updated.id,
@@ -465,6 +510,36 @@ export class InventoryChecksService {
     });
   }
 
+  async updateCouncil(currentUser: AuthUser, id: number, dto: UpdateCouncilDto) {
+    this.ensureManager(currentUser);
+    const inventoryCheck = await this.ensureInventoryCheckExists(id);
+    this.ensureDraft(inventoryCheck.status);
+
+    return this.prismaService.$transaction(async (tx) => {
+      // 1. Delete existing council members
+      await tx.inventoryCouncilMember.deleteMany({
+        where: { inventoryCheckId: id },
+      });
+
+      // 2. Create new council members
+      if (dto.members && dto.members.length > 0) {
+        await tx.inventoryCouncilMember.createMany({
+          data: dto.members.map((member: any) => ({
+            inventoryCheckId: id,
+            userId: member.userId,
+            roleInCouncil: member.roleInCouncil.trim(),
+          })),
+        });
+      }
+
+      // 3. Return updated record
+      return tx.inventoryCheck.findUnique({
+        where: { id },
+        include: this.inventoryCheckDetailInclude,
+      });
+    });
+  }
+
   async createMaintenancePlanFromItem(
     currentUser: AuthUser,
     inventoryCheckId: number,
@@ -602,6 +677,15 @@ export class InventoryChecksService {
         orderBy: {
           asset: {
             assetCode: 'asc',
+          },
+        },
+      },
+      councilMembers: {
+        include: {
+          user: {
+            include: {
+              role: true,
+            },
           },
         },
       },

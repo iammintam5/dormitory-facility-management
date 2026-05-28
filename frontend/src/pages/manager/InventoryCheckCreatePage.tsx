@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../..
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { CouncilMemberSelect, CouncilMemberState } from '../../components/council/CouncilMemberSelect';
 
 export function InventoryCheckCreatePage() {
   const navigate = useNavigate();
@@ -19,6 +20,7 @@ export function InventoryCheckCreatePage() {
   const [roomId, setRoomId] = useState('');
   const [checkDate, setCheckDate] = useState(new Date().toISOString().slice(0, 10));
   const [generalNote, setGeneralNote] = useState('');
+  const [members, setMembers] = useState<CouncilMemberState[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -51,6 +53,10 @@ export function InventoryCheckCreatePage() {
         roomId: Number(roomId),
         checkDate,
         generalNote: generalNote.trim() || undefined,
+        members: members.length > 0 ? members.map(m => ({
+          userId: m.user.id,
+          roleInCouncil: m.roleInCouncil.trim()
+        })) : undefined,
       });
 
       showToast('Tạo phiếu kiểm kê thành công.');
@@ -123,7 +129,17 @@ export function InventoryCheckCreatePage() {
                 />
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="space-y-2 border-t pt-4">
+                <h3 className="text-sm font-medium">Hội đồng kiểm kê (Tùy chọn)</h3>
+                <p className="text-sm text-slate-500 mb-4">Bạn có thể chọn hội đồng ngay bây giờ hoặc cập nhật sau khi tạo phiếu.</p>
+                <CouncilMemberSelect 
+                  members={members} 
+                  onChange={setMembers} 
+                  disabled={isSubmitting} 
+                />
+              </div>
+
+              <div className="flex items-center gap-4 pt-4 border-t">
                 <Button type="submit" disabled={isSubmitting || !roomId} className="w-40">
                   {isSubmitting ? 'Đang tạo phiếu...' : 'Tạo phiếu kiểm kê'}
                 </Button>

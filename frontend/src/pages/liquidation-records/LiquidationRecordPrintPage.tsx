@@ -4,5 +4,5 @@ import { LiquidationRecordPrintPreviewPage } from '../print/LiquidationRecordPri
 export function LiquidationRecordPrintPage() {
   const { user } = useAuth();
   const basePath = user?.role === 'ADMIN' ? '/admin' : '/manager';
-  return <LiquidationRecordPrintPreviewPage backTo={`${basePath}/liquidation-records`} />;
+  return <LiquidationRecordPrintPreviewPage backTo={`${basePath}/liquidations`} />;
 }

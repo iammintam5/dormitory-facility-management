@@ -1,4 +1,6 @@
-import { IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, MaxLength, Min } from 'class-validator';
+import { IsDateString, IsInt, IsNotEmpty, IsNumber, IsOptional, IsPositive, IsString, MaxLength, Min, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { CouncilMemberDto } from './update-council.dto';
 
 export class CreateLiquidationRecordDto {
   @IsInt()
@@ -25,4 +27,10 @@ export class CreateLiquidationRecordDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CouncilMemberDto)
+  members?: CouncilMemberDto[];
 }

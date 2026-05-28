@@ -21,6 +21,7 @@ import { CreateMaintenancePlanFromItemDto } from './dto/create-maintenance-plan-
 import { CreateMaintenanceRecordFromItemDto } from './dto/create-maintenance-record-from-item.dto';
 import { QueryInventoryChecksDto } from './dto/query-inventory-checks.dto';
 import { UpdateInventoryCheckResultsDto } from './dto/update-inventory-check-results.dto';
+import { UpdateCouncilDto } from './dto/update-council.dto';
 import { InventoryChecksService } from './inventory-checks.service';
 
 @Controller('inventory-checks')
@@ -60,6 +61,16 @@ export class InventoryChecksController {
     @Body() dto: UpdateInventoryCheckResultsDto,
   ) {
     return this.inventoryChecksService.updateResults(currentUser, id, dto);
+  }
+
+  @Post(':id/council')
+  @Roles('ADMIN', 'QL_CSVC')
+  updateCouncil(
+    @CurrentUser() currentUser: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCouncilDto,
+  ) {
+    return this.inventoryChecksService.updateCouncil(currentUser, id, dto);
   }
 
   @Post(':id/complete')
