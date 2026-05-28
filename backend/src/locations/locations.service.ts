@@ -153,9 +153,22 @@ export class LocationsService {
   }
 
   findRooms() {
-    return this.prismaService.room.findMany({
+    console.log('[LocationsService] Starting findRooms query with nested includes...');
+    const startTime = Date.now();
+    
+    const query = this.prismaService.room.findMany({
       include: this.roomInclude,
       orderBy: [{ floorId: 'asc' }, { roomCode: 'asc' }],
+    });
+
+    return query.then((result) => {
+      const duration = Date.now() - startTime;
+      console.log(`[LocationsService] findRooms completed in ${duration}ms, returned ${result.length} rooms`);
+      return result;
+    }).catch((error) => {
+      const duration = Date.now() - startTime;
+      console.error(`[LocationsService] findRooms failed after ${duration}ms:`, error);
+      throw error;
     });
   }
 

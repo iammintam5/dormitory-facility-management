@@ -25,6 +25,13 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     request.user = await this.authService.validateAccessToken(token);
+    console.log('[JwtAuthGuard] Token validated successfully:', {
+      userId: request.user?.userId,
+      userCode: request.user?.userCode,
+      role: request.user?.role,
+      fullName: request.user?.fullName,
+      endpoint: `${context.switchToHttp().getRequest().method} ${context.switchToHttp().getRequest().url}`,
+    });
     return true;
   }
 }

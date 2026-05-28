@@ -33,10 +33,13 @@ export function HandoversManagementPage() {
   }, []);
 
   const fetchRooms = async () => {
+    console.log('[HandoversManagementPage] fetchRooms called');
     try {
       const response = await apiClient.get<Room[]>('/locations/rooms');
+      console.log('[HandoversManagementPage] fetchRooms succeeded with', response.data.length, 'rooms');
       setRooms(response.data);
     } catch (error) {
+      console.error('[HandoversManagementPage] fetchRooms failed:', error);
       console.error('Lỗi tải danh sách phòng:', error);
       setErrorMessage('Không thể tải danh sách phòng. Vui lòng làm mới trang.');
     }
