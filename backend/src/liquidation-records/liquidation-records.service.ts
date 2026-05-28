@@ -11,6 +11,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateLiquidationRecordDto } from './dto/create-liquidation-record.dto';
 import { QueryLiquidationRecordsDto } from './dto/query-liquidation-records.dto';
 import { LiquidationWorkflowNoteDto } from './dto/liquidation-workflow-note.dto';
+import { UpdateCouncilDto } from './dto/update-council.dto';
 
 @Injectable()
 export class LiquidationRecordsService {
@@ -23,53 +24,62 @@ export class LiquidationRecordsService {
 
     const liquidationCode = await this.generateLiquidationCode();
 
-    return this.prismaService.$transaction(async (tx) => {
-      const created = await tx.liquidationRecord.create({
-        data: {
-          liquidationCode,
-          createdBy: currentUser.userId,
-          liquidationDate: new Date(dto.liquidationDate),
-          status: ApprovalStatus.DRAFT,
-          note: dto.note?.trim() || null,
-          liquidationItems: {
-            create: [
-              {
-                assetId: dto.assetId,
-                assetCondition: dto.assetCondition.trim(),
-                reason: dto.reason.trim(),
-                estimatedRemainingValue: dto.estimatedRemainingValue,
+    try {
+      return await this.prismaService.$transaction(async (tx) => {
+        const created = await tx.liquidationRecord.create({
+          data: {
+            liquidationCode,
+            createdBy: currentUser.userId,
+            liquidationDate: new Date(dto.liquidationDate),
+            status: ApprovalStatus.DRAFT,
+            note: dto.note?.trim() || null,
+            liquidationItems: {
+              create: [
+                {
+                  assetId: dto.assetId,
+                  assetCondition: dto.assetCondition.trim(),
+                  reason: dto.reason.trim(),
+                  estimatedRemainingValue: dto.estimatedRemainingValue,
+                },
+              ],
+            },
+            ...(dto.members && dto.members.length > 0 && {
+              councilMembers: {
+                create: dto.members.map(m => ({
+                  userId: m.userId,
+                  roleInCouncil: m.roleInCouncil.trim(),
+                })),
               },
-            ],
+            }),
           },
-        },
-        include: this.liquidationRecordInclude,
-      });
+          include: this.liquidationRecordInclude,
+        });
 
-      await tx.asset.update({
-        where: { id: dto.assetId },
-        data: {
-          status: AssetStatus.PENDING_LIQUIDATION,
-        },
-      });
+        await tx.asset.update({
+          where: { id: dto.assetId },
+          data: {
+            status: AssetStatus.PENDING_LIQUIDATION,
+          },
+        });
 
-      await this.createAuditLog(tx, {
-        userId: currentUser.userId,
-        action: 'create',
-        tableName: 'liquidation_records',
-        recordId: created.id,
-        newValue: this.stringifyPayload({
-          liquidationCode,
-          assetId: dto.assetId,
-          status: created.status,
-          reason: dto.reason,
-        }),
-      });
+        await this.createAuditLog(tx, {
+          userId: currentUser.userId,
+          action: 'create',
+          tableName: 'liquidation_records',
+          recordId: created.id,
+          newValue: this.stringifyPayload({
+            liquidationCode,
+            assetId: dto.assetId,
+            status: created.status,
+            reason: dto.reason,
+          }),
+        });
 
-      return tx.liquidationRecord.findUniqueOrThrow({
-        where: { id: created.id },
-        include: this.liquidationRecordInclude,
-      });
-    });
+        return created;
+      }, { timeout: 15000 });
+    } catch (error: any) {
+      throw error;
+    }
   }
 
   async findAll(currentUser: AuthUser, query: QueryLiquidationRecordsDto) {
@@ -388,6 +398,35 @@ export class LiquidationRecordsService {
     });
   }
 
+  async updateCouncil(currentUser: AuthUser, id: number, dto: UpdateCouncilDto) {
+    this.ensureManager(currentUser);
+    const record = await this.ensureRecordExists(id);
+    if (record.status !== ApprovalStatus.DRAFT) {
+      throw new ConflictException('Chi duoc cap nhat hoi dong khi dang o trang thai DRAFT.');
+    }
+
+    return this.prismaService.$transaction(async (tx) => {
+      await tx.liquidationCouncilMember.deleteMany({
+        where: { liquidationRecordId: id },
+      });
+
+      if (dto.members && dto.members.length > 0) {
+        await tx.liquidationCouncilMember.createMany({
+          data: dto.members.map((member: any) => ({
+            liquidationRecordId: id,
+            userId: member.userId,
+            roleInCouncil: member.roleInCouncil.trim(),
+          })),
+        });
+      }
+
+      return tx.liquidationRecord.findUnique({
+        where: { id },
+        include: this.liquidationRecordInclude,
+      });
+    });
+  }
+
   private get liquidationRecordInclude() {
     return {
       liquidationItems: {
@@ -411,6 +450,15 @@ export class LiquidationRecordsService {
       createdByUser: {
         include: {
           role: true,
+        },
+      },
+      councilMembers: {
+        include: {
+          user: {
+            include: {
+              role: true,
+            },
+          },
         },
       },
     } satisfies Prisma.LiquidationRecordInclude;

@@ -25,7 +25,7 @@ export function InventoryCheckPrintForm({
       </div>
 
       <PrintSection title="I. THÔNG TIN CHUNG">
-        <p><span className="font-semibold">Phòng kiểm kê:</span> {inventoryCheck.room.roomCode}</p>
+        <p><span className="font-semibold">Phòng kiểm kê:</span> {inventoryCheck.room?.roomCode ?? 'Toàn bộ'}</p>
         <p><span className="font-semibold">Người kiểm kê:</span> {inventoryCheck.checkedByUser.fullName} - {inventoryCheck.checkedByUser.userCode}</p>
         <p><span className="font-semibold">Trạng thái:</span> {inventoryCheck.status === 'COMPLETED' ? 'Đã hoàn tất' : 'Đang nhập kết quả'}</p>
       </PrintSection>
@@ -59,12 +59,24 @@ export function InventoryCheckPrintForm({
         </div>
       </PrintSection>
 
-      <PrintSignatures
-        leftTitle="NGƯỜI KIỂM KÊ"
-        leftSubtitle={inventoryCheck.checkedByUser.fullName}
-        rightTitle="ĐẠI DIỆN BAN QUẢN LÝ"
-        rightSubtitle=""
-      />
+      {(!inventoryCheck.councilMembers || inventoryCheck.councilMembers.length === 0) ? (
+        <PrintSignatures
+          leftTitle="NGƯỜI KIỂM KÊ"
+          leftSubtitle={inventoryCheck.checkedByUser.fullName}
+          rightTitle="ĐẠI DIỆN BAN QUẢN LÝ"
+          rightSubtitle=""
+        />
+      ) : (
+        <div className="no-break mt-9 flex flex-wrap justify-between px-6 text-[13pt] gap-y-10 gap-x-4">
+          {inventoryCheck.councilMembers.map((member) => (
+            <div key={member.user.id} className="w-[30%] text-center">
+              <p className="font-bold uppercase">{member.roleInCouncil}</p>
+              <p className="mb-16 text-[12pt] italic">(Ký và ghi rõ họ tên)</p>
+              <p className="font-semibold">{member.user.fullName}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <p className="mt-10 text-right text-[11pt] italic text-slate-500">
         Thời gian in: {formatDateTime(inventoryCheck.printable.generatedAt)}
