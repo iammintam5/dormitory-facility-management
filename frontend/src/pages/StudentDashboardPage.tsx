@@ -168,7 +168,7 @@ export function StudentDashboardPage() {
                   <li key={asset.id} className="p-4 hover:bg-slate-50 transition flex items-center justify-between">
                     <div>
                       <h4 className="font-semibold text-slate-800">{asset.assetName}</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">Mã: {asset.assetCode} • {asset.category.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Mã: {asset.assetCode} • {asset.category?.name || 'Chưa có tên'}</p>
                     </div>
                     <Badge variant={asset.status === 'IN_USE' ? 'success' : 'warning'}>
                       {asset.status === 'IN_USE' ? 'Bình thường' : 'Có lỗi'}

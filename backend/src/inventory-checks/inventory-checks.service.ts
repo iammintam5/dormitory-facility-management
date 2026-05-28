@@ -368,6 +368,7 @@ export class InventoryChecksService {
           roomId: item.inventoryCheck.roomId!,
           description: dto.description.trim(),
           status: DamageReportStatus.SUBMITTED,
+          location: 'Ghi nhận qua đợt kiểm kê định kỳ',
         },
         include: {
           reporter: {

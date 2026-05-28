@@ -395,6 +395,7 @@ export class MaintenanceService {
           roomId: record.asset.roomId!,
           description: dto.description.trim(),
           status: DamageReportStatus.SUBMITTED,
+          location: 'Ghi nhận trong quá trình bảo trì',
         },
       });
 

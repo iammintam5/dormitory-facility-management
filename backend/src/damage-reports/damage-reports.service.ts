@@ -443,6 +443,9 @@ export class DamageReportsService {
               },
             },
             assets: {
+              include: {
+                category: true,
+              },
               orderBy: {
                 assetCode: 'asc',
               },
