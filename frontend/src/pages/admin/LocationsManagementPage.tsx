@@ -789,7 +789,7 @@ export function LocationsManagementPage() {
       )}
 
       {/* --- MODALS --- */}
-      <Modal isOpen={isBuildingModalOpen} onClose={() => setIsBuildingModalOpen(false)} title={selectedBuilding ? 'Sửa Khu' : 'Tạo Khu Mới'} maxWidth="max-w-md">
+      <Modal isOpen={isBuildingModalOpen} onClose={() => setIsBuildingModalOpen(false)} title={selectedBuilding ? 'Sửa Khu' : 'Tạo Khu Mới'} size="md">
         <form className="grid gap-4" onSubmit={submitBuilding}>
           <InputField label="Mã Khu" error={buildingForm.formState.errors.code?.message}>
             <input {...buildingForm.register('code')} className={inputClassName} placeholder="VD: B1" />
@@ -804,7 +804,7 @@ export function LocationsManagementPage() {
         </form>
       </Modal>
 
-      <Modal isOpen={isFloorModalOpen} onClose={() => setIsFloorModalOpen(false)} title={selectedFloor ? 'Sửa Tầng' : 'Tạo Tầng Mới'} maxWidth="max-w-md">
+      <Modal isOpen={isFloorModalOpen} onClose={() => setIsFloorModalOpen(false)} title={selectedFloor ? 'Sửa Tầng' : 'Tạo Tầng Mới'} size="md">
         <form className="grid gap-4" onSubmit={submitFloor}>
           <InputField label="Số Tầng" error={floorForm.formState.errors.floorNumber?.message}>
             <input type="number" {...floorForm.register('floorNumber')} className={inputClassName} placeholder="VD: 1, 2" />
@@ -819,7 +819,7 @@ export function LocationsManagementPage() {
         </form>
       </Modal>
 
-      <Modal isOpen={isRoomModalOpen} onClose={() => setIsRoomModalOpen(false)} title={selectedRoom ? 'Sửa Phòng' : 'Tạo Phòng Mới'} maxWidth="max-w-md">
+      <Modal isOpen={isRoomModalOpen} onClose={() => setIsRoomModalOpen(false)} title={selectedRoom ? 'Sửa Phòng' : 'Tạo Phòng Mới'} size="md">
         <form className="grid gap-4" onSubmit={submitRoom}>
           <InputField label="Mã Phòng" error={roomForm.formState.errors.roomCode?.message}>
             <input {...roomForm.register('roomCode')} className={inputClassName} placeholder="VD: B1-101" />
@@ -837,7 +837,7 @@ export function LocationsManagementPage() {
         </form>
       </Modal>
 
-      <Modal isOpen={isBulkRoomModalOpen} onClose={() => setIsBulkRoomModalOpen(false)} title="Tạo Phòng Hàng Loạt" maxWidth="max-w-xl">
+      <Modal isOpen={isBulkRoomModalOpen} onClose={() => setIsBulkRoomModalOpen(false)} title="Tạo Phòng Hàng Loạt" size="xl">
         <form className="grid gap-4" onSubmit={submitBulkRoom}>
           <InputField label="Tiền tố phòng" error={bulkRoomForm.formState.errors.prefix?.message}>
             <input {...bulkRoomForm.register('prefix')} className={inputClassName} placeholder="VD: B1-1" />
