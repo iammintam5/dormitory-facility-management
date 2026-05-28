@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '../lib/api-error';
 import { formatDate, formatDateTime } from '../lib/format';
 import { DamageReportStudentAssetsResponse, DamageReportsResponse } from '../types/damage-reports';
 import { AppNotification, NotificationsResponse } from '../types/notifications';
+import { DAMAGE_REPORT_STATUS } from '../constants/damage-reports';
 
 export function StudentDashboardPage() {
   const [roomData, setRoomData] = useState<DamageReportStudentAssetsResponse | null>(null);
@@ -25,7 +26,7 @@ export function StudentDashboardPage() {
     try {
       const [roomRes, reportsRes, notifRes] = await Promise.all([
         apiClient.get<DamageReportStudentAssetsResponse>('/damage-reports/my-assets'),
-        apiClient.get<DamageReportsResponse>('/damage-reports', { params: { status: 'PENDING', pageSize: 1 } }),
+        apiClient.get<DamageReportsResponse>('/damage-reports', { params: { status: DAMAGE_REPORT_STATUS.SUBMITTED, pageSize: 1 } }),
         apiClient.get<NotificationsResponse>('/notifications/my', { params: { pageSize: 5 } })
       ]);
 

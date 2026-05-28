@@ -313,6 +313,10 @@ export const router = createBrowserRouter([
                 element: <StudentHandoversPage />,
               },
               {
+                path: 'my-room',
+                element: <StudentHandoversPage />,
+              },
+              {
                 path: 'handovers/:id',
                 element: <HandoverDetailPage />,
               },

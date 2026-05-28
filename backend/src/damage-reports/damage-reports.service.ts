@@ -525,7 +525,7 @@ export class DamageReportsService {
     }
 
     if (report.status !== DamageReportStatus.SUBMITTED) {
-      throw new ConflictException('Chỉ được sửa hoặc hủy phiếu khi trạng thái còn SUBMITTED.');
+      throw new ConflictException('Chỉ được phép chỉnh sửa/hủy phiếu báo hỏng khi đang ở trạng thái "Chờ xử lý" (SV_QĐ2).');
     }
   }
 
