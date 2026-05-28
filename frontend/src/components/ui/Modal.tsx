@@ -20,16 +20,18 @@ export function Modal({ isOpen, onClose, title, children, footer, size = 'md' }:
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={onClose} />
-      <div className={`relative z-50 w-full ${sizeClasses[size]} rounded-lg bg-background p-6 shadow-lg sm:my-8`}>
+      <div className={`relative z-50 w-full ${sizeClasses[size]} rounded-lg bg-background shadow-lg flex flex-col max-h-[90vh] sm:my-8`}>
         {title && (
-          <div className="mb-4 text-lg font-semibold leading-none tracking-tight">
+          <div className="shrink-0 px-6 py-4 border-b border-slate-200 text-lg font-semibold leading-none tracking-tight">
             {title}
           </div>
         )}
-        <div className="relative">{children}</div>
-        {footer && <div className="mt-6 flex justify-end gap-2">{footer}</div>}
+        <div className="overflow-y-auto flex-1 px-6 py-4">
+          {children}
+        </div>
+        {footer && <div className="shrink-0 border-t border-slate-200 px-6 py-4 flex justify-end gap-2">{footer}</div>}
       </div>
     </div>
   );

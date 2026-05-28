@@ -366,7 +366,7 @@ export function LiquidationRecordsManagementPage() {
         title="Tạo Biên bản Thanh lý"
         size="lg"
       >
-        <p className="text-sm text-slate-500 mb-6">Tài sản được chọn sẽ được chuyển sang trạng thái chờ thanh lý sau khi tạo biên bản.</p>
+        <p className="text-sm text-slate-500 mb-4">Tài sản được chọn sẽ được chuyển sang trạng thái chờ thanh lý sau khi tạo biên bản.</p>
         <form id="create-liquidation-form" className="space-y-4" onSubmit={submitCreate}>
           <div className="space-y-2">
             <label className="text-sm font-medium">Tài sản cần thanh lý</label>
