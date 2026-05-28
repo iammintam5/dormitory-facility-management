@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { useToast } from '../../toast/toast-context';
 import { EmptyState } from '../../components/admin/EmptyState';
 import { SectionCard } from '../../components/admin/SectionCard';
+import { Modal } from '../../components/ui/Modal';
 import { apiClient } from '../../lib/axios';
 import { formatDate } from '../../lib/format';
 import { DormBuilding, Floor, Room, RoomStudentAssignment } from '../../types/locations';
@@ -71,10 +72,19 @@ export function LocationsManagementPage() {
   // Split-Pane State (Structure)
   const [expandedBuildingId, setExpandedBuildingId] = useState<number | null>(null);
   const [selectedFloorId, setSelectedFloorId] = useState<number | null>(null);
-  const [showAddBuilding, setShowAddBuilding] = useState(false);
-  const [addingFloorToBuildingId, setAddingFloorToBuildingId] = useState<number | null>(null);
-  const [showRoomForm, setShowRoomForm] = useState<'single' | 'bulk' | null>(null);
   const [selectedRoomIds, setSelectedRoomIds] = useState<number[]>([]);
+
+  // Modal State
+  const [isBuildingModalOpen, setIsBuildingModalOpen] = useState(false);
+  const [selectedBuilding, setSelectedBuilding] = useState<DormBuilding | null>(null);
+
+  const [isFloorModalOpen, setIsFloorModalOpen] = useState(false);
+  const [selectedFloor, setSelectedFloor] = useState<Floor | null>(null);
+
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+
+  const [isBulkRoomModalOpen, setIsBulkRoomModalOpen] = useState(false);
 
   // Drill-down State (Assign Tab)
   const [assignFilterBuildingId, setAssignFilterBuildingId] = useState<number | ''>('');
@@ -136,46 +146,63 @@ export function LocationsManagementPage() {
     }
   };
 
-  const refreshRoomStudents = async (roomId: number) => {
-    const response = await apiClient.get<RoomStudentAssignment[]>(`/locations/rooms/${roomId}/students`);
-    setRoomAssignments((prev) => ({
-      ...prev,
-      [roomId]: response.data,
-    }));
-  };
-
   const roomsOfSelectedFloor = useMemo(() =>
     rooms.filter(r => r.floorId === selectedFloorId),
     [rooms, selectedFloorId]);
 
-  useEffect(() => {
-    if (selectedFloorId) {
-      setSelectedRoomIds([]);
-      roomForm.setValue('floorId', selectedFloorId);
-      bulkRoomForm.setValue('floorId', selectedFloorId);
+  // Modal Handlers
+  const handleOpenBuildingModal = (building?: DormBuilding) => {
+    setSelectedBuilding(building || null);
+    if (building) {
+      buildingForm.reset({ code: building.code, name: building.name });
+    } else {
+      buildingForm.reset({ code: '', name: '' });
+    }
+    setIsBuildingModalOpen(true);
+  };
 
-      // Tự động điền tiền tố mã phòng dựa trên Khu và Tầng (VD: A1-1 hoặc C-1)
-      const floor = floors.find(f => f.id === selectedFloorId);
+  const handleOpenFloorModal = (buildingId: number, floor?: Floor) => {
+    setSelectedFloor(floor || null);
+    if (floor) {
+      floorForm.reset({ buildingId: floor.buildingId, floorNumber: floor.floorNumber, name: floor.name || '' });
+    } else {
+      const buildingFloors = floors.filter(f => f.buildingId === buildingId);
+      const nextFloorNum = buildingFloors.length > 0 ? Math.max(...buildingFloors.map(f => f.floorNumber)) + 1 : 1;
+      floorForm.reset({ buildingId, floorNumber: nextFloorNum, name: '' });
+    }
+    setIsFloorModalOpen(true);
+  };
+
+  const handleOpenRoomModal = (floorId: number, room?: Room) => {
+    setSelectedRoom(room || null);
+    if (room) {
+      roomForm.reset({ floorId: room.floorId, roomCode: room.roomCode, capacity: room.capacity || 8, note: room.note || '' });
+    } else {
+      const floor = floors.find(f => f.id === floorId);
+      let prefix = '';
       if (floor) {
         const building = buildings.find(b => b.id === floor.buildingId);
-        if (building) {
-          const prefix = `${building.code}-${floor.floorNumber}`;
-
-          // Khi chuyen tang khac, bat buoc phai reset lai dung prefix cua tang do
-          roomForm.setValue('roomCode', prefix);
-          bulkRoomForm.setValue('prefix', prefix);
-
-          // Tu dong dem so phong hien co tren tang nay de tinh "Tu so" va "Den so"
-          // Khong dua rooms vao dependency array de tranh viec re-render khi dang go
-          const currentRoomsCount = rooms.filter(r => r.floorId === selectedFloorId).length;
-          const nextStart = currentRoomsCount + 1;
-          bulkRoomForm.setValue('startNumber', nextStart);
-          bulkRoomForm.setValue('endNumber', nextStart + 9);
-        }
+        if (building) prefix = `${building.code}-${floor.floorNumber}`;
       }
+      roomForm.reset({ floorId, roomCode: prefix, capacity: 8, note: '' });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedFloorId, floors, buildings, roomForm, bulkRoomForm]);
+    setIsRoomModalOpen(true);
+  };
+
+  const handleOpenBulkRoomModal = (floorId: number) => {
+    const floor = floors.find(f => f.id === floorId);
+    let prefix = '';
+    let nextStart = 1;
+    if (floor) {
+      const building = buildings.find(b => b.id === floor.buildingId);
+      if (building) prefix = `${building.code}-${floor.floorNumber}`;
+      const currentRoomsCount = rooms.filter(r => r.floorId === floorId).length;
+      nextStart = currentRoomsCount + 1;
+    }
+    bulkRoomForm.reset({ floorId, prefix, startNumber: nextStart, endNumber: nextStart + 9, capacity: 8, note: '' });
+    setIsBulkRoomModalOpen(true);
+  };
+
 
   // Assignment Tab Memos
   const assignFloors = useMemo(() => floors.filter(f => assignFilterBuildingId ? f.buildingId === assignFilterBuildingId : true), [floors, assignFilterBuildingId]);
@@ -190,40 +217,50 @@ export function LocationsManagementPage() {
 
   // Submit Handlers
   const submitBuilding = buildingForm.handleSubmit(async (values) => {
-    // Tu dong dien Ten Khu la Ma Khu neu bo trong
     if (!values.name || values.name.trim() === '') {
       values.name = values.code;
     }
-
     await submitWithFeedback(async () => {
-      const res = await apiClient.post<DormBuilding>('/locations/buildings', values);
-      setBuildings(prev => [...prev, res.data]);
-      buildingForm.reset({ code: '', name: '' });
-      setShowAddBuilding(false);
-      setExpandedBuildingId(res.data.id);
-    }, 'Tao khu thanh cong.');
+      if (selectedBuilding) {
+        const res = await apiClient.patch<DormBuilding>(`/locations/buildings/${selectedBuilding.id}`, values);
+        setBuildings(prev => prev.map(b => b.id === selectedBuilding.id ? res.data : b));
+      } else {
+        const res = await apiClient.post<DormBuilding>('/locations/buildings', values);
+        setBuildings(prev => [...prev, res.data]);
+        setExpandedBuildingId(res.data.id);
+      }
+      setIsBuildingModalOpen(false);
+    }, selectedBuilding ? 'Cập nhật Khu thành công.' : 'Tạo Khu thành công.');
   });
 
   const submitFloor = floorForm.handleSubmit(async (values) => {
-    // Neu name la chuoi rong thi xoa di de khong bi loi @IsNotEmpty tren backend
     if (!values.name || values.name.trim() === '') {
       delete values.name;
     }
-
     await submitWithFeedback(async () => {
-      const res = await apiClient.post<Floor>('/locations/floors', values);
-      setFloors(prev => [...prev, res.data]);
-      setAddingFloorToBuildingId(null);
-      setSelectedFloorId(res.data.id);
-    }, 'Tao tang thanh cong.');
+      if (selectedFloor) {
+        const res = await apiClient.patch<Floor>(`/locations/floors/${selectedFloor.id}`, values);
+        setFloors(prev => prev.map(f => f.id === selectedFloor.id ? res.data : f));
+      } else {
+        const res = await apiClient.post<Floor>('/locations/floors', values);
+        setFloors(prev => [...prev, res.data]);
+        setSelectedFloorId(res.data.id);
+      }
+      setIsFloorModalOpen(false);
+    }, selectedFloor ? 'Cập nhật Tầng thành công.' : 'Tạo Tầng thành công.');
   });
 
   const submitRoom = roomForm.handleSubmit(async (values) => {
     await submitWithFeedback(async () => {
-      const res = await apiClient.post<Room>('/locations/rooms', values);
-      setRooms(prev => [...prev, res.data]);
-      roomForm.reset({ ...values, roomCode: '', note: '' });
-    }, 'Tao phong thanh cong.');
+      if (selectedRoom) {
+        const res = await apiClient.patch<Room>(`/locations/rooms/${selectedRoom.id}`, values);
+        setRooms(prev => prev.map(r => r.id === selectedRoom.id ? res.data : r));
+      } else {
+        const res = await apiClient.post<Room>('/locations/rooms', values);
+        setRooms(prev => [...prev, res.data]);
+      }
+      setIsRoomModalOpen(false);
+    }, selectedRoom ? 'Cập nhật Phòng thành công.' : 'Tạo Phòng thành công.');
   });
 
   const submitBulkRoom = bulkRoomForm.handleSubmit(async (values) => {
@@ -246,13 +283,13 @@ export function LocationsManagementPage() {
           successCount++;
         }
         setRooms(prev => [...prev, ...newRooms]);
-        bulkRoomForm.reset({ ...values, startNumber: values.endNumber + 1, endNumber: values.endNumber + 10 });
         showToast(`Đã tạo thành công ${successCount} phòng.`, 'success');
+        setIsBulkRoomModalOpen(false);
       } catch (error) {
         if (newRooms.length > 0) {
           setRooms(prev => [...prev, ...newRooms]);
         }
-        showToast(`Lỗi sau khi tạo được ${successCount} phòng: ` + getApiErrorMessage(error, 'Thao tác thất bại (Có thể do mất kết nối mạng hoặc lỗi server).'), 'error');
+        showToast(`Lỗi sau khi tạo được ${successCount} phòng: ` + getApiErrorMessage(error, 'Thao tác thất bại.'), 'error');
       }
     } finally {
       setIsGenerating(false);
@@ -348,16 +385,6 @@ export function LocationsManagementPage() {
     }, `Đã xóa thành công ${selectedRoomIds.length} phòng.`);
   };
 
-  const handleAddFloorClick = (buildingId: number) => {
-    setAddingFloorToBuildingId(buildingId);
-    const buildingFloors = floors.filter(f => f.buildingId === buildingId);
-    const nextFloorNum = buildingFloors.length > 0
-      ? Math.max(...buildingFloors.map(f => f.floorNumber)) + 1
-      : 1;
-    floorForm.setValue('buildingId', buildingId);
-    floorForm.setValue('floorNumber', nextFloorNum);
-  };
-
   return (
     <div className="space-y-4 max-w-full mx-auto h-full flex flex-col">
       {/* Tabs Menu */}
@@ -386,7 +413,7 @@ export function LocationsManagementPage() {
                 <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between flex-shrink-0">
                   <h2 className="font-bold text-slate-800">Khu</h2>
                   <button
-                    onClick={() => setShowAddBuilding(!showAddBuilding)}
+                    onClick={() => handleOpenBuildingModal()}
                     className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center hover:bg-emerald-200 transition"
                     title="Thêm Khu mới"
                   >
@@ -395,17 +422,6 @@ export function LocationsManagementPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                  {showAddBuilding && (
-                    <form className="mb-4 bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2 animate-in fade-in" onSubmit={submitBuilding}>
-                      <input {...buildingForm.register('code')} className="w-full text-sm p-2 border rounded-lg" placeholder="Mã khu (VD: B1)" />
-                      <input {...buildingForm.register('name')} className="w-full text-sm p-2 border rounded-lg" placeholder="Tên khu (Tự động điền nếu để trống)" />
-                      <div className="flex gap-2">
-                        <button type="submit" className="flex-1 bg-slate-900 text-white text-xs py-2 rounded-lg">Lưu Khu</button>
-                        <button type="button" onClick={() => setShowAddBuilding(false)} className="flex-1 bg-slate-200 text-slate-700 text-xs py-2 rounded-lg">Hủy</button>
-                      </div>
-                    </form>
-                  )}
-
                   {buildings.length === 0 ? (
                     <p className="text-sm text-slate-500 text-center py-4">Chưa có dữ liệu Khu</p>
                   ) : (
@@ -423,12 +439,20 @@ export function LocationsManagementPage() {
                             </span>
                             {b.code}
                           </div>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); void handleDelete('buildings', b.id); }}
-                            className={`hidden group-hover:block text-xs px-2 rounded hover:bg-rose-500 hover:text-white transition ${expandedBuildingId === b.id ? 'text-slate-300' : 'text-slate-400'}`}
-                          >
-                            Xóa
-                          </button>
+                          <div className="hidden group-hover:flex items-center gap-1">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleOpenBuildingModal(b); }}
+                              className={`text-xs px-2 rounded hover:bg-emerald-500 hover:text-white transition ${expandedBuildingId === b.id ? 'text-slate-300' : 'text-slate-400'}`}
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); void handleDelete('buildings', b.id); }}
+                              className={`text-xs px-2 rounded hover:bg-rose-500 hover:text-white transition ${expandedBuildingId === b.id ? 'text-slate-300' : 'text-slate-400'}`}
+                            >
+                              Xóa
+                            </button>
+                          </div>
                         </div>
 
                         {/* Floors List (Nested) */}
@@ -442,33 +466,29 @@ export function LocationsManagementPage() {
                                 onClick={() => setSelectedFloorId(f.id)}
                               >
                                 <span>Tầng {f.floorNumber} {f.name ? `(${f.name})` : ''}</span>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); void handleDelete('floors', f.id); }}
-                                  className="hidden group-hover:block text-xs px-1 text-rose-400 hover:text-rose-600"
-                                >
-                                  Xóa
-                                </button>
+                                <div className="hidden group-hover:flex items-center gap-1">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleOpenFloorModal(b.id, f); }}
+                                    className="text-xs px-1 text-emerald-500 hover:text-emerald-700"
+                                  >
+                                    Sửa
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); void handleDelete('floors', f.id); }}
+                                    className="text-xs px-1 text-rose-400 hover:text-rose-600"
+                                  >
+                                    Xóa
+                                  </button>
+                                </div>
                               </div>
                             ))}
 
-                            {/* Add Floor Inline Form */}
-                            {addingFloorToBuildingId === b.id ? (
-                              <form className="mt-2 bg-slate-50 p-2 rounded-lg border border-slate-200 space-y-2 animate-in fade-in" onSubmit={submitFloor}>
-                                <input type="hidden" {...floorForm.register('buildingId')} value={b.id} />
-                                <input type="number" {...floorForm.register('floorNumber')} className="w-full text-xs p-1.5 border rounded" placeholder="Nhập số tầng (VD: 1, 2...)" autoFocus />
-                                <div className="flex gap-2">
-                                  <button type="submit" className="flex-1 bg-emerald-600 text-white text-[10px] py-1.5 rounded">Lưu Tầng</button>
-                                  <button type="button" onClick={() => setAddingFloorToBuildingId(null)} className="flex-1 bg-slate-200 text-slate-700 text-[10px] py-1.5 rounded">Hủy</button>
-                                </div>
-                              </form>
-                            ) : (
-                              <button
-                                onClick={() => handleAddFloorClick(b.id)}
-                                className="text-xs text-emerald-600 hover:text-emerald-700 font-medium py-1 px-2 w-full text-left mt-1"
-                              >
-                                + Thêm Tầng
-                              </button>
-                            )}
+                            <button
+                              onClick={() => handleOpenFloorModal(b.id)}
+                              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium py-1 px-2 w-full text-left mt-1"
+                            >
+                              + Thêm Tầng
+                            </button>
                           </div>
                         )}
                       </div>
@@ -524,64 +544,11 @@ export function LocationsManagementPage() {
                               )}
                             </div>
                           )}
-                          <button onClick={() => setShowRoomForm(showRoomForm === 'single' ? null : 'single')} className={`px-3 py-1.5 text-sm font-medium border rounded-lg shadow-sm transition ${showRoomForm === 'single' ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'}`}>+ Tạo 1 phòng</button>
-                          <button onClick={() => setShowRoomForm(showRoomForm === 'bulk' ? null : 'bulk')} className={`px-3 py-1.5 text-sm font-medium border rounded-lg shadow-sm transition ${showRoomForm === 'bulk' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'}`}>+ Tạo hàng loạt</button>
+                          <button onClick={() => handleOpenRoomModal(selectedFloorId)} className="px-3 py-1.5 text-sm font-medium border rounded-lg shadow-sm bg-white text-slate-700 border-slate-200 hover:bg-slate-50 transition">+ Tạo 1 phòng</button>
+                          <button onClick={() => handleOpenBulkRoomModal(selectedFloorId)} className="px-3 py-1.5 text-sm font-medium border rounded-lg shadow-sm bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 transition">+ Tạo hàng loạt</button>
                         </div>
                       }
                     >
-                      {showRoomForm === 'single' && (
-                        <div className="p-4 border rounded-xl bg-slate-50 shadow-sm mb-6 animate-in fade-in slide-in-from-top-4">
-                          <form className="grid gap-4" onSubmit={submitRoom}>
-                            <InputField label="Mã phòng" error={roomForm.formState.errors.roomCode?.message}>
-                              <input {...roomForm.register('roomCode')} className={inputClassName} placeholder="VD: B1-101" autoFocus />
-                            </InputField>
-                            <div className="grid grid-cols-2 gap-4">
-                              <InputField label="Sức chứa" error={roomForm.formState.errors.capacity?.message}>
-                                <input type="number" {...roomForm.register('capacity')} className={inputClassName} />
-                              </InputField>
-                              <InputField label="Ghi chú" error={roomForm.formState.errors.note?.message}>
-                                <input {...roomForm.register('note')} className={inputClassName} />
-                              </InputField>
-                            </div>
-                            <div className="flex gap-2">
-                              <button type="submit" className="px-4 py-2 text-sm font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded-lg">Lưu phòng mới</button>
-                              <button type="button" onClick={() => setShowRoomForm(null)} className="px-4 py-2 text-sm font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg">Hủy</button>
-                            </div>
-                          </form>
-                        </div>
-                      )}
-
-                      {showRoomForm === 'bulk' && (
-                        <div className="p-4 border rounded-xl bg-emerald-50/50 border-emerald-200 shadow-sm mb-6 animate-in fade-in slide-in-from-top-4">
-                          <form className="grid gap-4" onSubmit={submitBulkRoom}>
-                            <InputField label="Tiền tố phòng (VD: B1-1)" error={bulkRoomForm.formState.errors.prefix?.message}>
-                              <input {...bulkRoomForm.register('prefix')} className={inputClassName} placeholder="B1-1" autoFocus />
-                            </InputField>
-                            <div className="grid grid-cols-2 gap-4">
-                              <InputField label="Từ số (VD: 01)" error={bulkRoomForm.formState.errors.startNumber?.message}>
-                                <input type="number" {...bulkRoomForm.register('startNumber')} className={inputClassName} />
-                              </InputField>
-                              <InputField label="Đến số (VD: 20)" error={bulkRoomForm.formState.errors.endNumber?.message}>
-                                <input type="number" {...bulkRoomForm.register('endNumber')} className={inputClassName} />
-                              </InputField>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <InputField label="Sức chứa chung" error={bulkRoomForm.formState.errors.capacity?.message}>
-                                <input type="number" {...bulkRoomForm.register('capacity')} className={inputClassName} />
-                              </InputField>
-                              <InputField label="Ghi chú chung" error={bulkRoomForm.formState.errors.note?.message}>
-                                <input {...bulkRoomForm.register('note')} className={inputClassName} />
-                              </InputField>
-                            </div>
-                            <div className="flex gap-2 items-center">
-                              <button type="submit" disabled={isGenerating} className="px-4 py-2 text-sm font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg disabled:opacity-50 flex items-center gap-2">
-                                {isGenerating ? 'Đang phát sinh...' : 'Lưu hàng loạt'}
-                              </button>
-                              <button type="button" onClick={() => setShowRoomForm(null)} className="px-4 py-2 text-sm font-semibold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 rounded-lg">Hủy</button>
-                            </div>
-                          </form>
-                        </div>
-                      )}
                       {roomsOfSelectedFloor.length === 0 ? (
                         <EmptyState title="Chưa có phòng" description="Tầng này hiện chưa có phòng nào." />
                       ) : (
@@ -593,7 +560,7 @@ export function LocationsManagementPage() {
                                 if (selectedRoomIds.includes(room.id)) setSelectedRoomIds(selectedRoomIds.filter(id => id !== room.id));
                                 else setSelectedRoomIds([...selectedRoomIds, room.id]);
                               }}
-                              className={`rounded-xl border ${selectedRoomIds.includes(room.id) ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900' : 'border-slate-200 bg-white'} p-4 flex flex-col justify-between shadow-sm hover:shadow-md transition cursor-pointer`}
+                              className={`group rounded-xl border ${selectedRoomIds.includes(room.id) ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900' : 'border-slate-200 bg-white'} p-4 flex flex-col justify-between shadow-sm hover:shadow-md transition cursor-pointer`}
                             >
                               <div className="flex justify-between items-start mb-3">
                                 <div className="flex items-center gap-2">
@@ -605,14 +572,24 @@ export function LocationsManagementPage() {
                                   />
                                   <h3 className="text-lg font-bold text-slate-800">{room.roomCode}</h3>
                                 </div>
-                                <button
-                                  type="button"
-                                  onClick={(e) => { e.stopPropagation(); void handleDelete('rooms', room.id); }}
-                                  className="text-slate-300 hover:text-rose-500 transition"
-                                  title="Xóa phòng"
-                                >
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                </button>
+                                <div className="hidden group-hover:flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); handleOpenRoomModal(selectedFloorId, room); }}
+                                    className="text-slate-300 hover:text-emerald-600 transition"
+                                    title="Sửa phòng"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); void handleDelete('rooms', room.id); }}
+                                    className="text-slate-300 hover:text-rose-500 transition"
+                                    title="Xóa phòng"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                  </button>
+                                </div>
                               </div>
                               <div className="flex gap-4 text-sm text-slate-600 bg-slate-50 p-2 rounded-lg border border-slate-100">
                                 <div className="flex items-center gap-1.5 font-medium">
@@ -635,10 +612,9 @@ export function LocationsManagementPage() {
             </div>
           )}
 
-          {/* STUDENTS ASSIGNMENT TAB (Kept exactly the same robust design) */}
+          {/* STUDENTS ASSIGNMENT TAB */}
           {activeTab === 'students' && (
             <div className="space-y-6 overflow-y-auto pr-2 pb-10">
-
               <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
                 <h3 className="font-semibold text-slate-800 mb-3 flex items-center gap-2">
                   <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
@@ -811,6 +787,85 @@ export function LocationsManagementPage() {
           )}
         </div>
       )}
+
+      {/* --- MODALS --- */}
+      <Modal isOpen={isBuildingModalOpen} onClose={() => setIsBuildingModalOpen(false)} title={selectedBuilding ? 'Sửa Khu' : 'Tạo Khu Mới'} maxWidth="max-w-md">
+        <form className="grid gap-4" onSubmit={submitBuilding}>
+          <InputField label="Mã Khu" error={buildingForm.formState.errors.code?.message}>
+            <input {...buildingForm.register('code')} className={inputClassName} placeholder="VD: B1" />
+          </InputField>
+          <InputField label="Tên Khu" error={buildingForm.formState.errors.name?.message}>
+            <input {...buildingForm.register('name')} className={inputClassName} placeholder="VD: Ký túc xá B1" />
+          </InputField>
+          <div className="flex justify-end gap-3 mt-4">
+            <button type="button" onClick={() => setIsBuildingModalOpen(false)} className="px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition">Hủy</button>
+            <button type="submit" className="px-4 py-2 font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition">Lưu</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={isFloorModalOpen} onClose={() => setIsFloorModalOpen(false)} title={selectedFloor ? 'Sửa Tầng' : 'Tạo Tầng Mới'} maxWidth="max-w-md">
+        <form className="grid gap-4" onSubmit={submitFloor}>
+          <InputField label="Số Tầng" error={floorForm.formState.errors.floorNumber?.message}>
+            <input type="number" {...floorForm.register('floorNumber')} className={inputClassName} placeholder="VD: 1, 2" />
+          </InputField>
+          <InputField label="Tên Tầng (Tuỳ chọn)" error={floorForm.formState.errors.name?.message}>
+            <input {...floorForm.register('name')} className={inputClassName} placeholder="VD: Tầng 1" />
+          </InputField>
+          <div className="flex justify-end gap-3 mt-4">
+            <button type="button" onClick={() => setIsFloorModalOpen(false)} className="px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition">Hủy</button>
+            <button type="submit" className="px-4 py-2 font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition">Lưu</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={isRoomModalOpen} onClose={() => setIsRoomModalOpen(false)} title={selectedRoom ? 'Sửa Phòng' : 'Tạo Phòng Mới'} maxWidth="max-w-md">
+        <form className="grid gap-4" onSubmit={submitRoom}>
+          <InputField label="Mã Phòng" error={roomForm.formState.errors.roomCode?.message}>
+            <input {...roomForm.register('roomCode')} className={inputClassName} placeholder="VD: B1-101" />
+          </InputField>
+          <InputField label="Sức chứa (người)" error={roomForm.formState.errors.capacity?.message}>
+            <input type="number" {...roomForm.register('capacity')} className={inputClassName} placeholder="VD: 8" />
+          </InputField>
+          <InputField label="Ghi chú" error={roomForm.formState.errors.note?.message}>
+            <textarea {...roomForm.register('note')} className={`${inputClassName} resize-none h-24`} placeholder="Mô tả..." />
+          </InputField>
+          <div className="flex justify-end gap-3 mt-4">
+            <button type="button" onClick={() => setIsRoomModalOpen(false)} className="px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition">Hủy</button>
+            <button type="submit" className="px-4 py-2 font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg shadow-sm transition">Lưu</button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={isBulkRoomModalOpen} onClose={() => setIsBulkRoomModalOpen(false)} title="Tạo Phòng Hàng Loạt" maxWidth="max-w-xl">
+        <form className="grid gap-4" onSubmit={submitBulkRoom}>
+          <InputField label="Tiền tố phòng" error={bulkRoomForm.formState.errors.prefix?.message}>
+            <input {...bulkRoomForm.register('prefix')} className={inputClassName} placeholder="VD: B1-1" />
+          </InputField>
+          <div className="grid grid-cols-2 gap-4">
+            <InputField label="Từ số" error={bulkRoomForm.formState.errors.startNumber?.message}>
+              <input type="number" {...bulkRoomForm.register('startNumber')} className={inputClassName} />
+            </InputField>
+            <InputField label="Đến số" error={bulkRoomForm.formState.errors.endNumber?.message}>
+              <input type="number" {...bulkRoomForm.register('endNumber')} className={inputClassName} />
+            </InputField>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <InputField label="Sức chứa chung" error={bulkRoomForm.formState.errors.capacity?.message}>
+              <input type="number" {...bulkRoomForm.register('capacity')} className={inputClassName} />
+            </InputField>
+            <InputField label="Ghi chú chung" error={bulkRoomForm.formState.errors.note?.message}>
+              <input {...bulkRoomForm.register('note')} className={inputClassName} />
+            </InputField>
+          </div>
+          <div className="flex justify-end gap-3 mt-4">
+            <button type="button" onClick={() => setIsBulkRoomModalOpen(false)} className="px-4 py-2 font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition">Hủy</button>
+            <button type="submit" disabled={isGenerating} className="px-4 py-2 font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-sm transition disabled:opacity-50">
+              {isGenerating ? 'Đang tạo...' : 'Tạo hàng loạt'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 
