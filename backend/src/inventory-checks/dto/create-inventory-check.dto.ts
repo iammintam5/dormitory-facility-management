@@ -1,4 +1,6 @@
-import { IsDateString, IsInt, IsOptional, IsString } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, IsString, IsArray, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+import { CouncilMemberDto } from './update-council.dto';
 
 export class CreateInventoryCheckDto {
   @IsInt()
@@ -10,4 +12,10 @@ export class CreateInventoryCheckDto {
   @IsOptional()
   @IsString()
   generalNote?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CouncilMemberDto)
+  members?: CouncilMemberDto[];
 }

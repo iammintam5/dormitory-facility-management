@@ -8,6 +8,7 @@ import { LiquidationRecordsService } from './liquidation-records.service';
 import { QueryLiquidationRecordsDto } from './dto/query-liquidation-records.dto';
 import { CreateLiquidationRecordDto } from './dto/create-liquidation-record.dto';
 import { LiquidationWorkflowNoteDto } from './dto/liquidation-workflow-note.dto';
+import { UpdateCouncilDto } from './dto/update-council.dto';
 
 @Controller('liquidation-records')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -23,6 +24,15 @@ export class LiquidationRecordsController {
   @Post()
   create(@CurrentUser() currentUser: AuthUser, @Body() dto: CreateLiquidationRecordDto) {
     return this.liquidationRecordsService.create(currentUser, dto);
+  }
+
+  @Post(':id/council')
+  updateCouncil(
+    @CurrentUser() currentUser: AuthUser,
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateCouncilDto,
+  ) {
+    return this.liquidationRecordsService.updateCouncil(currentUser, id, dto);
   }
 
   @Get('assets/:assetId/history')

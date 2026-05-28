@@ -21,6 +21,8 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Badge } from '../../components/ui/Badge';
 import { PaginationBar } from '../../components/admin/PaginationBar';
+import { Modal } from '../../components/ui/Modal';
+import { CouncilMemberSelect, CouncilMemberState } from '../../components/council/CouncilMemberSelect';
 
 const createSchema = z.object({
   assetId: z.coerce.number().int().positive(),
@@ -58,6 +60,8 @@ export function LiquidationRecordsManagementPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [members, setMembers] = useState<CouncilMemberState[]>([]);
 
   const createForm = useForm<CreateFormValues>({
     resolver: zodResolver(createSchema),
@@ -127,6 +131,10 @@ export function LiquidationRecordsManagementPage() {
         assetCondition: values.assetCondition.trim(),
         reason: values.reason.trim(),
         note: values.note?.trim() || undefined,
+        members: members.length > 0 ? members.map(m => ({
+          userId: m.user.id,
+          roleInCouncil: m.roleInCouncil.trim()
+        })) : undefined,
       });
       showToast('Tạo biên bản thanh lý thành công.');
       createForm.reset({
@@ -137,9 +145,11 @@ export function LiquidationRecordsManagementPage() {
         estimatedRemainingValue: undefined,
         note: '',
       });
+      setMembers([]);
       await loadAssets();
       await loadRecords(1);
       setPage(1);
+      setIsModalOpen(false);
     } catch (error) {
       const message = getApiErrorMessage(error, 'Không thể tạo biên bản thanh lý.');
       setErrorMessage(message);
@@ -157,7 +167,7 @@ export function LiquidationRecordsManagementPage() {
           if (acc.some((item) => item.id === asset.room!.id)) return acc;
           acc.push({
             id: asset.room!.id,
-            label: `${asset.room!.roomCode} - ${asset.room!.floor?.block?.name ?? 'Khu'}`,
+            label: `${asset.room!.roomCode} - ${asset.room!.floor?.building?.name ?? 'Khu'}`,
           });
           return acc;
         }, [])
@@ -169,8 +179,10 @@ export function LiquidationRecordsManagementPage() {
     () =>
       assets
         .reduce<Array<{ id: number; label: string }>>((acc, asset) => {
-          if (acc.some((item) => item.id === asset.category.id)) return acc;
-          acc.push({ id: asset.category.id, label: asset.category.name });
+          const category = asset.category;
+          if (!category) return acc;
+          if (acc.some((item) => item.id === category.id)) return acc;
+          acc.push({ id: category.id, label: category.name });
           return acc;
         }, [])
         .sort((left, right) => left.label.localeCompare(right.label)),
@@ -191,150 +203,94 @@ export function LiquidationRecordsManagementPage() {
 
   return (
     <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Quản lý Thanh lý tài sản</h1>
+          <p className="text-sm text-slate-500 mt-1">Theo dõi và tạo mới biên bản thanh lý cho thiết bị hư hỏng, hết khấu hao.</p>
+        </div>
+        <Button onClick={() => setIsModalOpen(true)} className="bg-slate-900 text-white hover:bg-slate-800 rounded-xl px-5 py-2 h-auto font-medium">
+          + Tạo Biên bản Thanh lý
+        </Button>
+      </div>
+
       {errorMessage && (
         <div className="rounded-md bg-destructive/15 p-4 text-sm font-medium text-destructive">
           {errorMessage}
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle>Tạo biên bản thanh lý</CardTitle>
-            <CardDescription>Tài sản sẽ được chuyển sang trạng thái chờ thanh lý.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form className="space-y-4" onSubmit={submitCreate}>
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Tài sản</label>
-                <Select {...createForm.register('assetId', { valueAsNumber: true })} error={!!createForm.formState.errors.assetId}>
-                  <option value={0}>Chọn tài sản</option>
-                  {assets.map((asset) => (
-                    <option key={asset.id} value={asset.id}>
-                      {asset.assetCode} - {asset.assetName}
-                    </option>
-                  ))}
-                </Select>
-                {createForm.formState.errors.assetId && <p className="text-xs text-destructive">{createForm.formState.errors.assetId.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Ngày thanh lý</label>
-                <Input type="date" {...createForm.register('liquidationDate')} error={!!createForm.formState.errors.liquidationDate} />
-                {createForm.formState.errors.liquidationDate && <p className="text-xs text-destructive">{createForm.formState.errors.liquidationDate.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Tình trạng tài sản</label>
-                <textarea
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  {...createForm.register('assetCondition')}
-                />
-                {createForm.formState.errors.assetCondition && <p className="text-xs text-destructive">{createForm.formState.errors.assetCondition.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Lý do thanh lý</label>
-                <textarea
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  {...createForm.register('reason')}
-                />
-                {createForm.formState.errors.reason && <p className="text-xs text-destructive">{createForm.formState.errors.reason.message}</p>}
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Giá trị còn lại ước tính</label>
-                <Input
-                  type="number"
-                  min={0}
-                  step="1000"
-                  {...createForm.register('estimatedRemainingValue', { valueAsNumber: true })}
-                />
-              </div>
-
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting ? 'Đang tạo...' : 'Tạo biên bản'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Lọc danh sách</CardTitle>
-            <CardDescription>Tìm nhanh biên bản theo trạng thái, loại tài sản...</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Trạng thái</label>
-                <Select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setPage(1);
-                    setStatusFilter(e.target.value);
-                  }}
-                >
-                  <option value="">Tất cả</option>
-                  {statusOptions.map((status) => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Phòng</label>
-                <Select
-                  value={roomFilter}
-                  onChange={(e) => {
-                    setPage(1);
-                    setRoomFilter(e.target.value);
-                  }}
-                >
-                  <option value="">Tất cả phòng</option>
-                  {roomOptions.map((room) => (
-                    <option key={room.id} value={room.id}>{room.label}</option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Loại tài sản</label>
-                <Select
-                  value={categoryFilter}
-                  onChange={(e) => {
-                    setPage(1);
-                    setCategoryFilter(e.target.value);
-                  }}
-                >
-                  <option value="">Tất cả loại</option>
-                  {categoryOptions.map((category) => (
-                    <option key={category.id} value={category.id}>{category.label}</option>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Từ khóa</label>
-                <Input
-                  value={keyword}
-                  onChange={(e) => {
-                    setPage(1);
-                    setKeyword(e.target.value);
-                  }}
-                  placeholder="Mã biên bản, lý do..."
-                />
-              </div>
+      <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
+        <CardContent className="p-4 bg-slate-50/50">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 items-end">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Trạng thái</label>
+              <Select
+                value={statusFilter}
+                onChange={(e) => {
+                  setPage(1);
+                  setStatusFilter(e.target.value);
+                }}
+                className="bg-white"
+              >
+                <option value="">Tất cả</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
+              </Select>
             </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Danh sách Biên bản thanh lý</CardTitle>
-        </CardHeader>
-        <CardContent>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Phòng</label>
+              <Select
+                value={roomFilter}
+                onChange={(e) => {
+                  setPage(1);
+                  setRoomFilter(e.target.value);
+                }}
+                className="bg-white"
+              >
+                <option value="">Tất cả phòng</option>
+                {roomOptions.map((room) => (
+                  <option key={room.id} value={room.id}>{room.label}</option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Loại tài sản</label>
+              <Select
+                value={categoryFilter}
+                onChange={(e) => {
+                  setPage(1);
+                  setCategoryFilter(e.target.value);
+                }}
+                className="bg-white"
+              >
+                <option value="">Tất cả loại</option>
+                {categoryOptions.map((category) => (
+                  <option key={category.id} value={category.id}>{category.label}</option>
+                ))}
+              </Select>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Từ khóa</label>
+              <Input
+                value={keyword}
+                onChange={(e) => {
+                  setPage(1);
+                  setKeyword(e.target.value);
+                }}
+                placeholder="Mã biên bản, lý do..."
+                className="bg-white"
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
+        <CardContent className="p-0">
           {isLoading ? (
             <div className="flex justify-center p-8 text-muted-foreground animate-pulse">
               Đang tải danh sách biên bản thanh lý...
@@ -367,9 +323,9 @@ export function LiquidationRecordsManagementPage() {
                         </p>
                       </TableCell>
                       <TableCell>
-                        <p>{record.asset.assetCode} - {record.asset.assetName}</p>
+                        <p>{record.liquidationItems[0]?.asset.assetCode} - {record.liquidationItems[0]?.asset.assetName}</p>
                         <p className="text-xs text-muted-foreground">
-                          {record.asset.room?.roomCode ?? '--'} / {record.asset.category.name}
+                          {record.liquidationItems[0]?.asset.room?.roomCode ?? '--'} / {record.liquidationItems[0]?.asset.category?.name}
                         </p>
                       </TableCell>
                       <TableCell>
@@ -379,10 +335,10 @@ export function LiquidationRecordsManagementPage() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
-                          <Link to={`${basePath}/liquidation-records/${record.id}`}>
+                          <Link to={`${basePath}/liquidations/${record.id}`}>
                             <Button variant="outline" size="sm">Chi tiết</Button>
                           </Link>
-                          <Link to={`${basePath}/liquidation-records/${record.id}/print`}>
+                          <Link to={`${basePath}/liquidations/${record.id}/print`}>
                             <Button variant="secondary" size="sm">In phiếu</Button>
                           </Link>
                         </div>
@@ -403,6 +359,85 @@ export function LiquidationRecordsManagementPage() {
           )}
         </CardContent>
       </Card>
+
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Tạo Biên bản Thanh lý"
+        size="lg"
+      >
+        <p className="text-sm text-slate-500 mb-6">Tài sản được chọn sẽ được chuyển sang trạng thái chờ thanh lý sau khi tạo biên bản.</p>
+        <form id="create-liquidation-form" className="space-y-4" onSubmit={submitCreate}>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Tài sản cần thanh lý</label>
+            <Select {...createForm.register('assetId', { valueAsNumber: true })} error={!!createForm.formState.errors.assetId}>
+              <option value={0}>-- Chọn tài sản --</option>
+              {assets.map((asset) => (
+                <option key={asset.id} value={asset.id}>
+                  {asset.assetCode} - {asset.assetName}
+                </option>
+              ))}
+            </Select>
+            {createForm.formState.errors.assetId && <p className="text-xs text-destructive">{createForm.formState.errors.assetId.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Ngày thanh lý</label>
+            <Input type="date" {...createForm.register('liquidationDate')} error={!!createForm.formState.errors.liquidationDate} />
+            {createForm.formState.errors.liquidationDate && <p className="text-xs text-destructive">{createForm.formState.errors.liquidationDate.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Tình trạng tài sản</label>
+            <textarea
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Mô tả tình trạng hư hỏng hiện tại..."
+              {...createForm.register('assetCondition')}
+            />
+            {createForm.formState.errors.assetCondition && <p className="text-xs text-destructive">{createForm.formState.errors.assetCondition.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Lý do thanh lý</label>
+            <textarea
+              className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              placeholder="Lý do đề xuất thanh lý..."
+              {...createForm.register('reason')}
+            />
+            {createForm.formState.errors.reason && <p className="text-xs text-destructive">{createForm.formState.errors.reason.message}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Giá trị còn lại ước tính (VNĐ)</label>
+            <Input
+              type="number"
+              min={0}
+              step="1000"
+              placeholder="VD: 50000"
+              {...createForm.register('estimatedRemainingValue', { valueAsNumber: true })}
+            />
+          </div>
+
+          <div className="space-y-2 border-t pt-4">
+            <h3 className="text-sm font-medium">Hội đồng thanh lý (Tùy chọn)</h3>
+            <p className="text-sm text-slate-500 mb-4">Bạn có thể chọn hội đồng ngay bây giờ hoặc cập nhật sau khi tạo phiếu.</p>
+            <CouncilMemberSelect 
+              members={members} 
+              onChange={setMembers} 
+              disabled={isSubmitting} 
+            />
+          </div>
+
+          <div className="pt-4 flex justify-end gap-3 border-t">
+            <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+              Hủy
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Đang tạo...' : 'Tạo biên bản'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
