@@ -223,7 +223,7 @@ export class MaintenanceService {
     if (dto.planId) {
       plan = await this.ensurePlanExists(dto.planId);
       if (plan.assetId !== dto.assetId) {
-        throw new BadRequestException('Ke hoach bao tri khong thuoc tai san da chon.');
+        throw new BadRequestException('Kế hoạch bảo trì không thuộc tài sản đã chọn.');
       }
     }
 
@@ -339,7 +339,7 @@ export class MaintenanceService {
       include: this.maintenanceRecordInclude,
     });
     if (!record) {
-      throw new NotFoundException('Khong tim thay phieu bao tri.');
+      throw new NotFoundException('Không tìm thấy phiếu bảo trì.');
     }
     return record;
   }
@@ -349,7 +349,7 @@ export class MaintenanceService {
     return {
       ...record,
       printable: {
-        title: 'Phieu bao tri tai san',
+        title: 'Phiếu bảo trì tài sản',
         generatedAt: new Date().toISOString(),
         assetLabel: `${record.asset.assetName} (${record.asset.assetCode})`,
         performedByLabel: `${record.performedByUser.fullName} (${record.performedByUser.userCode})`,
@@ -376,12 +376,12 @@ export class MaintenanceService {
     const record = await this.ensureRecordExists(recordId);
     if (record.resultStatus !== MaintenanceResultStatus.NEED_REPAIR) {
       throw new ConflictException(
-        'Chi duoc tao phieu bao hong khi ket qua bao tri la NEED_REPAIR.',
+        'Chỉ được tạo phiếu báo hỏng khi kết quả bảo trì là NEED_REPAIR.',
       );
     }
 
     if (!record.asset.roomId) {
-      throw new BadRequestException('Tai san hien khong gan voi phong hop le.');
+      throw new BadRequestException('Tài sản hiện không gắn với phòng hợp lệ.');
     }
 
     const reportCode = await this.generateDamageReportCode();
@@ -403,7 +403,7 @@ export class MaintenanceService {
           reportId: created.id,
           action: 'create',
           newStatus: DamageReportStatus.SUBMITTED,
-          note: `Tao tu phieu bao tri ${record.maintenanceCode}.`,
+          note: `Tạo từ phiếu bảo trì ${record.maintenanceCode}.`,
           createdBy: currentUser.userId,
         },
       });
@@ -439,7 +439,7 @@ export class MaintenanceService {
     const record = await this.ensureRecordExists(recordId);
     if (record.resultStatus !== MaintenanceResultStatus.RECOMMEND_LIQUIDATION) {
       throw new ConflictException(
-        'Chi duoc tao bien ban thanh ly khi ket qua bao tri la RECOMMEND_LIQUIDATION.',
+        'Chỉ được tạo biên bản thanh lý khi kết quả bảo trì là RECOMMEND_LIQUIDATION.',
       );
     }
 
@@ -571,7 +571,7 @@ export class MaintenanceService {
 
   private ensureManager(currentUser: AuthUser) {
     if (!['ADMIN', 'QL_CSVC'].includes(currentUser.role)) {
-      throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay.');
+      throw new ForbiddenException('Bạn không có quyền thực hiện thao tác này.');
     }
   }
 
@@ -591,7 +591,7 @@ export class MaintenanceService {
         },
       },
     });
-    if (!asset) throw new NotFoundException('Khong tim thay tai san.');
+    if (!asset) throw new NotFoundException('Không tìm thấy tài sản.');
     return asset;
   }
 
@@ -604,7 +604,7 @@ export class MaintenanceService {
       },
     });
     if (existing) {
-      throw new ConflictException('Tai san nay da co ke hoach bao tri dang hoat dong.');
+      throw new ConflictException('Tài sản này đã có kế hoạch bảo trì đang hoạt động.');
     }
   }
 
@@ -613,7 +613,7 @@ export class MaintenanceService {
       where: { id },
       include: this.maintenancePlanInclude,
     });
-    if (!plan) throw new NotFoundException('Khong tim thay ke hoach bao tri.');
+    if (!plan) throw new NotFoundException('Không tìm thấy kế hoạch bảo trì.');
     return plan;
   }
 
@@ -622,7 +622,7 @@ export class MaintenanceService {
       where: { id },
       include: this.maintenanceRecordInclude,
     });
-    if (!record) throw new NotFoundException('Khong tim thay phieu bao tri.');
+    if (!record) throw new NotFoundException('Không tìm thấy phiếu bảo trì.');
     return record;
   }
 
@@ -682,8 +682,8 @@ export class MaintenanceService {
             await tx.notification.create({
               data: {
                 userId: manager.id,
-                title: 'Tai san den han bao tri',
-                content: `${plan.asset.assetName} (${plan.asset.assetCode}) da den han bao tri vao ${plan.nextDueDate.toISOString().slice(0, 10)}.`,
+                title: 'Tài sản đến hạn bảo trì',
+                content: `${plan.asset.assetName} (${plan.asset.assetCode}) đã đến hạn bảo trì vào ${plan.nextDueDate.toISOString().slice(0, 10)}.`,
                 status: NotificationStatus.UNREAD,
                 relatedTable: 'maintenance_plans',
                 relatedId: plan.id,

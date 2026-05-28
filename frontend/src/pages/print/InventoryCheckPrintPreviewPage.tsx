@@ -30,7 +30,7 @@ export function InventoryCheckPrintPreviewPage({ backTo }: { backTo?: string } =
       );
       setInventoryCheck(response.data);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai du lieu in phieu kiem ke.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải dữ liệu in phiếu kiểm kê.'));
     }
   };
 
@@ -45,7 +45,7 @@ export function InventoryCheckPrintPreviewPage({ backTo }: { backTo?: string } =
   if (!inventoryCheck) {
     return (
       <div className="mx-auto max-w-3xl rounded-2xl bg-slate-50 p-6 text-sm text-slate-600">
-        Dang tai bieu mau in...
+        Đang tải biểu mẫu in...
       </div>
     );
   }
@@ -60,7 +60,7 @@ export function InventoryCheckPrintPreviewPage({ backTo }: { backTo?: string } =
             to={backTo}
             className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
-            Quay lai
+            Quay lại
           </Link>
         ) : undefined
       }

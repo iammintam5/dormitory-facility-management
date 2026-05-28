@@ -10,8 +10,8 @@ import { apiClient } from '../../lib/axios';
 import { AssetCategory } from '../../types/assets';
 
 const categorySchema = z.object({
-  code: z.string().min(1, 'Vui long nhap ma loai tai san.'),
-  name: z.string().min(1, 'Vui long nhap ten loai tai san.'),
+  code: z.string().min(1, 'Vui lòng nhập mã loại tài sản.'),
+  name: z.string().min(1, 'Vui lòng nhập tên loại tài sản.'),
   description: z.string().optional(),
   maintenanceCycleMonths: z
     .union([z.coerce.number().int().positive(), z.literal(''), z.undefined()])
@@ -55,7 +55,7 @@ export function AssetCategoriesManagementPage() {
       const response = await apiClient.get<AssetCategory[]>('/asset-categories');
       setCategories(response.data);
     } catch (error) {
-      showToast(getApiErrorMessage(error, 'Khong the tai danh sach loai tai san.'), 'error');
+      showToast(getApiErrorMessage(error, 'Không thể tải danh sách loại tài sản.'), 'error');
     } finally {
       setIsLoading(false);
     }
@@ -77,17 +77,17 @@ export function AssetCategoriesManagementPage() {
 
       if (selectedCategory) {
         await apiClient.patch(`/asset-categories/${selectedCategory.id}`, payload);
-        showToast('Cap nhat loai tai san thanh cong.', 'success');
+        showToast('Cập nhật loại tài sản thành công.', 'success');
       } else {
         await apiClient.post('/asset-categories', payload);
-        showToast('Tao loai tai san thanh cong.', 'success');
+        showToast('Tạo loại tài sản thành công.', 'success');
       }
 
       setSelectedCategory(null);
       reset(defaultValues);
       await fetchCategories();
     } catch (error) {
-      showToast(getApiErrorMessage(error, 'Khong the luu loai tai san.'), 'error');
+      showToast(getApiErrorMessage(error, 'Không thể lưu loại tài sản.'), 'error');
     } finally {
       setIsSaving(false);
     }
@@ -106,24 +106,24 @@ export function AssetCategoriesManagementPage() {
   const handleDelete = async (categoryId: number) => {
     try {
       await apiClient.delete(`/asset-categories/${categoryId}`);
-      showToast('Xoa loai tai san thanh cong.', 'success');
+      showToast('Xóa loại tài sản thành công.', 'success');
       await fetchCategories();
     } catch (error) {
-      showToast(getApiErrorMessage(error, 'Khong the xoa loai tai san.'), 'error');
+      showToast(getApiErrorMessage(error, 'Không thể xóa loại tài sản.'), 'error');
     }
   };
 
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Quan ly loai tai san"
-        description="Quan ly danh muc loai tai san va chu ky bao tri mac dinh."
+        title="Quản lý loại tài sản"
+        description="Quản lý danh mục loại tài sản và chu kỳ bảo trì mặc định."
       >
         <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
           <form className="space-y-4 rounded-2xl bg-slate-50 p-4" onSubmit={onSubmit}>
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-900">
-                {selectedCategory ? 'Cap nhat loai tai san' : 'Tao loai tai san moi'}
+                {selectedCategory ? 'Cập nhật loại tài sản' : 'Tạo loại tài sản mới'}
               </h3>
               {selectedCategory && (
                 <button
@@ -134,25 +134,25 @@ export function AssetCategoriesManagementPage() {
                   }}
                   className="text-sm font-medium text-slate-600 hover:text-slate-900"
                 >
-                  Bo chon
+                  Bỏ chọn
                 </button>
               )}
             </div>
 
-            <Field label="Ma loai" error={errors.code?.message}>
+            <Field label="Mã loại" error={errors.code?.message}>
               <input {...register('code')} className={inputClassName} />
             </Field>
 
-            <Field label="Ten loai" error={errors.name?.message}>
+            <Field label="Tên loại" error={errors.name?.message}>
               <input {...register('name')} className={inputClassName} />
             </Field>
 
-            <Field label="Mo ta" error={errors.description?.message}>
+            <Field label="Mô tả" error={errors.description?.message}>
               <textarea {...register('description')} className={`${inputClassName} min-h-24`} />
             </Field>
 
             <Field
-              label="Chu ky bao tri (thang)"
+              label="Chu kỳ bảo trì (tháng)"
               error={errors.maintenanceCycleMonths?.message as string | undefined}
             >
               <input type="number" {...register('maintenanceCycleMonths')} className={inputClassName} />
@@ -163,18 +163,18 @@ export function AssetCategoriesManagementPage() {
               disabled={isSaving}
               className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
             >
-              {isSaving ? 'Dang luu...' : selectedCategory ? 'Cap nhat' : 'Tao loai tai san'}
+              {isSaving ? 'Đang lưu...' : selectedCategory ? 'Cập nhật' : 'Tạo loại tài sản'}
             </button>
           </form>
 
           {isLoading ? (
             <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-              Dang tai loai tai san...
+              Đang tải loại tài sản...
             </div>
           ) : categories.length === 0 ? (
             <EmptyState
-              title="Chua co loai tai san nao"
-              description="Hay tao loai tai san dau tien o khung ben trai."
+              title="Chưa có loại tài sản nào"
+              description="Hãy tạo loại tài sản đầu tiên ở khung bên trái."
             />
           ) : (
             <div className="overflow-hidden rounded-2xl border border-slate-200">
@@ -182,9 +182,9 @@ export function AssetCategoriesManagementPage() {
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50 text-left text-slate-600">
                     <tr>
-                      <th className="px-4 py-3 font-medium">Loai tai san</th>
-                      <th className="px-4 py-3 font-medium">Chu ky bao tri</th>
-                      <th className="px-4 py-3 font-medium">Thao tac</th>
+                      <th className="px-4 py-3 font-medium">Loại tài sản</th>
+                      <th className="px-4 py-3 font-medium">Chu kỳ bảo trì</th>
+                      <th className="px-4 py-3 font-medium">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -196,7 +196,7 @@ export function AssetCategoriesManagementPage() {
                           <p className="mt-1 text-xs text-slate-500">{category.description || '--'}</p>
                         </td>
                         <td className="px-4 py-3 text-slate-700">
-                          {category.maintenanceCycleMonths ? `${category.maintenanceCycleMonths} thang` : 'Khong co'}
+                          {category.maintenanceCycleMonths ? `${category.maintenanceCycleMonths} tháng` : 'Không có'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex flex-wrap gap-2">
@@ -205,14 +205,14 @@ export function AssetCategoriesManagementPage() {
                               onClick={() => handleEdit(category)}
                               className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                             >
-                              Sua
+                              Sửa
                             </button>
                             <button
                               type="button"
                               onClick={() => void handleDelete(category.id)}
                               className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50"
                             >
-                              Xoa
+                              Xóa
                             </button>
                           </div>
                         </td>

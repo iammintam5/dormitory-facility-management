@@ -28,42 +28,42 @@ async function main() {
   const adminRole = await prisma.role.upsert({
     where: { code: 'ADMIN' },
     update: {
-      name: 'Quan tri he thong',
-      description: 'Toan quyen quan tri he thong',
+      name: 'Quản trị hệ thống',
+      description: 'Toàn quyền quản trị hệ thống',
     },
     create: {
       id: 1,
       code: 'ADMIN',
-      name: 'Quan tri he thong',
-      description: 'Toan quyen quan tri he thong',
+      name: 'Quản trị hệ thống',
+      description: 'Toàn quyền quản trị hệ thống',
     },
   });
 
   const managerRole = await prisma.role.upsert({
     where: { code: 'QL_CSVC' },
     update: {
-      name: 'Quan ly co so vat chat',
-      description: 'Quan ly tai san va van hanh CSVC',
+      name: 'Quản lý cơ sở vật chất',
+      description: 'Quản lý tài sản và vận hành CSVC',
     },
     create: {
       id: 2,
       code: 'QL_CSVC',
-      name: 'Quan ly co so vat chat',
-      description: 'Quan ly tai san va van hanh CSVC',
+      name: 'Quản lý cơ sở vật chất',
+      description: 'Quản lý tài sản và vận hành CSVC',
     },
   });
 
   const studentRole = await prisma.role.upsert({
     where: { code: 'STUDENT' },
     update: {
-      name: 'Sinh vien',
-      description: 'Sinh vien noi tru',
+      name: 'Sinh viên',
+      description: 'Sinh viên nội trú',
     },
     create: {
       id: 3,
       code: 'STUDENT',
-      name: 'Sinh vien',
-      description: 'Sinh vien noi tru',
+      name: 'Sinh viên',
+      description: 'Sinh viên nội trú',
     },
   });
 
@@ -71,7 +71,7 @@ async function main() {
     where: { userCode: 'ADMIN001' },
     update: {
       roleId: adminRole.id,
-      fullName: 'Nguyen Quan Tri',
+      fullName: 'Nguyễn Quan Trị',
       email: 'admin@ktx.local',
       phone: '0900000001',
       passwordHash: adminPasswordHash,
@@ -80,7 +80,7 @@ async function main() {
     create: {
       id: 1,
       roleId: adminRole.id,
-      fullName: 'Nguyen Quan Tri',
+      fullName: 'Nguyễn Quan Trị',
       userCode: 'ADMIN001',
       email: 'admin@ktx.local',
       phone: '0900000001',
@@ -93,7 +93,7 @@ async function main() {
     where: { userCode: 'QLCSVC001' },
     update: {
       roleId: managerRole.id,
-      fullName: 'Tran Co So Vat Chat',
+      fullName: 'Trần Vật Chất',
       email: 'qlcsvc@ktx.local',
       phone: '0900000002',
       passwordHash: managerPasswordHash,
@@ -102,7 +102,7 @@ async function main() {
     create: {
       id: 2,
       roleId: managerRole.id,
-      fullName: 'Tran Co So Vat Chat',
+      fullName: 'Trần Vật Chất',
       userCode: 'QLCSVC001',
       email: 'qlcsvc@ktx.local',
       phone: '0900000002',
@@ -115,7 +115,7 @@ async function main() {
     where: { userCode: 'SV001' },
     update: {
       roleId: studentRole.id,
-      fullName: 'Le Minh An',
+      fullName: 'Lê Minh An',
       email: 'sv001@ktx.local',
       phone: '0900000011',
       passwordHash: studentPasswordHash,
@@ -124,7 +124,7 @@ async function main() {
     create: {
       id: 3,
       roleId: studentRole.id,
-      fullName: 'Le Minh An',
+      fullName: 'Lê Minh An',
       userCode: 'SV001',
       email: 'sv001@ktx.local',
       phone: '0900000011',
@@ -137,7 +137,7 @@ async function main() {
     where: { userCode: 'SV002' },
     update: {
       roleId: studentRole.id,
-      fullName: 'Pham Thu Binh',
+      fullName: 'Phạm Thúy Bình',
       email: 'sv002@ktx.local',
       phone: '0900000012',
       passwordHash: studentPasswordHash,
@@ -146,7 +146,7 @@ async function main() {
     create: {
       id: 4,
       roleId: studentRole.id,
-      fullName: 'Pham Thu Binh',
+      fullName: 'Phạm Thúy Bình',
       userCode: 'SV002',
       email: 'sv002@ktx.local',
       phone: '0900000012',
@@ -159,7 +159,7 @@ async function main() {
     where: { userCode: 'SV003' },
     update: {
       roleId: studentRole.id,
-      fullName: 'Do Gia Cuong',
+      fullName: 'Đỗ Gia Cường',
       email: 'sv003@ktx.local',
       phone: '0900000013',
       passwordHash: studentPasswordHash,
@@ -168,7 +168,7 @@ async function main() {
     create: {
       id: 5,
       roleId: studentRole.id,
-      fullName: 'Do Gia Cuong',
+      fullName: 'Đỗ Gia Cường',
       userCode: 'SV003',
       email: 'sv003@ktx.local',
       phone: '0900000013',
@@ -197,13 +197,13 @@ async function main() {
       },
     },
     update: {
-      name: 'Tang 1',
+      name: 'Tầng 1',
     },
     create: {
       id: 1,
       buildingId: buildingA.id,
       floorNumber: 1,
-      name: 'Tang 1',
+      name: 'Tầng 1',
     },
   });
 
@@ -215,13 +215,13 @@ async function main() {
       },
     },
     update: {
-      name: 'Tang 2',
+      name: 'Tầng 2',
     },
     create: {
       id: 2,
       buildingId: buildingA.id,
       floorNumber: 2,
-      name: 'Tang 2',
+      name: 'Tầng 2',
     },
   });
 
@@ -234,14 +234,14 @@ async function main() {
     },
     update: {
       capacity: 4,
-      note: 'Phong 4 nguoi tang 1',
+      note: 'Phòng 4 người tầng 1',
     },
     create: {
       id: 1,
       floorId: floor1.id,
       roomCode: 'A101',
       capacity: 4,
-      note: 'Phong 4 nguoi tang 1',
+      note: 'Phòng 4 người tầng 1',
     },
   });
 
@@ -254,14 +254,14 @@ async function main() {
     },
     update: {
       capacity: 4,
-      note: 'Phong 4 nguoi tang 1',
+      note: 'Phòng 4 người tầng 1',
     },
     create: {
       id: 2,
       floorId: floor1.id,
       roomCode: 'A102',
       capacity: 4,
-      note: 'Phong 4 nguoi tang 1',
+      note: 'Phòng 4 người tầng 1',
     },
   });
 
@@ -274,14 +274,14 @@ async function main() {
     },
     update: {
       capacity: 6,
-      note: 'Phong 6 nguoi tang 2',
+      note: 'Phòng 6 người tầng 2',
     },
     create: {
       id: 3,
       floorId: floor2.id,
       roomCode: 'A201',
       capacity: 6,
-      note: 'Phong 6 nguoi tang 2',
+      note: 'Phòng 6 người tầng 2',
     },
   });
 
@@ -294,14 +294,14 @@ async function main() {
     },
     update: {
       capacity: 6,
-      note: 'Phong 6 nguoi tang 2',
+      note: 'Phòng 6 người tầng 2',
     },
     create: {
       id: 4,
       floorId: floor2.id,
       roomCode: 'A202',
       capacity: 6,
-      note: 'Phong 6 nguoi tang 2',
+      note: 'Phòng 6 người tầng 2',
     },
   });
 
@@ -371,15 +371,15 @@ async function main() {
   const categoryBed = await prisma.assetCategory.upsert({
     where: { code: 'BED' },
     update: {
-      name: 'Giuong',
-      description: 'Giuong ky tuc xa',
+      name: 'Giường',
+      description: 'Giường ký túc xá',
       maintenanceCycleMonths: 24,
     },
     create: {
       id: 1,
       code: 'BED',
-      name: 'Giuong',
-      description: 'Giuong ky tuc xa',
+      name: 'Giường',
+      description: 'Giường ký túc xá',
       maintenanceCycleMonths: 24,
     },
   });
@@ -387,15 +387,15 @@ async function main() {
   const categoryDesk = await prisma.assetCategory.upsert({
     where: { code: 'DESK' },
     update: {
-      name: 'Ban hoc',
-      description: 'Ban hoc sinh vien',
+      name: 'Bàn học',
+      description: 'Bàn học sinh viên',
       maintenanceCycleMonths: null,
     },
     create: {
       id: 2,
       code: 'DESK',
-      name: 'Ban hoc',
-      description: 'Ban hoc sinh vien',
+      name: 'Bàn học',
+      description: 'Bàn học sinh viên',
       maintenanceCycleMonths: null,
     },
   });
@@ -403,15 +403,15 @@ async function main() {
   const categoryFan = await prisma.assetCategory.upsert({
     where: { code: 'FAN' },
     update: {
-      name: 'Quat tran',
-      description: 'Quat su dung trong phong',
+      name: 'Quạt trần',
+      description: 'Quạt sử dụng trong phòng',
       maintenanceCycleMonths: 6,
     },
     create: {
       id: 3,
       code: 'FAN',
-      name: 'Quat tran',
-      description: 'Quat su dung trong phong',
+      name: 'Quạt trần',
+      description: 'Quạt sử dụng trong phòng',
       maintenanceCycleMonths: 6,
     },
   });
@@ -421,20 +421,20 @@ async function main() {
     update: {
       categoryId: categoryBed.id,
       roomId: roomA101.id,
-      assetName: 'Giuong tang A101-01',
+      assetName: 'Giường tầng A101-01',
       status: AssetStatus.IN_USE,
       yearInUse: 2025,
-      description: 'Bo giuong phong A101',
+      description: 'Bộ giường phòng A101',
     },
     create: {
       id: 1,
       categoryId: categoryBed.id,
       roomId: roomA101.id,
       assetCode: 'AST-A101-BED-01',
-      assetName: 'Giuong tang A101-01',
+      assetName: 'Giường tầng A101-01',
       status: AssetStatus.IN_USE,
       yearInUse: 2025,
-      description: 'Bo giuong phong A101',
+      description: 'Bộ giường phòng A101',
     },
   });
 
@@ -443,20 +443,20 @@ async function main() {
     update: {
       categoryId: categoryDesk.id,
       roomId: roomA101.id,
-      assetName: 'Ban hoc A101-01',
+      assetName: 'Bàn học A101-01',
       status: AssetStatus.IN_USE,
       yearInUse: 2025,
-      description: 'Ban hoc phong A101',
+      description: 'Bàn học phòng A101',
     },
     create: {
       id: 2,
       categoryId: categoryDesk.id,
       roomId: roomA101.id,
       assetCode: 'AST-A101-DESK-01',
-      assetName: 'Ban hoc A101-01',
+      assetName: 'Bàn học A101-01',
       status: AssetStatus.IN_USE,
       yearInUse: 2025,
-      description: 'Ban hoc phong A101',
+      description: 'Bàn học phòng A101',
     },
   });
 
@@ -465,20 +465,20 @@ async function main() {
     update: {
       categoryId: categoryFan.id,
       roomId: roomA102.id,
-      assetName: 'Quat tran A102',
+      assetName: 'Quạt trần A102',
       status: AssetStatus.UNDER_MAINTENANCE,
       yearInUse: 2025,
-      description: 'Quat tran phong A102',
+      description: 'Quạt trần phòng A102',
     },
     create: {
       id: 3,
       categoryId: categoryFan.id,
       roomId: roomA102.id,
       assetCode: 'AST-A102-FAN-01',
-      assetName: 'Quat tran A102',
+      assetName: 'Quạt trần A102',
       status: AssetStatus.UNDER_MAINTENANCE,
       yearInUse: 2025,
-      description: 'Quat tran phong A102',
+      description: 'Quạt trần phòng A102',
     },
   });
 
@@ -487,20 +487,20 @@ async function main() {
     update: {
       categoryId: categoryBed.id,
       roomId: roomA201.id,
-      assetName: 'Giuong tang A201-01',
+      assetName: 'Giường tầng A201-01',
       status: AssetStatus.PENDING_LIQUIDATION,
       yearInUse: 2025,
-      description: 'Bo giuong phong A201',
+      description: 'Bộ giường phòng A201',
     },
     create: {
       id: 4,
       categoryId: categoryBed.id,
       roomId: roomA201.id,
       assetCode: 'AST-A201-BED-01',
-      assetName: 'Giuong tang A201-01',
+      assetName: 'Giường tầng A201-01',
       status: AssetStatus.PENDING_LIQUIDATION,
       yearInUse: 2025,
-      description: 'Bo giuong phong A201',
+      description: 'Bộ giường phòng A201',
     },
   });
 
@@ -513,7 +513,7 @@ async function main() {
       handoverDate: new Date('2026-01-10'),
       status: ApprovalStatus.APPROVED,
       returnedAt: null,
-      note: 'Ban giao tai san ban dau',
+      note: 'Bàn giao tài sản ban đầu',
     },
     create: {
       id: 1,
@@ -523,7 +523,7 @@ async function main() {
       createdBy: facilityManager.id,
       handoverDate: new Date('2026-01-10'),
       status: ApprovalStatus.APPROVED,
-      note: 'Ban giao tai san ban dau',
+      note: 'Bàn giao tài sản ban đầu',
     },
   });
 
@@ -538,7 +538,7 @@ async function main() {
       quantity: 1,
       conditionAtHandover: 'Tot',
       conditionAtReturn: null,
-      note: 'Khong co bat thuong',
+      note: 'Không có bất thường',
     },
     create: {
       id: 1,
@@ -546,7 +546,7 @@ async function main() {
       assetId: assetBedA101.id,
       quantity: 1,
       conditionAtHandover: 'Tot',
-      note: 'Khong co bat thuong',
+      note: 'Không có bất thường',
     },
   });
 
@@ -561,7 +561,7 @@ async function main() {
       quantity: 1,
       conditionAtHandover: 'Tot',
       conditionAtReturn: null,
-      note: 'Ban hoc su dung on dinh',
+      note: 'Bàn học sử dụng ổn định',
     },
     create: {
       id: 2,
@@ -569,7 +569,7 @@ async function main() {
       assetId: assetDeskA101.id,
       quantity: 1,
       conditionAtHandover: 'Tot',
-      note: 'Ban hoc su dung on dinh',
+      note: 'Bàn học sử dụng ổn định',
     },
   });
 
@@ -580,7 +580,7 @@ async function main() {
       checkedBy: facilityManager.id,
       checkDate: new Date('2026-05-01'),
       status: ApprovalStatus.COMPLETED,
-      generalNote: 'Kiem ke dinh ky phong A101',
+      generalNote: 'Kiểm kê định kỳ phòng A101',
       completedAt: new Date('2026-05-01T10:00:00'),
     },
     create: {
@@ -590,7 +590,7 @@ async function main() {
       checkedBy: facilityManager.id,
       checkDate: new Date('2026-05-01'),
       status: ApprovalStatus.COMPLETED,
-      generalNote: 'Kiem ke dinh ky phong A101',
+      generalNote: 'Kiểm kê định kỳ phòng A101',
       completedAt: new Date('2026-05-01T10:00:00'),
     },
   });
@@ -607,7 +607,7 @@ async function main() {
       actualQuantity: 1,
       difference: 0,
       actualCondition: 'Tot',
-      note: 'Trung khop he thong',
+      note: 'Trùng khớp hệ thống',
     },
     create: {
       id: 1,
@@ -617,7 +617,7 @@ async function main() {
       actualQuantity: 1,
       difference: 0,
       actualCondition: 'Tot',
-      note: 'Trung khop he thong',
+      note: 'Trùng khớp hệ thống',
     },
   });
 
@@ -627,7 +627,7 @@ async function main() {
       reporterId: studentC.id,
       assetId: assetFanA102.id,
       roomId: roomA102.id,
-      description: 'Quat tran rung manh va phat ra tieng on lon',
+      description: 'Quạt trần rung mạnh và phát ra tiếng ồn lớn',
       status: DamageReportStatus.IN_PROGRESS,
     },
     create: {
@@ -636,7 +636,7 @@ async function main() {
       reporterId: studentC.id,
       assetId: assetFanA102.id,
       roomId: roomA102.id,
-      description: 'Quat tran rung manh va phat ra tieng on lon',
+      description: 'Quạt trần rung mạnh và phát ra tiếng ồn lớn',
       status: DamageReportStatus.IN_PROGRESS,
     },
   });
@@ -648,7 +648,7 @@ async function main() {
       action: 'create',
       oldStatus: null,
       newStatus: DamageReportStatus.SUBMITTED,
-      note: 'Sinh vien tao bao cao',
+      note: 'Sinh viên tạo báo cáo',
       createdBy: studentC.id,
     },
     create: {
@@ -656,7 +656,7 @@ async function main() {
       reportId: damageReportA102.id,
       action: 'create',
       newStatus: DamageReportStatus.SUBMITTED,
-      note: 'Sinh vien tao bao cao',
+      note: 'Sinh viên tạo báo cáo',
       createdBy: studentC.id,
     },
   });
@@ -668,7 +668,7 @@ async function main() {
       action: 'processing',
       oldStatus: DamageReportStatus.SUBMITTED,
       newStatus: DamageReportStatus.IN_PROGRESS,
-      note: 'Da tiep nhan va chuyen xu ly',
+      note: 'Đã tiếp nhận và chuyển xử lý',
       createdBy: facilityManager.id,
     },
     create: {
@@ -677,7 +677,7 @@ async function main() {
       action: 'processing',
       oldStatus: DamageReportStatus.SUBMITTED,
       newStatus: DamageReportStatus.IN_PROGRESS,
-      note: 'Da tiep nhan va chuyen xu ly',
+      note: 'Đã tiếp nhận và chuyển xử lý',
       createdBy: facilityManager.id,
     },
   });
@@ -688,7 +688,7 @@ async function main() {
       createdBy: facilityManager.id,
       liquidationDate: new Date('2026-04-20'),
       status: ApprovalStatus.PENDING,
-      note: 'Cho phe duyet thanh ly',
+      note: 'Cho phép duyệt thanh lý',
     },
     create: {
       id: 1,
@@ -696,13 +696,13 @@ async function main() {
       createdBy: facilityManager.id,
       liquidationDate: new Date('2026-04-20'),
       status: ApprovalStatus.PENDING,
-      note: 'Cho phe duyet thanh ly',
+      note: 'Cho phép duyệt thanh lý',
       liquidationItems: {
         create: [
           {
             assetId: assetBedA201.id,
-            assetCondition: 'Xuong cap, khong con phu hop',
-            reason: 'Thanh ly tai san cu',
+            assetCondition: 'Xuống cấp, không còn phù hợp',
+            reason: 'Thanh lý tài sản cũ',
             estimatedRemainingValue: 250000,
           }
         ]
@@ -718,7 +718,7 @@ async function main() {
       cycleMonths: 6,
       nextDueDate: new Date('2026-11-20'),
       isActive: true,
-      note: 'Bao tri dinh ky quat tran A102',
+      note: 'Bảo trì định kỳ quạt trần A102',
     },
     create: {
       id: 1,
@@ -727,7 +727,7 @@ async function main() {
       cycleMonths: 6,
       nextDueDate: new Date('2026-11-20'),
       isActive: true,
-      note: 'Bao tri dinh ky quat tran A102',
+      note: 'Bảo trì định kỳ quạt trần A102',
     },
   });
 
@@ -739,12 +739,12 @@ async function main() {
       performedBy: facilityManager.id,
       maintenanceDate: new Date('2026-05-12'),
       maintenanceType: MaintenanceType.AD_HOC,
-      content: 'Kiem tra va can chinh quat tran',
+      content: 'Kiểm tra và căn chỉnh quạt trần',
       resultStatus: MaintenanceResultStatus.NEED_REPAIR,
       nextMaintenanceDate: new Date('2026-06-12'),
       cost: 150000,
-      materialNote: 'Can thay bac dan',
-      note: 'Theo doi sau sua chua',
+      materialNote: 'Cần thay bạc đạn',
+      note: 'Theo dõi sau sửa chữa',
     },
     create: {
       id: 1,
@@ -754,12 +754,12 @@ async function main() {
       performedBy: facilityManager.id,
       maintenanceDate: new Date('2026-05-12'),
       maintenanceType: MaintenanceType.AD_HOC,
-      content: 'Kiem tra va can chinh quat tran',
+      content: 'Kiểm tra và căn chỉnh quạt trần',
       resultStatus: MaintenanceResultStatus.NEED_REPAIR,
       nextMaintenanceDate: new Date('2026-06-12'),
       cost: 150000,
-      materialNote: 'Can thay bac dan',
-      note: 'Theo doi sau sua chua',
+      materialNote: 'Cần thay bạc đạn',
+      note: 'Theo dõi sau sửa chữa',
     },
   });
 
@@ -767,8 +767,8 @@ async function main() {
     where: { id: 1 },
     update: {
       userId: admin.id,
-      title: 'Bao cao hu hong moi',
-      content: 'Phong A102 vua phat sinh bao cao hu hong quat tran.',
+      title: 'Báo cáo hư hỏng mới',
+      content: 'Phòng A102 vừa phát sinh báo cáo hư hỏng quạt trần.',
       status: NotificationStatus.UNREAD,
       relatedTable: 'damage_reports',
       relatedId: damageReportA102.id,
@@ -777,8 +777,8 @@ async function main() {
     create: {
       id: 1,
       userId: admin.id,
-      title: 'Bao cao hu hong moi',
-      content: 'Phong A102 vua phat sinh bao cao hu hong quat tran.',
+      title: 'Báo cáo hư hỏng mới',
+      content: 'Phòng A102 vừa phát sinh báo cáo hư hỏng quạt trần.',
       status: NotificationStatus.UNREAD,
       relatedTable: 'damage_reports',
       relatedId: damageReportA102.id,
@@ -789,8 +789,8 @@ async function main() {
     where: { id: 2 },
     update: {
       userId: studentC.id,
-      title: 'Da tiep nhan yeu cau',
-      content: 'Yeu cau sua quat phong A102 da duoc tiep nhan.',
+      title: 'Đã tiếp nhận yêu cầu',
+      content: 'Yêu cầu sửa quạt phòng A102 đã được tiếp nhận.',
       status: NotificationStatus.READ,
       relatedTable: 'maintenance_records',
       relatedId: 1,
@@ -799,8 +799,8 @@ async function main() {
     create: {
       id: 2,
       userId: studentC.id,
-      title: 'Da tiep nhan yeu cau',
-      content: 'Yeu cau sua quat phong A102 da duoc tiep nhan.',
+      title: 'Đã tiếp nhận yêu cầu',
+      content: 'Yêu cầu sửa quạt phòng A102 đã được tiếp nhận.',
       status: NotificationStatus.READ,
       relatedTable: 'maintenance_records',
       relatedId: 1,
@@ -816,7 +816,7 @@ async function main() {
       tableName: 'users',
       recordId: studentA.id,
       oldValue: null,
-      newValue: JSON.stringify({ user_code: 'SV001', full_name: 'Le Minh An' }),
+      newValue: JSON.stringify({ user_code: 'SV001', full_name: 'Lê Minh An' }),
       ipAddress: '127.0.0.1',
     },
     create: {
@@ -825,7 +825,7 @@ async function main() {
       action: 'create',
       tableName: 'users',
       recordId: studentA.id,
-      newValue: JSON.stringify({ user_code: 'SV001', full_name: 'Le Minh An' }),
+      newValue: JSON.stringify({ user_code: 'SV001', full_name: 'Lê Minh An' }),
       ipAddress: '127.0.0.1',
     },
   });
@@ -859,7 +859,7 @@ async function main() {
       createdBy: admin.id,
       backupFilePath: '/backups/backup-2026-05-15.sql',
       status: BackupStatus.SUCCESS,
-      note: 'Sao luu dinh ky hang tuan',
+      note: 'Sao lưu định kỳ hàng tuần',
     },
     create: {
       id: 1,
@@ -867,7 +867,7 @@ async function main() {
       createdBy: admin.id,
       backupFilePath: '/backups/backup-2026-05-15.sql',
       status: BackupStatus.SUCCESS,
-      note: 'Sao luu dinh ky hang tuan',
+      note: 'Sao lưu định kỳ hàng tuần',
     },
   });
 

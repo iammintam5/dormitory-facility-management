@@ -44,7 +44,7 @@ export function NotificationsPage() {
       setTotalPages(response.data.pagination.totalPages);
       setTotal(response.data.pagination.total);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai danh sach thong bao.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải danh sách thông báo.'));
     } finally {
       setIsLoading(false);
     }
@@ -59,7 +59,7 @@ export function NotificationsPage() {
         ),
       );
     } catch (error) {
-      showToast(getApiErrorMessage(error, 'Khong the danh dau da doc.'), 'error');
+      showToast(getApiErrorMessage(error, 'Không thể đánh dấu đã đọc.'), 'error');
     }
   }
 
@@ -73,9 +73,9 @@ export function NotificationsPage() {
           readAt: item.readAt ?? new Date().toISOString(),
         })),
       );
-      showToast('Da danh dau tat ca thong bao la da doc.');
+      showToast('Đã đánh dấu tất cả thông báo là đã đọc.');
     } catch (error) {
-      showToast(getApiErrorMessage(error, 'Khong the cap nhat tat ca thong bao.'), 'error');
+      showToast(getApiErrorMessage(error, 'Không thể cập nhật tất cả thông báo.'), 'error');
     }
   }
 
@@ -86,20 +86,20 @@ export function NotificationsPage() {
           to={`${basePath}/dashboard`}
           className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >
-          Quay lai dashboard
+          Quay lại dashboard
         </Link>
         <button
           type="button"
           onClick={() => void markAllRead()}
           className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
         >
-          Danh dau tat ca da doc
+          Đánh dấu tất cả đã đọc
         </button>
       </div>
 
       <SectionCard
-        title="Tat ca thong bao"
-        description="Theo doi cac cap nhat moi nhat lien quan den bao hong, ban giao, bao tri va nghiep vu he thong."
+        title="Tất cả thông báo"
+        description="Theo dõi các cập nhật mới nhất liên quan đến báo hỏng, bàn giao, bảo trì và nghiệp vụ hệ thống."
       >
         {errorMessage && (
           <p className="mb-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>
@@ -107,12 +107,12 @@ export function NotificationsPage() {
 
         {isLoading ? (
           <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-            Dang tai thong bao...
+            Đang tải thông báo...
           </div>
         ) : items.length === 0 ? (
           <EmptyState
-            title="Chua co thong bao"
-            description="Thong bao moi se duoc hien thi tai day de anh theo doi nhanh."
+            title="Chưa có thông báo"
+            description="Thông báo mới sẽ được hiển thị tại đây để bạn theo dõi nhanh."
           />
         ) : (
           <div className="space-y-3">
@@ -136,7 +136,7 @@ export function NotificationsPage() {
                             : 'bg-slate-100 text-slate-600'
                         }`}
                       >
-                        {item.status === 'UNREAD' ? 'Chua doc' : 'Da doc'}
+                        {item.status === 'UNREAD' ? 'Chưa đọc' : 'Đã đọc'}
                       </span>
                     </div>
                     <p className="text-sm leading-6 text-slate-700">{item.content}</p>
@@ -149,7 +149,7 @@ export function NotificationsPage() {
                       onClick={() => void markRead(item.id)}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                     >
-                      Danh dau da doc
+                      Đánh dấu đã đọc
                     </button>
                   )}
                 </div>

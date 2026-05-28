@@ -15,13 +15,13 @@ export class JwtAuthGuard implements CanActivate {
     const authorization = request.headers.authorization;
 
     if (!authorization?.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Ban chua dang nhap.');
+      throw new UnauthorizedException('Bạn chưa đăng nhập.');
     }
 
     const token = authorization.slice(7).trim();
 
     if (!token) {
-      throw new UnauthorizedException('Token khong hop le.');
+      throw new UnauthorizedException('Token không hợp lệ.');
     }
 
     request.user = await this.authService.validateAccessToken(token);

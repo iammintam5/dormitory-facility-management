@@ -45,7 +45,7 @@ export function StudentDamageReportsHistoryPage() {
       setTotalPages(response.data.pagination.totalPages);
       setTotal(response.data.pagination.total);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai lich su phieu bao hong.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải lịch sử phiếu báo hỏng.'));
     } finally {
       setIsLoading(false);
     }
@@ -54,13 +54,13 @@ export function StudentDamageReportsHistoryPage() {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Lich su bao hong"
-        description="Theo doi tat ca phieu bao hong da gui va tien do xu ly cua bo phan CSVC."
+        title="Lịch sử báo hỏng"
+        description="Theo dõi tất cả phiếu báo hỏng đã gửi và tiến độ xử lý của bộ phận CSVC."
       >
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="grid gap-3 md:grid-cols-2">
             <select value={status} onChange={(event) => setStatus(event.target.value)} className={inputClassName}>
-              <option value="">Tat ca trang thai</option>
+              <option value="">Tất cả trạng thái</option>
               {damageStatuses.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -68,7 +68,7 @@ export function StudentDamageReportsHistoryPage() {
               ))}
             </select>
             <select value={priority} onChange={(event) => setPriority(event.target.value)} className={inputClassName}>
-              <option value="">Tat ca uu tien</option>
+              <option value="">Tất cả ưu tiên</option>
               {damagePriorities.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -83,13 +83,13 @@ export function StudentDamageReportsHistoryPage() {
               onClick={() => void fetchReports(1)}
               className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
             >
-              Loc du lieu
+              Lọc dữ liệu
             </button>
             <Link
               to="/student/damage-reports/new"
               className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
             >
-              Tao phieu moi
+              Tạo phiếu mới
             </Link>
           </div>
         </div>
@@ -102,12 +102,12 @@ export function StudentDamageReportsHistoryPage() {
 
         {isLoading ? (
           <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-            Dang tai lich su phieu bao hong...
+            Đang tải lịch sử phiếu báo hỏng...
           </div>
         ) : reports.length === 0 ? (
           <EmptyState
-            title="Chua co phieu bao hong nao"
-            description="Khi phat hien su co tai san, ban co the tao phieu moi de bo phan CSVC tiep nhan."
+            title="Chưa có phiếu báo hỏng nào"
+            description="Khi phát hiện sự cố tài sản, bạn có thể tạo phiếu mới để bộ phận CSVC tiếp nhận."
           />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-200">
@@ -115,12 +115,12 @@ export function StudentDamageReportsHistoryPage() {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-left text-slate-600">
                   <tr>
-                    <th className="px-4 py-3 font-medium">Phieu</th>
-                    <th className="px-4 py-3 font-medium">Tai san / Phong</th>
-                    <th className="px-4 py-3 font-medium">Uu tien</th>
-                    <th className="px-4 py-3 font-medium">Trang thai</th>
-                    <th className="px-4 py-3 font-medium">Cap nhat</th>
-                    <th className="px-4 py-3 font-medium">Chi tiet</th>
+                    <th className="px-4 py-3 font-medium">Phiếu</th>
+                    <th className="px-4 py-3 font-medium">Tài sản / Phòng</th>
+                    <th className="px-4 py-3 font-medium">Ưu tiên</th>
+                    <th className="px-4 py-3 font-medium">Trạng thái</th>
+                    <th className="px-4 py-3 font-medium">Cập nhật</th>
+                    <th className="px-4 py-3 font-medium">Chi tiết</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
@@ -146,7 +146,7 @@ export function StudentDamageReportsHistoryPage() {
                           to={`/student/damage-reports/${report.id}`}
                           className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                         >
-                          Xem chi tiet
+                          Xem chi tiết
                         </Link>
                       </td>
                     </tr>

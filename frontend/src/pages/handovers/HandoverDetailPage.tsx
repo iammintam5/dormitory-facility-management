@@ -41,7 +41,7 @@ export function HandoverDetailPage() {
       setHandover(response.data);
       setNote(response.data.note ?? '');
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai chi tiet bien ban.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải chi tiết biên bản.'));
     } finally {
       setIsLoading(false);
     }
@@ -59,10 +59,10 @@ export function HandoverDetailPage() {
       await apiClient.post(`/handovers/${handover.id}/${endpoint}`, {
         note: note.trim() || undefined,
       });
-      showToast('Cap nhat bien ban thanh cong.');
+      showToast('Cập nhật biên bản thành công.');
       await loadHandover();
     } catch (error) {
-      const message = getApiErrorMessage(error, 'Khong the cap nhat bien ban.');
+      const message = getApiErrorMessage(error, 'Không thể cập nhật biên bản.');
       setErrorMessage(message);
       showToast(message, 'error');
     } finally {
@@ -73,7 +73,7 @@ export function HandoverDetailPage() {
   if (isLoading) {
     return (
       <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-        Dang tai chi tiet bien ban...
+        Đang tải chi tiết biên bản...
       </div>
     );
   }
@@ -81,7 +81,7 @@ export function HandoverDetailPage() {
   if (!handover) {
     return (
       <div className="rounded-2xl bg-rose-50 px-6 py-12 text-center text-sm text-rose-700">
-        {errorMessage || 'Khong tim thay bien ban ban giao.'}
+        {errorMessage || 'Không tìm thấy biên bản bàn giao.'}
       </div>
     );
   }
@@ -93,14 +93,14 @@ export function HandoverDetailPage() {
           to={`${basePath}/handovers`}
           className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >
-          Quay lai danh sach
+          Quay lại danh sách
         </Link>
         {isManager && (
           <Link
             to={`${basePath}/handovers/${handover.id}/print`}
             className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
           >
-            In / Xuat bieu mau
+            In / Xuất biểu mẫu
           </Link>
         )}
       </div>
@@ -122,41 +122,41 @@ export function HandoverDetailPage() {
                     {handover.handoverCode}
                   </p>
                   <h2 className="mt-2 text-xl font-bold text-slate-900">
-                    Bien ban ban giao tai san phong {handover.room.roomCode}
+                    Biên bản bàn giao tài sản phòng {handover.room.roomCode}
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Lap boi {handover.createdByUser?.fullName ?? '--'} | Ngay lap {formatDate(handover.handoverDate)}
+                    Lập bởi {handover.createdByUser?.fullName ?? '--'} | Ngày lập {formatDate(handover.handoverDate)}
                   </p>
                 </div>
                 <HandoverStatusBadge status={handover.status} />
               </div>
 
               <dl className="mt-5 grid gap-4 md:grid-cols-2">
-                <InfoItem label="Sinh vien" value={`${handover.student.fullName} (${handover.student.userCode})`} />
-                <InfoItem label="Phong" value={`${handover.room.roomCode} - ${handover.room.floor.block.name} / Tang ${handover.room.floor.floorNumber}`} />
-                <InfoItem label="Ngay tao" value={formatDateTime(handover.createdAt)} />
-                <InfoItem label="Lan cap nhat cuoi" value={formatDateTime(handover.updatedAt ?? handover.createdAt)} />
+                <InfoItem label="Sinh viên" value={`${handover.student.fullName} (${handover.student.userCode})`} />
+                <InfoItem label="Phòng" value={`${handover.room.roomCode} - ${handover.room.floor.block.name} / ầng ${handover.room.floor.floorNumber}`} />
+                <InfoItem label="Ngày tạo" value={formatDateTime(handover.createdAt)} />
+                <InfoItem label="Lần cập nhật cuối" value={formatDateTime(handover.updatedAt ?? handover.createdAt)} />
               </dl>
 
               <div className="mt-5 rounded-2xl bg-white p-4">
-                <p className="text-sm font-medium text-slate-700">Ghi chu chung</p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">{handover.note || 'Khong co ghi chu.'}</p>
+                <p className="text-sm font-medium text-slate-700">Ghi chú chung</p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{handover.note || 'Không có ghi chú.'}</p>
               </div>
             </div>
 
             <SectionCard
-              title="Danh sach tai san ban giao"
-              description="Thong tin tung tai san, so luong va tinh trang tai thoi diem ban giao."
+              title="Danh sách tài sản bàn giao"
+              description="Thông tin từng tài sản, số lượng và tình trạng tại thời điểm bàn giao."
             >
               <div className="overflow-hidden rounded-2xl border border-slate-200">
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-slate-200 text-sm">
                     <thead className="bg-slate-50 text-left text-slate-600">
                       <tr>
-                        <th className="px-4 py-3 font-medium">Tai san</th>
-                        <th className="px-4 py-3 font-medium">So luong</th>
-                        <th className="px-4 py-3 font-medium">Tinh trang khi ban giao</th>
-                        <th className="px-4 py-3 font-medium">Ghi chu</th>
+                        <th className="px-4 py-3 font-medium">Tài sản</th>
+                        <th className="px-4 py-3 font-medium">Số lượng</th>
+                        <th className="px-4 py-3 font-medium">Tình trạng khi bàn giao</th>
+                        <th className="px-4 py-3 font-medium">Ghi chú</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
@@ -181,21 +181,21 @@ export function HandoverDetailPage() {
           <div className="space-y-6">
             {(isManager || isStudent) && (
               <SectionCard
-                title={isStudent ? 'Xac nhan bien ban' : 'Workflow bien ban'}
+                title={isStudent ? 'Xác nhận biên bản' : 'Workflow biên bản'}
                 description={
                   isStudent
-                    ? 'Sinh vien xem ky thong tin truoc khi xac nhan bien ban ban giao.'
-                    : 'Quan ly gui xac nhan, huy bien ban hoac ghi nhan tra tai san.'
+                    ? 'Sinh viên xem kỹ thông tin trước khi xác nhận biên bản bàn giao.'
+                    : 'Quản lý gửi xác nhận, hủy biên bản hoặc ghi nhận trả tài sản.'
                 }
               >
                 <div className="space-y-4">
                   <label className="block space-y-2">
-                    <span className="text-sm font-medium text-slate-700">Ghi chu</span>
+                    <span className="text-sm font-medium text-slate-700">Ghi chú</span>
                     <textarea
                       value={note}
                       onChange={(event) => setNote(event.target.value)}
                       className={`${inputClassName} min-h-28`}
-                      placeholder="Them ghi chu cho bien ban neu can."
+                      placeholder="Thêm ghi chú cho biên bản nếu cần."
                     />
                   </label>
 
@@ -207,7 +207,7 @@ export function HandoverDetailPage() {
                         onClick={() => void runWorkflow('send-confirmation')}
                         className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
                       >
-                        Gui cho sinh vien xac nhan
+                        Gửi cho sinh viên xác nhận
                       </button>
                     )}
 
@@ -218,7 +218,7 @@ export function HandoverDetailPage() {
                         onClick={() => void runWorkflow('confirm')}
                         className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
                       >
-                        Xac nhan bien ban
+                        Xác nhận biên bản
                       </button>
                     )}
 
@@ -229,7 +229,7 @@ export function HandoverDetailPage() {
                         onClick={() => void runWorkflow('mark-returned')}
                         className="rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:opacity-60"
                       >
-                        Ghi nhan tra tai san
+                        Ghi nhận trả tài sản
                       </button>
                     )}
 
@@ -240,7 +240,7 @@ export function HandoverDetailPage() {
                         onClick={() => void runWorkflow('cancel')}
                         className="rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
                       >
-                        Huy bien ban
+                        Hủy biên bản
                       </button>
                     )}
                   </div>

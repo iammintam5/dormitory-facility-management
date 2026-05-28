@@ -64,7 +64,7 @@ export function StudentCreateDamageReportPage() {
         });
       }
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai danh sach tai san trong phong.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải danh sách tài sản trong phòng.'));
     } finally {
       setIsLoading(false);
     }
@@ -72,7 +72,7 @@ export function StudentCreateDamageReportPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     if (!lookup.room) {
-      setErrorMessage('Ban chua duoc gan phong nen chua the tao phieu bao hong.');
+      setErrorMessage('Bạn chưa được gán phòng nên chưa thể tạo phiếu báo hỏng.');
       return;
     }
 
@@ -87,10 +87,10 @@ export function StudentCreateDamageReportPage() {
         priority: values.priority,
       });
 
-      showToast('Tao phieu bao hong thanh cong.');
+      showToast('Tạo phiếu báo hỏng thành công.');
       navigate(`/student/damage-reports/${response.data.id}`);
     } catch (error) {
-      const message = getApiErrorMessage(error, 'Khong the tao phieu bao hong.');
+      const message = getApiErrorMessage(error, 'Không thể tạo phiếu báo hỏng.');
       setErrorMessage(message);
       showToast(message, 'error');
     } finally {
@@ -101,46 +101,46 @@ export function StudentCreateDamageReportPage() {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Tao phieu bao hong"
-        description="Sinh vien chi duoc bao hong doi voi tai san thuoc phong dang o."
+        title="Tạo phiếu báo hỏng"
+        description="Sinh viên chỉ được báo hỏng đối với tài sản thuộc phòng đang ở."
       >
         {isLoading ? (
           <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-            Dang tai danh sach tai san trong phong...
+            Đang tải danh sách tài sản trong phòng...
           </div>
         ) : !lookup.room ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
-            Ban chua duoc gan phong. Vui long lien he quan tri de cap nhat thong tin noi tru.
+            Bạn chưa được gán phòng. Vui lòng liên hệ quản trị để cập nhật thông tin nội trú.
           </div>
         ) : lookup.assets.length === 0 ? (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700">
-            Phong cua ban hien chua co tai san nao duoc gan. Khong the tao phieu bao hong luc nay.
+            Phòng của bạn hiện chưa có tài sản nào được gán. Không thể tạo phiếu báo hỏng lúc này.
           </div>
         ) : (
           <form className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]" onSubmit={onSubmit}>
             <div className="rounded-2xl bg-slate-50 p-4">
-              <h3 className="text-base font-semibold text-slate-900">Thong tin phong</h3>
+              <h3 className="text-base font-semibold text-slate-900">Thông tin phòng</h3>
               <dl className="mt-4 space-y-3 text-sm text-slate-700">
                 <div>
-                  <dt className="text-slate-500">Phong</dt>
+                  <dt className="text-slate-500">Phòng</dt>
                   <dd className="font-medium">{lookup.room.roomCode}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Tang</dt>
+                  <dt className="text-slate-500">Tầng</dt>
                   <dd className="font-medium">
-                    {lookup.room.floor?.building?.name ?? 'Khu'} / Tang{' '}
+                    {lookup.room.floor?.building?.name ?? 'Khu'} / Tầng{' '}
                     {lookup.room.floor?.floorNumber ?? '--'}
                   </dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500">Tai san co the bao hong</dt>
+                  <dt className="text-slate-500">Tài sản có thể báo hỏng</dt>
                   <dd className="font-medium">{lookup.assets.length}</dd>
                 </div>
               </dl>
             </div>
 
             <div className="space-y-4">
-              <Field label="Tai san" error={errors.assetId?.message}>
+              <Field label="Tài sản" error={errors.assetId?.message}>
                 <select {...register('assetId')} className={inputClassName}>
                   {lookup.assets.map((asset) => (
                     <option key={asset.id} value={asset.id}>
@@ -150,7 +150,7 @@ export function StudentCreateDamageReportPage() {
                 </select>
               </Field>
 
-              <Field label="Muc do uu tien" error={errors.priority?.message}>
+              <Field label="Mức độ ưu tiên" error={errors.priority?.message}>
                 <select {...register('priority')} className={inputClassName}>
                   <option value="LOW">LOW</option>
                   <option value="MEDIUM">MEDIUM</option>
@@ -159,11 +159,11 @@ export function StudentCreateDamageReportPage() {
                 </select>
               </Field>
 
-              <Field label="Mo ta hu hong" error={errors.description?.message}>
+              <Field label="Mô tả hư hỏng" error={errors.description?.message}>
                 <textarea
                   {...register('description')}
                   className={`${inputClassName} min-h-36`}
-                  placeholder="Mo ta ro hien tuong hu hong, thoi diem xay ra va muc do anh huong."
+                  placeholder="Mô tả rõ hiện tượng hư hỏng, thời điểm xảy ra và mức độ ảnh hưởng."
                 />
               </Field>
 
@@ -179,14 +179,14 @@ export function StudentCreateDamageReportPage() {
                   disabled={isSubmitting}
                   className="rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
                 >
-                  {isSubmitting ? 'Dang gui...' : 'Gui phieu bao hong'}
+                  {isSubmitting ? 'Đang gửi...' : 'Gửi phiếu báo hỏng'}
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate('/student/damage-reports')}
                   className="rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
-                  Xem lich su
+                  Xem lịch sử
                 </button>
               </div>
             </div>

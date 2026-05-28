@@ -175,7 +175,7 @@ export class LiquidationRecordsService {
       record.status !== ApprovalStatus.DRAFT &&
       record.status !== ApprovalStatus.REJECTED
     ) {
-      throw new ConflictException('Chi duoc gui duyet bien ban o trang thai DRAFT hoac REJECTED.');
+      throw new ConflictException('Chỉ được gửi duyệt biên bản ở trạng thái DRAFT hoặc REJECTED.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -200,8 +200,8 @@ export class LiquidationRecordsService {
         await tx.notification.createMany({
           data: admins.map((admin) => ({
             userId: admin.id,
-            title: 'Can duyet bien ban thanh ly',
-            content: `Bien ban ${updated.liquidationCode} dang cho phe duyet.`,
+            title: 'Cần duyệt biên bản thanh lý',
+            content: `Biên bản ${updated.liquidationCode} đang chờ phê duyệt.`,
             status: NotificationStatus.UNREAD,
             relatedTable: 'liquidation_records',
             relatedId: updated.id,
@@ -229,7 +229,7 @@ export class LiquidationRecordsService {
     this.ensureAdmin(currentUser);
     const record = await this.ensureRecordExists(id);
     if (record.status !== ApprovalStatus.PENDING) {
-      throw new ConflictException('Chi duoc duyet bien ban dang cho phe duyet.');
+      throw new ConflictException('Chỉ được duyệt biên bản đang chờ phê duyệt.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -243,8 +243,8 @@ export class LiquidationRecordsService {
       });
 
       await this.notifyUsers(tx, [record.createdBy], {
-        title: 'Bien ban thanh ly da duoc duyet',
-        content: `Bien ban ${updated.liquidationCode} da duoc phe duyet.`,
+        title: 'Biên bản thanh lý đã được duyệt',
+        content: `Biên bản ${updated.liquidationCode} đã được phê duyệt.`,
         relatedId: updated.id,
       });
 
@@ -268,7 +268,7 @@ export class LiquidationRecordsService {
     this.ensureAdmin(currentUser);
     const record = await this.ensureRecordExists(id);
     if (record.status !== ApprovalStatus.PENDING) {
-      throw new ConflictException('Chi duoc tu choi bien ban dang cho phe duyet.');
+      throw new ConflictException('Chỉ được từ chối biên bản đang chờ phê duyệt.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -287,8 +287,8 @@ export class LiquidationRecordsService {
       }
 
       await this.notifyUsers(tx, [record.createdBy], {
-        title: 'Bien ban thanh ly bi tu choi',
-        content: `Bien ban ${updated.liquidationCode} da bi tu choi.`,
+        title: 'Biên bản thanh lý bị từ chối',
+        content: `Biên bản ${updated.liquidationCode} đã bị từ chối.`,
         relatedId: updated.id,
       });
 
@@ -312,7 +312,7 @@ export class LiquidationRecordsService {
     this.ensureAdmin(currentUser);
     const record = await this.ensureRecordExists(id);
     if (record.status !== ApprovalStatus.APPROVED) {
-      throw new ConflictException('Chi duoc hoan tat bien ban da duoc duyet.');
+      throw new ConflictException('Chỉ được hoàn tất biên bản đã được duyệt.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -336,8 +336,8 @@ export class LiquidationRecordsService {
       }
 
       await this.notifyUsers(tx, [record.createdBy], {
-        title: 'Da hoan tat thanh ly tai san',
-        content: `Bien ban ${updated.liquidationCode} da hoan tat thanh ly.`,
+        title: 'Đã hoàn tất thanh lý tài sản',
+        content: `Biên bản ${updated.liquidationCode} đã hoàn tất thanh lý.`,
         relatedId: updated.id,
       });
 
@@ -361,7 +361,7 @@ export class LiquidationRecordsService {
       record.status === ApprovalStatus.COMPLETED ||
       record.status === ApprovalStatus.CANCELLED
     ) {
-      throw new ConflictException('Khong the huy bien ban da hoan tat hoac da huy.');
+      throw new ConflictException('Không thể hủy biên bản đã hoàn tất hoặc đã hủy.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -380,8 +380,8 @@ export class LiquidationRecordsService {
       }
 
       await this.notifyUsers(tx, [record.createdBy], {
-        title: 'Bien ban thanh ly da bi huy',
-        content: `Bien ban ${updated.liquidationCode} da bi huy.`,
+        title: 'Biên bản thanh lý đã bị hủy',
+        content: `Biên bản ${updated.liquidationCode} đã bị hủy.`,
         relatedId: updated.id,
       });
 
@@ -402,7 +402,7 @@ export class LiquidationRecordsService {
     this.ensureManager(currentUser);
     const record = await this.ensureRecordExists(id);
     if (record.status !== ApprovalStatus.DRAFT) {
-      throw new ConflictException('Chi duoc cap nhat hoi dong khi dang o trang thai DRAFT.');
+      throw new ConflictException('Chỉ được cập nhật hội đồng khi đang ở trạng thái DRAFT.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -466,13 +466,13 @@ export class LiquidationRecordsService {
 
   private ensureManager(currentUser: AuthUser) {
     if (!['ADMIN', 'QL_CSVC'].includes(currentUser.role)) {
-      throw new ForbiddenException('Ban khong co quyen thao tac thanh ly tai san.');
+      throw new ForbiddenException('Bạn không có quyền thực hiện thao tác thanh lý tài sản.');
     }
   }
 
   private ensureAdmin(currentUser: AuthUser) {
     if (currentUser.role !== 'ADMIN') {
-      throw new ForbiddenException('Chi quan tri vien moi duoc phe duyet thanh ly.');
+      throw new ForbiddenException('Chỉ quản trị viên mới được phê duyệt thanh lý.');
     }
   }
 
@@ -494,11 +494,11 @@ export class LiquidationRecordsService {
     });
 
     if (!asset) {
-      throw new NotFoundException('Khong tim thay tai san.');
+      throw new NotFoundException('Không tìm thấy tài sản.');
     }
 
     if (asset.status === AssetStatus.LIQUIDATED) {
-      throw new BadRequestException('Tai san da thanh ly, khong the tao bien ban moi.');
+      throw new BadRequestException('Tài sản đã thanh lý, không thể tạo biên bản mới.');
     }
 
     return asset;
@@ -511,7 +511,7 @@ export class LiquidationRecordsService {
     });
 
     if (!record) {
-      throw new NotFoundException('Khong tim thay bien ban thanh ly.');
+      throw new NotFoundException('Không tìm thấy biên bản thanh lý.');
     }
 
     return record;
@@ -532,7 +532,7 @@ export class LiquidationRecordsService {
     });
 
     if (openCount > 0) {
-      throw new ConflictException('Tai san da co bien ban thanh ly dang xu ly.');
+      throw new ConflictException('Tài sản đã có biên bản thanh lý đang xử lý.');
     }
   }
 
