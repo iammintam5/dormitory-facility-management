@@ -128,7 +128,7 @@ export function StudentCreateDamageReportPage() {
                 <div>
                   <dt className="text-slate-500">Tang</dt>
                   <dd className="font-medium">
-                    {lookup.room.floor?.block?.name ?? 'Khu'} / Tang{' '}
+                    {lookup.room.floor?.building?.name ?? 'Khu'} / Tang{' '}
                     {lookup.room.floor?.floorNumber ?? '--'}
                   </dd>
                 </div>

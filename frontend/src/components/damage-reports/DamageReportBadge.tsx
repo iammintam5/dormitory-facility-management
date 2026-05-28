@@ -22,18 +22,18 @@ export function DamageReportPriorityBadge({ priority }: { priority: DamageReport
 
 function getStatusClassName(status: DamageReportStatus) {
   switch (status) {
-    case 'PENDING':
+    case 'SUBMITTED':
       return 'bg-amber-100 text-amber-700';
-    case 'RECEIVED':
+    case 'REVIEWING':
       return 'bg-sky-100 text-sky-700';
-    case 'PROCESSING':
+    case 'APPROVED':
+      return 'bg-teal-100 text-teal-700';
+    case 'IN_PROGRESS':
       return 'bg-indigo-100 text-indigo-700';
     case 'COMPLETED':
       return 'bg-emerald-100 text-emerald-700';
     case 'REJECTED':
       return 'bg-rose-100 text-rose-700';
-    case 'CANCELLED':
-      return 'bg-slate-200 text-slate-700';
   }
 }
 
