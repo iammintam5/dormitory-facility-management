@@ -18,6 +18,7 @@ import { CreateHandoverDto } from './dto/create-handover.dto';
 import { QueryHandoversDto } from './dto/query-handovers.dto';
 import { UpdateHandoverDto } from './dto/update-handover.dto';
 import { WorkflowNoteDto } from './dto/workflow-note.dto';
+import { MarkReturnedDto } from './dto/mark-returned.dto';
 import { HandoversService } from './handovers.service';
 
 @Controller('handovers')
@@ -106,7 +107,7 @@ export class HandoversController {
   markReturned(
     @CurrentUser() currentUser: AuthUser,
     @Param('id', ParseIntPipe) id: number,
-    @Body() dto: WorkflowNoteDto,
+    @Body() dto: MarkReturnedDto,
   ) {
     return this.handoversService.markReturned(currentUser, id, dto);
   }
