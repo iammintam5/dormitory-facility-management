@@ -29,7 +29,7 @@ import { MaintenanceManagementPage } from './pages/manager/MaintenanceManagement
 import { MaintenanceRecordCreatePage } from './pages/manager/MaintenanceRecordCreatePage';
 import { LiquidationRecordsManagementPage } from './pages/manager/LiquidationRecordsManagementPage';
 import { HandoverCreatePage } from './pages/manager/HandoverCreatePage';
-import { HandoversManagementPage } from './pages/manager/HandoversManagementPage';
+import { HandoversManagementPage } from './pages/admin/HandoversManagementPage';
 import { ManagerDashboardPage } from './pages/ManagerDashboardPage';
 import { DamageReportsManagementPage } from './pages/manager/DamageReportsManagementPage';
 import { StudentDashboardPage } from './pages/StudentDashboardPage';
@@ -99,6 +99,10 @@ export const router = createBrowserRouter([
                 element: <AssetsManagementPage />,
               },
               {
+                path: 'handovers',
+                element: <HandoversManagementPage />,
+              },
+              {
                 path: 'notifications',
                 element: <NotificationsPage />,
               },
@@ -123,15 +127,15 @@ export const router = createBrowserRouter([
                 element: <MaintenanceRecordPrintPage />,
               },
               {
-                path: 'liquidation-records',
+                path: 'liquidations',
                 element: <LiquidationRecordsManagementPage />,
               },
               {
-                path: 'liquidation-records/:id',
+                path: 'liquidations/:id',
                 element: <LiquidationRecordDetailPage />,
               },
               {
-                path: 'liquidation-records/:id/print',
+                path: 'liquidations/:id/print',
                 element: <LiquidationRecordPrintPage />,
               },
               {
@@ -222,15 +226,15 @@ export const router = createBrowserRouter([
                 element: <MaintenanceRecordPrintPage />,
               },
               {
-                path: 'liquidation-records',
+                path: 'liquidations',
                 element: <LiquidationRecordsManagementPage />,
               },
               {
-                path: 'liquidation-records/:id',
+                path: 'liquidations/:id',
                 element: <LiquidationRecordDetailPage />,
               },
               {
-                path: 'liquidation-records/:id/print',
+                path: 'liquidations/:id/print',
                 element: <LiquidationRecordPrintPage />,
               },
               {
