@@ -66,12 +66,9 @@ export function HandoversManagementPage() {
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'DRAFT': return 'secondary';
-      case 'WAITING_CONFIRMATION':
-      case 'PENDING_APPROVAL': return 'warning';
-      case 'CONFIRMED':
+      case 'PENDING': return 'warning';
       case 'APPROVED':
       case 'COMPLETED': return 'success';
-      case 'RETURNED':
       case 'REJECTED': return 'destructive';
       case 'CANCELLED': return 'outline';
       default: return 'default';
@@ -195,14 +192,10 @@ export function HandoversManagementPage() {
   );
 }
 
-// In the new unified enum, this might be 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
 const handoverStatuses: string[] = [
   'DRAFT',
-  'WAITING_CONFIRMATION',
-  'PENDING_APPROVAL',
-  'CONFIRMED',
+  'PENDING',
   'APPROVED',
-  'RETURNED',
   'REJECTED',
   'COMPLETED',
   'CANCELLED',

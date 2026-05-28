@@ -211,7 +211,7 @@ export function HandoverDetailPage() {
                       </button>
                     )}
 
-                    {isStudent && handover.status === 'WAITING_CONFIRMATION' && (
+                    {isStudent && handover.status === 'PENDING' && (
                       <button
                         type="button"
                         disabled={isSubmitting}
@@ -222,7 +222,7 @@ export function HandoverDetailPage() {
                       </button>
                     )}
 
-                    {isManager && handover.status === 'CONFIRMED' && (
+                    {isManager && handover.status === 'APPROVED' && (
                       <button
                         type="button"
                         disabled={isSubmitting}
@@ -233,7 +233,7 @@ export function HandoverDetailPage() {
                       </button>
                     )}
 
-                    {isManager && ['DRAFT', 'WAITING_CONFIRMATION'].includes(handover.status) && (
+                    {isManager && ['DRAFT', 'PENDING'].includes(handover.status) && (
                       <button
                         type="button"
                         disabled={isSubmitting}

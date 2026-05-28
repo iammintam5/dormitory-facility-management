@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState } from '../../components/admin/EmptyState';
 import { PaginationBar } from '../../components/admin/PaginationBar';
@@ -51,23 +51,23 @@ export function StudentDamageReportsHistoryPage() {
       setTotalPages(response.data.pagination.totalPages);
       setTotal(response.data.pagination.total);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Không thể tải lịch sử phiếu báo hỏng.'));
+      setErrorMessage(getApiErrorMessage(error, 'KhÃ´ng thá»ƒ táº£i lá»‹ch sá»­ phiáº¿u bÃ¡o há»ng.'));
     } finally {
       setIsLoading(false);
     }
   };
 
   const cancelReport = async (reportId: number) => {
-    if (!window.confirm('Bạn có chắc muốn hủy phiếu báo hỏng này?')) {
+    if (!window.confirm('Báº¡n cÃ³ cháº¯c muá»‘n há»§y phiáº¿u bÃ¡o há»ng nÃ y?')) {
       return;
     }
 
     try {
       await apiClient.post(`/damage-reports/${reportId}/cancel`, {});
-      showToast('Phiếu báo hỏng đã được hủy thành công.', 'success');
+      showToast('Phiáº¿u bÃ¡o há»ng Ä‘Ã£ Ä‘Æ°á»£c há»§y thÃ nh cÃ´ng.', 'success');
       await fetchReports(page);
     } catch (error) {
-      const message = getApiErrorMessage(error, 'Không thể hủy phiếu báo hỏng.');
+      const message = getApiErrorMessage(error, 'KhÃ´ng thá»ƒ há»§y phiáº¿u bÃ¡o há»ng.');
       showToast(message, 'error');
     }
   };
@@ -91,12 +91,12 @@ export function StudentDamageReportsHistoryPage() {
     if (!editingReport) return;
 
     if (!editFormData.description.trim()) {
-      showToast('Vui lòng nhập mô tả sự cố.', 'error');
+      showToast('Vui lÃ²ng nháº­p mÃ´ táº£ sá»± cá»‘.', 'error');
       return;
     }
 
     if (!editFormData.location.trim() || editFormData.location.length < 3) {
-      showToast('Vui lòng nhập vị trí (tối thiểu 3 ký tự).', 'error');
+      showToast('Vui lÃ²ng nháº­p vá»‹ trÃ­ (tá»‘i thiá»ƒu 3 kÃ½ tá»±).', 'error');
       return;
     }
 
@@ -106,11 +106,11 @@ export function StudentDamageReportsHistoryPage() {
         description: editFormData.description.trim(),
         location: editFormData.location.trim(),
       });
-      showToast('Phiếu báo hỏng đã được cập nhật thành công.', 'success');
+      showToast('Phiáº¿u bÃ¡o há»ng Ä‘Ã£ Ä‘Æ°á»£c cáº­p nháº­t thÃ nh cÃ´ng.', 'success');
       closeEditModal();
       await fetchReports(page);
     } catch (error) {
-      const message = getApiErrorMessage(error, 'Không thể cập nhật phiếu báo hỏng.');
+      const message = getApiErrorMessage(error, 'KhÃ´ng thá»ƒ cáº­p nháº­t phiáº¿u bÃ¡o há»ng.');
       showToast(message, 'error');
     } finally {
       setIsSubmittingEdit(false);
@@ -120,13 +120,13 @@ export function StudentDamageReportsHistoryPage() {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Lịch sử báo hỏng"
-        description="Theo dõi tất cả phiếu báo hỏng đã gửi và tiến độ xử lý của bộ phận CSVC."
+        title="Lá»‹ch sá»­ bÃ¡o há»ng"
+        description="Theo dÃµi táº¥t cáº£ phiáº¿u bÃ¡o há»ng Ä‘Ã£ gá»­i vÃ  tiáº¿n Ä‘á»™ xá»­ lÃ½ cá»§a bá»™ pháº­n CSVC."
       >
         <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="grid gap-3 md:grid-cols-2">
             <select value={status} onChange={(event) => setStatus(event.target.value)} className={inputClassName}>
-              <option value="">Tất cả trạng thái</option>
+              <option value="">Táº¥t cáº£ tráº¡ng thÃ¡i</option>
               {damageStatuses.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -134,7 +134,7 @@ export function StudentDamageReportsHistoryPage() {
               ))}
             </select>
             <select value={priority} onChange={(event) => setPriority(event.target.value)} className={inputClassName}>
-              <option value="">Tất cả ưu tiên</option>
+              <option value="">Táº¥t cáº£ Æ°u tiÃªn</option>
               {damagePriorities.map((item) => (
                 <option key={item} value={item}>
                   {item}
@@ -149,13 +149,13 @@ export function StudentDamageReportsHistoryPage() {
               onClick={() => void fetchReports(1)}
               className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
             >
-              Lọc dữ liệu
+              Lá»c dá»¯ liá»‡u
             </button>
             <Link
               to="/student/damage-reports/new"
               className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
             >
-              Tạo phiếu mới
+              Táº¡o phiáº¿u má»›i
             </Link>
           </div>
         </div>
@@ -168,12 +168,12 @@ export function StudentDamageReportsHistoryPage() {
 
         {isLoading ? (
           <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-            Đang tải lịch sử phiếu báo hỏng...
+            Äang táº£i lá»‹ch sá»­ phiáº¿u bÃ¡o há»ng...
           </div>
         ) : reports.length === 0 ? (
           <EmptyState
-            title="Chưa có phiếu báo hỏng nào"
-            description="Khi phát hiện sự cố tài sản, bạn có thể tạo phiếu mới để bộ phận CSVC tiếp nhận."
+            title="ChÆ°a cÃ³ phiáº¿u bÃ¡o há»ng nÃ o"
+            description="Khi phÃ¡t hiá»‡n sá»± cá»‘ tÃ i sáº£n, báº¡n cÃ³ thá»ƒ táº¡o phiáº¿u má»›i Ä‘á»ƒ bá»™ pháº­n CSVC tiáº¿p nháº­n."
           />
         ) : (
           <div className="overflow-hidden rounded-2xl border border-slate-200">
@@ -181,12 +181,12 @@ export function StudentDamageReportsHistoryPage() {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50 text-left text-slate-600">
                   <tr>
-                    <th className="px-4 py-3 font-medium">Phiếu</th>
-                    <th className="px-4 py-3 font-medium">Tài sản / Phòng</th>
-                    <th className="px-4 py-3 font-medium">Ưu tiên</th>
-                    <th className="px-4 py-3 font-medium">Trạng thái</th>
-                    <th className="px-4 py-3 font-medium">Cập nhật</th>
-                    <th className="px-4 py-3 font-medium">Chi tiết</th>
+                    <th className="px-4 py-3 font-medium">Phiáº¿u</th>
+                    <th className="px-4 py-3 font-medium">TÃ i sáº£n / PhÃ²ng</th>
+                    <th className="px-4 py-3 font-medium">Æ¯u tiÃªn</th>
+                    <th className="px-4 py-3 font-medium">Tráº¡ng thÃ¡i</th>
+                    <th className="px-4 py-3 font-medium">Cáº­p nháº­t</th>
+                    <th className="px-4 py-3 font-medium">Chi tiáº¿t</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200 bg-white">
@@ -213,23 +213,15 @@ export function StudentDamageReportsHistoryPage() {
                             to={`/student/damage-reports/${report.id}`}
                             className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                           >
-                            Xem chi tiết
+                            Xem chi tiáº¿t
                           </Link>
                           {report.status === 'SUBMITTED' && (
-                            <>
-                              <button
-                                onClick={() => openEditModal(report)}
-                                className="rounded-lg border border-indigo-200 px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-50 transition"
-                              >
-                                Chỉnh sửa
-                              </button>
-                              <button
-                                onClick={() => void cancelReport(report.id)}
-                                className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 transition"
-                              >
-                                Hủy
-                              </button>
-                            </>
+                            <button
+                              onClick={() => void cancelReport(report.id)}
+                              className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50 transition"
+                            >
+                              Há»§y
+                            </button>
                           )}
                         </div>
                       </td>
@@ -254,32 +246,32 @@ export function StudentDamageReportsHistoryPage() {
       {isEditModalOpen && editingReport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-lg">
-            <h2 className="mb-4 text-xl font-bold text-slate-900">Chỉnh sửa báo hỏng</h2>
+            <h2 className="mb-4 text-xl font-bold text-slate-900">Chá»‰nh sá»­a bÃ¡o há»ng</h2>
             
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Mô tả sự cố <span className="text-rose-600">*</span>
+                  MÃ´ táº£ sá»± cá»‘ <span className="text-rose-600">*</span>
                 </label>
                 <textarea
                   value={editFormData.description}
                   onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
                   rows={4}
-                  placeholder="Mô tả chi tiết sự cố..."
+                  placeholder="MÃ´ táº£ chi tiáº¿t sá»± cá»‘..."
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Vị trí <span className="text-rose-600">*</span>
+                  Vá»‹ trÃ­ <span className="text-rose-600">*</span>
                 </label>
                 <input
                   type="text"
                   value={editFormData.location}
                   onChange={(e) => setEditFormData({ ...editFormData, location: e.target.value })}
                   className="w-full rounded-lg border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-indigo-500"
-                  placeholder="Vị trí của sự cố (tối thiểu 3 ký tự)..."
+                  placeholder="Vá»‹ trÃ­ cá»§a sá»± cá»‘ (tá»‘i thiá»ƒu 3 kÃ½ tá»±)..."
                 />
               </div>
             </div>
@@ -290,14 +282,14 @@ export function StudentDamageReportsHistoryPage() {
                 disabled={isSubmittingEdit}
                 className="flex-1 rounded-lg border border-slate-200 px-4 py-3 font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               >
-                Hủy
+                Há»§y
               </button>
               <button
                 onClick={() => void submitEditReport()}
                 disabled={isSubmittingEdit}
                 className="flex-1 rounded-lg bg-indigo-600 px-4 py-3 font-semibold text-white transition hover:bg-indigo-500 disabled:opacity-50"
               >
-                {isSubmittingEdit ? 'Đang lưu...' : 'Lưu thay đổi'}
+                {isSubmittingEdit ? 'Äang lÆ°u...' : 'LÆ°u thay Ä‘á»•i'}
               </button>
             </div>
           </div>
@@ -308,21 +300,21 @@ export function StudentDamageReportsHistoryPage() {
 }
 
 const tabs: { label: string; values: DamageReportStatus[] | null }[] = [
-  { label: 'Tất cả', values: null },
+  { label: 'Táº¥t cáº£', values: null },
   {
-    label: 'Chờ tiếp nhận',
+    label: 'Chá» tiáº¿p nháº­n',
     values: ['SUBMITTED'],
   },
   {
-    label: 'Đang xử lý',
+    label: 'Äang xá»­ lÃ½',
     values: ['REVIEWING', 'APPROVED', 'IN_PROGRESS'],
   },
   {
-    label: 'Hoàn tất',
+    label: 'HoÃ n táº¥t',
     values: ['COMPLETED'],
   },
   {
-    label: 'Đã huỷ',
+    label: 'ÄÃ£ huá»·',
     values: ['REJECTED'],
   },
 ];

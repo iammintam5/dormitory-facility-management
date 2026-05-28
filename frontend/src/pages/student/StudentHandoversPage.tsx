@@ -24,7 +24,7 @@ export function StudentHandoversPage() {
     try {
       const response = await apiClient.get<HandoversResponse>('/handovers', {
         params: {
-          status: 'WAITING_CONFIRMATION',
+          status: 'PENDING',
           page: 1,
           pageSize: 20,
         },

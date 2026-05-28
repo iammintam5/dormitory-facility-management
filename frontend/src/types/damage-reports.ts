@@ -29,6 +29,7 @@ export type DamageReport = {
   assetId: number;
   roomId: number;
   description: string;
+  location: string;
   priority: DamageReportPriority;
   status: DamageReportStatus;
   createdAt: string;

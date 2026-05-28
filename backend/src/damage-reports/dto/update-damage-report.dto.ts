@@ -18,4 +18,7 @@ export class UpdateDamageReportDto {
   @IsString()
   description?: string;
 
+  @IsOptional()
+  @IsString()
+  location?: string;
 }

@@ -18,35 +18,26 @@ import { useDebounce } from '../../hooks/use-debounce';
 
 const statusColors: Record<string, string> = {
   DRAFT: 'bg-slate-100 text-slate-700 border-slate-200',
-  WAITING_CONFIRMATION: 'bg-amber-100 text-amber-800 border-amber-200',
   PENDING: 'bg-amber-100 text-amber-800 border-amber-200',
-  PENDING_APPROVAL: 'bg-amber-100 text-amber-800 border-amber-200',
-  CONFIRMED: 'bg-blue-100 text-blue-800 border-blue-200',
   APPROVED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  COMPLETED: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-  RETURNED: 'bg-purple-100 text-purple-800 border-purple-200',
   REJECTED: 'bg-rose-100 text-rose-800 border-rose-200',
+  COMPLETED: 'bg-sky-100 text-sky-800 border-sky-200',
   CANCELLED: 'bg-slate-100 text-slate-800 border-slate-300',
 };
 
 const statusLabels: Record<string, string> = {
   DRAFT: 'Bản nháp',
-  WAITING_CONFIRMATION: 'Chờ xác nhận',
-  PENDING: 'Chờ duyệt',
-  PENDING_APPROVAL: 'Chờ duyệt',
-  CONFIRMED: 'Đã xác nhận',
-  APPROVED: 'Đã duyệt',
-  COMPLETED: 'Hoàn thành',
-  RETURNED: 'Đã trả phòng',
+  PENDING: 'Chờ xác nhận',
+  APPROVED: 'Đã xác nhận',
   REJECTED: 'Từ chối',
+  COMPLETED: 'Hoàn thành',
   CANCELLED: 'Đã hủy',
 };
 
 const StatusIcon = ({ status }: { status: string }) => {
-  if (['CONFIRMED', 'APPROVED', 'COMPLETED'].includes(status)) return <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
-  if (['WAITING_CONFIRMATION', 'PENDING', 'PENDING_APPROVAL'].includes(status)) return <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
+  if (['APPROVED', 'COMPLETED'].includes(status)) return <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
+  if (['PENDING'].includes(status)) return <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>;
   if (['CANCELLED', 'REJECTED'].includes(status)) return <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>;
-  if (status === 'RETURNED') return <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>;
   return <svg className="w-3.5 h-3.5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
 };
 
@@ -432,7 +423,7 @@ export function HandoversManagementPage() {
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                         </button>
-                        {handover.status === 'CONFIRMED' && (
+                        {handover.status === 'APPROVED' && (
                           <button 
                             onClick={() => openReturnModal(handover)}
                             className="p-1.5 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition"

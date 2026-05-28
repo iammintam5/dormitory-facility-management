@@ -328,6 +328,7 @@ model DamageReport {
   assetId     Int                @map("asset_id")
   roomId      Int                @map("room_id")
   description String
+  location    String             @db.VarChar(255)
   status      DamageReportStatus @default(SUBMITTED)
   createdAt   DateTime           @default(now()) @map("created_at")
   updatedAt   DateTime?          @updatedAt @map("updated_at")

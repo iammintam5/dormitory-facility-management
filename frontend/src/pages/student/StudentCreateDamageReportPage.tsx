@@ -11,7 +11,8 @@ import { DamageReportStudentAssetsResponse } from '../../types/damage-reports';
 
 const createSchema = z.object({
   assetId: z.coerce.number().int().positive(),
-  description: z.string().min(10, 'Mo ta toi thieu 10 ky tu.'),
+  description: z.string().min(10, 'Mô tả tối thiểu 10 ký tự.'),
+  location: z.string().min(3, 'Vị trí tối thiểu 3 ký tự.'),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
 });
 
@@ -38,6 +39,7 @@ export function StudentCreateDamageReportPage() {
     defaultValues: {
       assetId: 1,
       description: '',
+      location: '',
       priority: 'MEDIUM',
     },
   });
@@ -60,6 +62,7 @@ export function StudentCreateDamageReportPage() {
         reset({
           assetId: response.data.assets[0].id,
           description: '',
+          location: '',
           priority: 'MEDIUM',
         });
       }
@@ -84,6 +87,7 @@ export function StudentCreateDamageReportPage() {
         assetId: values.assetId,
         roomId: lookup.room.id,
         description: values.description.trim(),
+        location: values.location.trim(),
         priority: values.priority,
       });
 
@@ -157,6 +161,15 @@ export function StudentCreateDamageReportPage() {
                   <option value="HIGH">HIGH</option>
                   <option value="URGENT">URGENT</option>
                 </select>
+              </Field>
+
+              <Field label="Vị trí" error={errors.location?.message}>
+                <input
+                  {...register('location')}
+                  type="text"
+                  className={inputClassName}
+                  placeholder="Ví dụ: Góc tường phía tây, mặt bàn, cánh cửa..."
+                />
               </Field>
 
               <Field label="Mô tả hư hỏng" error={errors.description?.message}>
