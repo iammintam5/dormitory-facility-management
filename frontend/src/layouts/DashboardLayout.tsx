@@ -9,17 +9,30 @@ export function DashboardLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [pendingDamageReportsCount, setPendingDamageReportsCount] = useState(0);
 
   if (!user) return null;
 
   useEffect(() => {
     loadUnreadCount();
+    if (user.role === 'ADMIN' || user.role === 'QL_CSVC') {
+      loadPendingDamageReportsCount();
+    }
   }, []);
 
   const loadUnreadCount = async () => {
     try {
       const response = await apiClient.get<UnreadCountResponse>('/notifications/unread-count');
       setUnreadCount(response.data.count);
+    } catch {
+      // Silent fail - badge will show 0
+    }
+  };
+
+  const loadPendingDamageReportsCount = async () => {
+    try {
+      const response = await apiClient.get<{ count: number }>('/damage-reports/pending-count');
+      setPendingDamageReportsCount(response.data.count);
     } catch {
       // Silent fail - badge will show 0
     }
@@ -43,7 +56,7 @@ export function DashboardLayout() {
         { path: 'locations', label: 'Quản lý khu phòng', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
         { path: 'asset-categories', label: 'Danh mục tài sản', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z' },
         { path: 'assets', label: 'Quản lý tài sản', icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
-        { path: 'damage-reports', label: 'Báo hỏng & sửa chữa', badge: 5, icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
+        { path: 'damage-reports', label: 'Báo hỏng & sửa chữa', badge: pendingDamageReportsCount > 0 ? pendingDamageReportsCount : undefined, icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
         { path: 'handovers', label: 'Bàn giao tài sản', icon: 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4' },
         { path: 'inventory-checks', label: 'Kiểm kê', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
         { path: 'liquidations', label: 'Thanh lý', icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' },
@@ -57,7 +70,7 @@ export function DashboardLayout() {
         ...common,
         { path: 'locations', label: 'Quản lý khu phòng', icon: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
         { path: 'assets', label: 'Quản lý tài sản', icon: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
-        { path: 'damage-reports', label: 'Báo hỏng & sửa chữa', badge: 5, icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
+        { path: 'damage-reports', label: 'Báo hỏng & sửa chữa', badge: pendingDamageReportsCount > 0 ? pendingDamageReportsCount : undefined, icon: 'M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z' },
         { path: 'handovers', label: 'Bàn giao tài sản', icon: 'M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4' },
         { path: 'inventory-checks', label: 'Kiểm kê', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
         { path: 'liquidations', label: 'Thanh lý', icon: 'M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16' },

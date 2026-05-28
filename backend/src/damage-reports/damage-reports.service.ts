@@ -471,6 +471,16 @@ export class DamageReportsService {
     };
   }
 
+  async countPendingReports(currentUser: AuthUser) {
+    const where: Prisma.DamageReportWhereInput = {
+      status: DamageReportStatus.SUBMITTED,
+    };
+
+    const count = await this.prismaService.damageReport.count({ where });
+
+    return { count };
+  }
+
   private get damageReportInclude() {
     return {
       reporter: {

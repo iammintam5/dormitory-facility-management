@@ -35,8 +35,13 @@ export function DamageReportsManagementPage() {
   }, []);
 
   const fetchRooms = async () => {
-    const response = await apiClient.get<Room[]>('/locations/rooms');
-    setRooms(response.data);
+    try {
+      const response = await apiClient.get<Room[]>('/locations/rooms');
+      setRooms(response.data);
+    } catch (error) {
+      console.error('Lỗi tải danh sách phòng:', error);
+      setErrorMessage('Không thể tải danh sách phòng. Vui lòng làm mới trang.');
+    }
   };
 
   const fetchReports = async (nextPage = page) => {
