@@ -188,7 +188,7 @@ export function StudentDashboardPage() {
               <CardDescription>Cập nhật từ Ban Quản lý</CardDescription>
             </div>
             <Link 
-              to="/notifications" 
+              to="/student/notifications" 
               className="text-sm font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg transition"
             >
               Xem tất cả

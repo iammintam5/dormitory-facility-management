@@ -37,6 +37,7 @@ export class DamageReportsService {
           assetId: dto.assetId,
           roomId: dto.roomId,
           description: dto.description.trim(),
+          location: dto.location.trim(),
           status: DamageReportStatus.SUBMITTED,
         },
         include: this.damageReportInclude,
@@ -233,6 +234,7 @@ export class DamageReportsService {
           roomId: nextRoomId,
           assetId: nextAssetId,
           description: dto.description === undefined ? undefined : dto.description.trim(),
+          location: dto.location === undefined ? undefined : dto.location.trim(),
         },
         include: this.damageReportInclude,
       });
@@ -245,11 +247,13 @@ export class DamageReportsService {
           roomId: report.roomId,
           assetId: report.assetId,
           description: report.description,
+          location: report.location,
         }),
         newValue: this.stringifyPayload({
           roomId: updated.roomId,
           assetId: updated.assetId,
           description: updated.description,
+          location: updated.location,
         }),
       });
 
