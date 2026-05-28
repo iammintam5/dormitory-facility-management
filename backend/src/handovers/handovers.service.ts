@@ -18,6 +18,7 @@ import { CreateHandoverDto } from './dto/create-handover.dto';
 import { QueryHandoversDto } from './dto/query-handovers.dto';
 import { UpdateHandoverDto } from './dto/update-handover.dto';
 import { WorkflowNoteDto } from './dto/workflow-note.dto';
+import { MarkReturnedDto } from './dto/mark-returned.dto';
 
 @Injectable()
 export class HandoversService {
@@ -384,7 +385,7 @@ export class HandoversService {
     });
   }
 
-  async markReturned(currentUser: AuthUser, id: number, dto: WorkflowNoteDto) {
+  async markReturned(currentUser: AuthUser, id: number, dto: MarkReturnedDto) {
     this.ensureManager(currentUser);
     const handover = await this.prismaService.handover.findUnique({
       where: { id },
@@ -412,15 +413,24 @@ export class HandoversService {
         include: this.handoverDetailInclude,
       });
 
+      // Update conditionAtReturn for HandoverItems and status for Assets
       await Promise.all(
-        handover.handoverItems.map((item) =>
-          tx.asset.update({
+        dto.items.map(async (item) => {
+          // find the handoverItem
+          const handoverItem = handover.handoverItems.find(hi => hi.assetId === item.assetId);
+          if (handoverItem) {
+            await tx.handoverItem.update({
+              where: { id: handoverItem.id },
+              data: { conditionAtReturn: item.conditionAtReturn },
+            });
+          }
+          return tx.asset.update({
             where: { id: item.assetId },
             data: {
-              status: AssetStatus.AVAILABLE,
+              status: item.returnStatus,
             },
-          }),
-        ),
+          });
+        }),
       );
 
       await this.createAuditLog(tx, {
@@ -507,17 +517,17 @@ export class HandoversService {
           asset: true,
         },
       },
+      createdByUser: {
+        include: {
+          role: true,
+        },
+      },
     } satisfies Prisma.HandoverInclude;
   }
 
   private get handoverDetailInclude() {
     return {
       ...this.handoverListInclude,
-      createdByUser: {
-        include: {
-          role: true,
-        },
-      },
       handoverItems: {
         include: {
           asset: {
