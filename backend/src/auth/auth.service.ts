@@ -43,7 +43,7 @@ export class AuthService {
         }),
         ipAddress,
       });
-      throw new UnauthorizedException('Thong tin dang nhap khong hop le.');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ.');
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
@@ -60,11 +60,11 @@ export class AuthService {
         }),
         ipAddress,
       });
-      throw new UnauthorizedException('Thong tin dang nhap khong hop le.');
+      throw new UnauthorizedException('Thông tin đăng nhập không hợp lệ.');
     }
 
     if (user.status !== UserStatus.ACTIVE) {
-      throw new ForbiddenException('Tai khoan hien khong the dang nhap.');
+      throw new ForbiddenException('Tài khoản hiện không thể đăng nhập.');
     }
 
     const authUser = this.buildAuthUser(user);
@@ -107,13 +107,13 @@ export class AuthService {
     );
 
     if (!isCurrentPasswordValid) {
-      throw new UnauthorizedException('Mat khau hien tai khong dung.');
+      throw new UnauthorizedException('Mật khẩu hiện tại không đúng.');
     }
 
     const isSamePassword = await bcrypt.compare(dto.newPassword, user.passwordHash);
 
     if (isSamePassword) {
-      throw new ForbiddenException('Mat khau moi phai khac mat khau hien tai.');
+      throw new ForbiddenException('Mật khẩu mới phải khác mật khẩu hiện tại.');
     }
 
     await this.prismaService.user.update({
@@ -124,7 +124,7 @@ export class AuthService {
     });
 
     return {
-      message: 'Doi mat khau thanh cong.',
+      message: 'Đổi mật khẩu thành công.',
     };
   }
 
@@ -150,7 +150,7 @@ export class AuthService {
     });
 
     return {
-      message: 'Dat lai mat khau thanh cong.',
+      message: 'Đặt lại mật khẩu thành công.',
     };
   }
 
@@ -159,7 +159,7 @@ export class AuthService {
       const payload = await this.jwtService.verifyAsync<AuthUser>(token);
       return payload;
     } catch {
-      throw new UnauthorizedException('Token khong hop le hoac da het han.');
+      throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn.');
     }
   }
 
@@ -170,7 +170,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('Khong tim thay nguoi dung.');
+      throw new NotFoundException('Không tìm thấy người dùng.');
     }
 
     return user;

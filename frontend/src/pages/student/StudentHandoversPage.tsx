@@ -24,14 +24,14 @@ export function StudentHandoversPage() {
     try {
       const response = await apiClient.get<HandoversResponse>('/handovers', {
         params: {
-          status: 'WAITING_CONFIRMATION',
+          status: 'PENDING',
           page: 1,
           pageSize: 20,
         },
       });
       setItems(response.data.items);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai bien ban cho xac nhan.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải biên bản cho xác nhận.'));
     } finally {
       setIsLoading(false);
     }
@@ -40,8 +40,8 @@ export function StudentHandoversPage() {
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Bien ban cho xac nhan"
-        description="Sinh vien xem va xac nhan bien ban ban giao tai san do bo phan CSVC gui den."
+        title="Biên bản cho xác nhận"
+        description="Sinh viên xem và xác nhận biên bản bàn giao tài sản do bộ phận CSVC gửi đến."
       >
         {errorMessage && (
           <p className="mb-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>
@@ -49,12 +49,12 @@ export function StudentHandoversPage() {
 
         {isLoading ? (
           <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-            Dang tai bien ban cho xac nhan...
+            Đang tải biên bản cho xác nhận...
           </div>
         ) : items.length === 0 ? (
           <EmptyState
-            title="Khong co bien ban nao dang cho xac nhan"
-            description="Khi co bien ban moi, ban se thay danh sach tai day de xem va xac nhan."
+            title="Không có biên bản nào đang chờ xác nhận"
+            description="Khi có biên bản mới, bạn sẽ thấy danh sách tại đây để xem và xác nhận."
           />
         ) : (
           <div className="space-y-4">
@@ -66,10 +66,10 @@ export function StudentHandoversPage() {
                       {handover.handoverCode}
                     </p>
                     <h3 className="mt-2 text-lg font-semibold text-slate-900">
-                      Phong {handover.room.roomCode} - {handover.student.fullName}
+                      Phòng {handover.room.roomCode} - {handover.student.fullName}
                     </h3>
                     <p className="mt-1 text-sm text-slate-600">
-                      Ngay lap: {formatDate(handover.handoverDate)} | Cap nhat: {formatDateTime(handover.updatedAt ?? handover.createdAt)}
+                      Ngày lập: {formatDate(handover.handoverDate)} | Cập nhật: {formatDateTime(handover.updatedAt ?? handover.createdAt)}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-3">
@@ -78,7 +78,7 @@ export function StudentHandoversPage() {
                       to={`/student/handovers/${handover.id}`}
                       className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
                     >
-                      Xem va xac nhan
+                      Xem và xác nhận
                     </Link>
                   </div>
                 </div>

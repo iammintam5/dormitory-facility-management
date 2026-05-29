@@ -32,7 +32,7 @@ export function HealthStatusCard() {
         }
 
         setRequestState('error');
-        setErrorMessage('Khong the ket noi toi backend. Hay kiem tra server va bien moi truong.');
+        setErrorMessage('Không thể kết nối tới backend. Hay kiểm tra server và biến môi trường.');
       }
     };
 
@@ -52,12 +52,12 @@ export function HealthStatusCard() {
     <div className="rounded-xl border border-slate-200 bg-slate-50 p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-slate-500">Trang thai ket noi</p>
+          <p className="text-sm font-medium text-slate-500">Trạng thái kết nối</p>
           <h2 className="mt-1 text-xl font-semibold text-slate-900">
-            {requestState === 'loading' && 'Dang kiem tra...'}
-            {requestState === 'success' && 'Backend da san sang'}
-            {requestState === 'error' && 'Ket noi that bai'}
-            {requestState === 'idle' && 'Chua kiem tra'}
+            {requestState === 'loading' && 'Đang kiểm tra...'}
+            {requestState === 'success' && 'Backend đã sẵn sàng'}
+            {requestState === 'error' && 'Kết nối thất bại'}
+            {requestState === 'idle' && 'Chưa kiểm tra'}
           </h2>
         </div>
 
@@ -69,7 +69,7 @@ export function HealthStatusCard() {
       <div className="mt-4 rounded-lg bg-white p-4 text-sm text-slate-600">
         {requestState === 'success' && (
           <p>
-            Frontend goi thanh cong API health check. Backend tra ve:
+            Frontend gọi thanh công API health check. Backend trả về:
             <code className="ml-2 rounded bg-slate-100 px-2 py-1">{`{ status: "${healthStatus}" }`}</code>
           </p>
         )}
@@ -77,7 +77,7 @@ export function HealthStatusCard() {
         {requestState === 'error' && <p>{errorMessage}</p>}
 
         {(requestState === 'idle' || requestState === 'loading') && (
-          <p>Frontend dang thuc hien request toi backend qua Axios.</p>
+          <p>Frontend đang thực hiện request tới backend qua Axios.</p>
         )}
       </div>
     </div>

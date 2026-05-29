@@ -46,7 +46,7 @@ export class InventoryChecksService {
     });
 
     if (assets.length === 0) {
-      throw new BadRequestException('Phong hien khong co tai san nao de lap phieu kiem ke.');
+      throw new BadRequestException('Phòng hiện không có tài sản nào để lập phiếu kiểm kê.');
     }
 
     const inventoryCode = await this.generateInventoryCode();
@@ -66,7 +66,7 @@ export class InventoryChecksService {
               systemQuantity: 1,
               actualQuantity: 1,
               difference: 0,
-              actualCondition: 'Chua cap nhat',
+              actualCondition: 'Chưa cập nhật',
               note: null,
             })),
           },
@@ -173,7 +173,7 @@ export class InventoryChecksService {
     });
 
     if (!inventoryCheck) {
-      throw new NotFoundException('Khong tim thay phieu kiem ke.');
+      throw new NotFoundException('Không tìm thấy phiếu kiểm kê.');
     }
 
     return inventoryCheck;
@@ -197,7 +197,7 @@ export class InventoryChecksService {
 
     for (const item of dto.items) {
       if (!currentItemMap.has(item.itemId)) {
-        throw new BadRequestException('Co item kiem ke khong thuoc phieu hien tai.');
+        throw new BadRequestException('Có item kiểm kê không thuộc phiếu hiện tại.');
       }
     }
 
@@ -297,12 +297,12 @@ export class InventoryChecksService {
             await tx.assetHistory.create({
               data: {
                 assetId: item.assetId,
-                action: 'Cap nhat tu kiem ke',
+                action: 'Cập nhật từ kiểm kê',
                 oldStatus: item.asset.status,
                 newStatus: newStatus,
                 oldRoomId: item.asset.roomId,
                 newRoomId: item.asset.roomId,
-                note: `Phieu ${updated.inventoryCode}. Chenh lech: ${item.difference}. Tinh trang: ${item.actualCondition || '--'}`,
+                note: `Phiếu ${updated.inventoryCode}. Chênh lệch: ${item.difference}. Tình trạng: ${item.actualCondition || '--'}`,
               },
             });
           }
@@ -321,7 +321,7 @@ export class InventoryChecksService {
             data: facilityManagers.map((manager) => ({
               userId: manager.id,
               title: 'Kiem ke phat hien bat thuong',
-              content: `Phieu ${updated.inventoryCode} co tai san chenh lech hoac tinh trang xau, tai san da duoc chuyen sang trang thai DAMAGED.`,
+              content: `Phieu ${updated.inventoryCode} có tài sản chênh lệch hoac tình trạng xấu, tài sản đã được chuyển sang trạng thái DAMAGED.`,
               status: NotificationStatus.UNREAD,
               relatedTable: 'inventory_checks',
               relatedId: updated.id,
@@ -368,6 +368,7 @@ export class InventoryChecksService {
           roomId: item.inventoryCheck.roomId!,
           description: dto.description.trim(),
           status: DamageReportStatus.SUBMITTED,
+          location: 'Ghi nhận qua đợt kiểm kê định kỳ',
         },
         include: {
           reporter: {
@@ -389,7 +390,7 @@ export class InventoryChecksService {
           reportId: createdReport.id,
           action: 'create',
           newStatus: DamageReportStatus.SUBMITTED,
-          note: `Tao tu phieu kiem ke ${item.inventoryCheck.inventoryCode}.`,
+          note: `Tạo từ phiếu kiểm kê ${item.inventoryCheck.inventoryCode}.`,
           createdBy: currentUser.userId,
         },
       });
@@ -557,7 +558,7 @@ export class InventoryChecksService {
     });
 
     if (existingPlan) {
-      throw new ConflictException('Tai san nay da co ke hoach bao tri dang hoat dong.');
+      throw new ConflictException('Tài sản nay đã có kế hoạch bảo trì đang hoạt động.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -620,10 +621,10 @@ export class InventoryChecksService {
     return {
       ...inventoryCheck,
       printable: {
-        title: 'Phieu kiem ke tai san',
+        title: 'Phiếu kiểm kê tài sản',
         generatedAt: new Date().toISOString(),
         roomLabel: inventoryCheck.room
-          ? `${inventoryCheck.room.roomCode} - ${inventoryCheck.room.floor.building.name} / Tang ${inventoryCheck.room.floor.floorNumber}`
+          ? `${inventoryCheck.room.roomCode} - ${inventoryCheck.room.floor.building.name} / Tầng ${inventoryCheck.room.floor.floorNumber}`
           : 'Khong xac dinh',
         checkedByLabel: `${inventoryCheck.checkedByUser.fullName} (${inventoryCheck.checkedByUser.userCode})`,
       },
@@ -694,13 +695,13 @@ export class InventoryChecksService {
 
   private ensureManager(currentUser: AuthUser) {
     if (!['ADMIN', 'QL_CSVC'].includes(currentUser.role)) {
-      throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay.');
+      throw new ForbiddenException('Bạn không có quyền thực hiện thao tác này.');
     }
   }
 
   private ensureDraft(status: ApprovalStatus) {
     if (status !== ApprovalStatus.DRAFT) {
-      throw new ConflictException('Chi duoc cap nhat phieu khi dang o trang thai DRAFT.');
+      throw new ConflictException('Chỉ được cập nhật phiếu khi đang ở trạng thái DRAFT.');
     }
   }
 
@@ -717,7 +718,7 @@ export class InventoryChecksService {
     });
 
     if (!room) {
-      throw new NotFoundException('Khong tim thay phong.');
+      throw new NotFoundException('Không tìm thấy phòng.');
     }
 
     return room;
@@ -729,7 +730,7 @@ export class InventoryChecksService {
     });
 
     if (!inventoryCheck) {
-      throw new NotFoundException('Khong tim thay phieu kiem ke.');
+      throw new NotFoundException('Không tìm thấy phiếu kiểm kê.');
     }
 
     return inventoryCheck;
@@ -748,11 +749,11 @@ export class InventoryChecksService {
     });
 
     if (!item) {
-      throw new NotFoundException('Khong tim thay item kiem ke.');
+      throw new NotFoundException('Không tìm thấy item kiểm kê.');
     }
 
     if (!item.inventoryCheck.roomId) {
-      throw new BadRequestException('Phieu kiem ke hien tai khong gan voi phong hop le.');
+      throw new BadRequestException('Phiếu kiểm kê hiện tại không gắn với phòng hợp lệ.');
     }
 
     return item;

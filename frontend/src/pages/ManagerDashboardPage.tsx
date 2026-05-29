@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../co
 import { Badge } from '../components/ui/Badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
 import { Button } from '../components/ui/Button';
+import { DAMAGE_REPORT_STATUS } from '../constants/damage-reports';
 
 export function ManagerDashboardPage() {
   const [summary, setSummary] = useState<MaintenanceDashboardSummary | null>(null);
@@ -34,7 +35,7 @@ export function ManagerDashboardPage() {
         await Promise.all([
           apiClient.get<MaintenanceDashboardSummary>('/maintenance/dashboard-summary'),
           apiClient.get<DamageReportsResponse>('/damage-reports', {
-            params: { status: 'PENDING', page: 1, pageSize: 5 },
+            params: { status: DAMAGE_REPORT_STATUS.SUBMITTED, page: 1, pageSize: 5 },
           }),
           apiClient.get<DueAssetsResponse>('/maintenance/due-assets', {
             params: { days: 7 },

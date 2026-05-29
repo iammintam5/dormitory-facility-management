@@ -160,7 +160,7 @@ export class HandoversService {
     });
 
     if (!handover) {
-      throw new NotFoundException('Khong tim thay bien ban ban giao.');
+      throw new NotFoundException('Không tìm thấy biên bản bàn giao.');
     }
 
     this.ensureCanAccess(currentUser, handover.studentId);
@@ -251,7 +251,7 @@ export class HandoversService {
       });
 
       if (!handover) {
-        throw new NotFoundException('Khong tim thay bien ban ban giao.');
+        throw new NotFoundException('Không tìm thấy biên bản bàn giao.');
       }
 
       this.ensureDraft(handover.status);
@@ -267,8 +267,8 @@ export class HandoversService {
 
       await this.createNotification(tx, {
         userId: handover.studentId,
-        title: 'Co bien ban ban giao can xac nhan',
-        content: `Bien ban ${handover.handoverCode} dang cho ban xac nhan.`,
+        title: 'Có biên bản bàn giao cần xác nhận',
+        content: `Biên bản ${handover.handoverCode} đang chờ bạn xác nhận.`,
         relatedId: handover.id,
       });
 
@@ -286,7 +286,7 @@ export class HandoversService {
 
   async confirm(currentUser: AuthUser, id: number, dto: WorkflowNoteDto) {
     if (currentUser.role !== 'STUDENT') {
-      throw new ForbiddenException('Chi sinh vien moi duoc xac nhan bien ban.');
+      throw new ForbiddenException('Chỉ sinh viên mới được xác nhận biên bản.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -302,15 +302,15 @@ export class HandoversService {
       });
 
       if (!handover) {
-        throw new NotFoundException('Khong tim thay bien ban ban giao.');
+        throw new NotFoundException('Không tìm thấy biên bản bàn giao.');
       }
 
       if (handover.studentId !== currentUser.userId) {
-        throw new ForbiddenException('Ban khong co quyen xac nhan bien ban nay.');
+        throw new ForbiddenException('Bạn không có quyền xác nhận biên bản này.');
       }
 
       if (handover.status !== ApprovalStatus.PENDING) {
-        throw new ConflictException('Bien ban hien khong o trang thai cho xac nhan.');
+        throw new ConflictException('Biên bản hiện không ở trạng thái chờ xác nhận.');
       }
 
       const updated = await tx.handover.update({
@@ -335,8 +335,8 @@ export class HandoversService {
 
       await this.createNotification(tx, {
         userId: handover.studentId,
-        title: 'Ban da xac nhan bien ban ban giao',
-        content: `Bien ban ${handover.handoverCode} da duoc xac nhan thanh cong.`,
+        title: 'Bạn đã xác nhận biên bản bàn giao',
+        content: `Biên bản ${handover.handoverCode} đã được xác nhận thành công.`,
         relatedId: handover.id,
       });
 
@@ -360,7 +360,7 @@ export class HandoversService {
       handover.status !== ApprovalStatus.DRAFT &&
       handover.status !== ApprovalStatus.PENDING
     ) {
-      throw new ConflictException('Chi duoc huy bien ban khi con draft hoac cho xac nhan.');
+      throw new ConflictException('Chỉ được hủy biên bản khi còn ở trạng thái draft hoặc chờ xác nhận.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -395,11 +395,11 @@ export class HandoversService {
     });
 
     if (!handover) {
-      throw new NotFoundException('Khong tim thay bien ban ban giao.');
+      throw new NotFoundException('Không tìm thấy biên bản bàn giao.');
     }
 
     if (handover.status !== ApprovalStatus.APPROVED) {
-      throw new ConflictException('Chi duoc ghi nhan tra tai san khi bien ban da xac nhan.');
+      throw new ConflictException('Chỉ được ghi nhận trả tài sản khi biên bản đã xác nhận.');
     }
 
     return this.prismaService.$transaction(async (tx) => {
@@ -451,9 +451,9 @@ export class HandoversService {
     return {
       ...handover,
       printable: {
-        title: 'Bien ban ban giao tai san',
+        title: 'Biên bản bàn giao tài sản',
         generatedAt: new Date().toISOString(),
-        roomLabel: `${handover.room.roomCode} - ${handover.room.floor.building.name} / Tang ${handover.room.floor.floorNumber}`,
+        roomLabel: `${handover.room.roomCode} - ${handover.room.floor.building.name} / Tầng ${handover.room.floor.floorNumber}`,
         studentLabel: `${handover.student.fullName} (${handover.student.userCode})`,
       },
     };
@@ -546,7 +546,7 @@ export class HandoversService {
     });
 
     if (!handover) {
-      throw new NotFoundException('Khong tim thay bien ban ban giao.');
+      throw new NotFoundException('Không tìm thấy biên bản bàn giao.');
     }
 
     return handover;
@@ -554,19 +554,19 @@ export class HandoversService {
 
   private ensureManager(currentUser: AuthUser) {
     if (!['ADMIN', 'QL_CSVC'].includes(currentUser.role)) {
-      throw new ForbiddenException('Ban khong co quyen thuc hien thao tac nay.');
+      throw new ForbiddenException('Bạn không có quyền thực hiện thao tác này.');
     }
   }
 
   private ensureCanAccess(currentUser: AuthUser, studentId: number) {
     if (currentUser.role === 'STUDENT' && currentUser.userId !== studentId) {
-      throw new ForbiddenException('Ban khong co quyen xem bien ban nay.');
+      throw new ForbiddenException('Bạn không có quyền xem biên bản này.');
     }
   }
 
   private ensureDraft(status: ApprovalStatus) {
     if (status !== ApprovalStatus.DRAFT) {
-      throw new ConflictException('Chi duoc cap nhat bien ban khi dang o trang thai DRAFT.');
+      throw new ConflictException('Chỉ được cập nhật biên bản khi đang ở trạng thái DRAFT.');
     }
   }
 
@@ -583,7 +583,7 @@ export class HandoversService {
     });
 
     if (!room) {
-      throw new NotFoundException('Khong tim thay phong.');
+      throw new NotFoundException('Không tìm thấy phòng.');
     }
 
     return room;
@@ -606,11 +606,11 @@ export class HandoversService {
     });
 
     if (!assignment) {
-      throw new BadRequestException('Sinh vien hien khong o phong da chon.');
+      throw new BadRequestException('Sinh viên hiện không ở phòng đã chọn.');
     }
 
     if (assignment.student.role.code !== 'STUDENT') {
-      throw new BadRequestException('Chi co the lap bien ban cho sinh vien.');
+      throw new BadRequestException('Chỉ có thể lập biên bản cho sinh viên.');
     }
 
     return assignment.student;
@@ -626,18 +626,18 @@ export class HandoversService {
     });
 
     if (assets.length !== assetIds.length) {
-      throw new BadRequestException('Mot hoac nhieu tai san khong ton tai.');
+      throw new BadRequestException('Một hoặc nhiều tài sản không tồn tại.');
     }
 
     const invalidAsset = assets.find((asset) => asset.roomId !== roomId);
     if (invalidAsset) {
-      throw new BadRequestException('Chi duoc chon tai san thuoc phong da chon.');
+      throw new BadRequestException('Chỉ được chọn tài sản thuộc phòng đã chọn.');
     }
   }
 
   private async ensureDistinctAssets(assetIds: number[]) {
     if (new Set(assetIds).size !== assetIds.length) {
-      throw new BadRequestException('Danh sach tai san trong bien ban khong duoc trung lap.');
+      throw new BadRequestException('Danh sách tài sản trong biên bản không được trùng lặp.');
     }
   }
 

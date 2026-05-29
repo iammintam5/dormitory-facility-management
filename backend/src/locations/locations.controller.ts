@@ -63,8 +63,16 @@ export class LocationsController {
   }
 
   @Get('rooms')
-  findRooms() {
-    return this.locationsService.findRooms();
+  async findRooms() {
+    console.log('[LocationsController] GET /locations/rooms called');
+    try {
+      const result = await this.locationsService.findRooms();
+      console.log('[LocationsController] GET /locations/rooms returning successfully');
+      return result;
+    } catch (error) {
+      console.error('[LocationsController] GET /locations/rooms error:', error);
+      throw error;
+    }
   }
 
   @Get('rooms/:id/students')

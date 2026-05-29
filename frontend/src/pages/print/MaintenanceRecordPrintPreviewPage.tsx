@@ -28,7 +28,7 @@ export function MaintenanceRecordPrintPreviewPage({ backTo }: { backTo?: string 
       );
       setRecord(response.data);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai du lieu in phieu bao tri.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải dữ liệu in phiếu bảo trì.'));
     }
   };
 
@@ -37,7 +37,7 @@ export function MaintenanceRecordPrintPreviewPage({ backTo }: { backTo?: string 
   }
 
   if (!record) {
-    return <div className="mx-auto max-w-3xl rounded-2xl bg-slate-50 p-6 text-sm text-slate-600">Dang tai phieu in...</div>;
+    return <div className="mx-auto max-w-3xl rounded-2xl bg-slate-50 p-6 text-sm text-slate-600">Đang tải phiếu in...</div>;
   }
 
   return (
@@ -50,7 +50,7 @@ export function MaintenanceRecordPrintPreviewPage({ backTo }: { backTo?: string 
             to={backTo}
             className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
-            Quay lai
+            Quay lại
           </Link>
         ) : undefined
       }

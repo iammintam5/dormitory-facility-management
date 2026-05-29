@@ -33,8 +33,16 @@ export function HandoversManagementPage() {
   }, []);
 
   const fetchRooms = async () => {
-    const response = await apiClient.get<Room[]>('/locations/rooms');
-    setRooms(response.data);
+    console.log('[HandoversManagementPage] fetchRooms called');
+    try {
+      const response = await apiClient.get<Room[]>('/locations/rooms');
+      console.log('[HandoversManagementPage] fetchRooms succeeded with', response.data.length, 'rooms');
+      setRooms(response.data);
+    } catch (error) {
+      console.error('[HandoversManagementPage] fetchRooms failed:', error);
+      console.error('Lỗi tải danh sách phòng:', error);
+      setErrorMessage('Không thể tải danh sách phòng. Vui lòng làm mới trang.');
+    }
   };
 
   const fetchHandovers = async (nextPage = page) => {
@@ -66,12 +74,9 @@ export function HandoversManagementPage() {
   const getStatusVariant = (status: string) => {
     switch (status) {
       case 'DRAFT': return 'secondary';
-      case 'WAITING_CONFIRMATION':
-      case 'PENDING_APPROVAL': return 'warning';
-      case 'CONFIRMED':
+      case 'PENDING': return 'warning';
       case 'APPROVED':
       case 'COMPLETED': return 'success';
-      case 'RETURNED':
       case 'REJECTED': return 'destructive';
       case 'CANCELLED': return 'outline';
       default: return 'default';
@@ -195,14 +200,10 @@ export function HandoversManagementPage() {
   );
 }
 
-// In the new unified enum, this might be 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'COMPLETED'
 const handoverStatuses: string[] = [
   'DRAFT',
-  'WAITING_CONFIRMATION',
-  'PENDING_APPROVAL',
-  'CONFIRMED',
+  'PENDING',
   'APPROVED',
-  'RETURNED',
   'REJECTED',
   'COMPLETED',
   'CANCELLED',

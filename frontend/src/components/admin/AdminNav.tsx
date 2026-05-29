@@ -10,34 +10,34 @@ export function AdminNav({ role }: AdminNavProps) {
     role === 'ADMIN'
       ? [
           { to: '/admin/dashboard', label: 'Dashboard' },
-          { to: '/admin/users', label: 'Nguoi dung' },
-          { to: '/admin/locations', label: 'Khu / Tang / Phong' },
-          { to: '/admin/asset-categories', label: 'Loai tai san' },
-          { to: '/admin/assets', label: 'Tai san' },
-          { to: '/admin/maintenance', label: 'Bao tri' },
-          { to: '/admin/liquidation-records', label: 'Thanh ly' },
-          { to: '/admin/inventory-checks', label: 'Kiem ke' },
-          { to: '/admin/damage-reports', label: 'Bao hong' },
-          { to: '/admin/handovers', label: 'Ban giao' },
+          { to: '/admin/users', label: 'Người dung' },
+          { to: '/admin/locations', label: 'Khu / Tầng / Phòng' },
+          { to: '/admin/asset-categories', label: 'Loại tài sản' },
+          { to: '/admin/assets', label: 'Tài sản' },
+          { to: '/admin/maintenance', label: 'Bảo trì' },
+          { to: '/admin/liquidation-records', label: 'Thanh lý' },
+          { to: '/admin/inventory-checks', label: 'Kiểm kê' },
+          { to: '/admin/damage-reports', label: 'Báo hỏng' },
+          { to: '/admin/handovers', label: 'Bàn giao' },
           { to: '/admin/audit-logs', label: 'Audit log' },
         ]
       : role === 'QL_CSVC'
         ? [
             { to: '/manager/dashboard', label: 'Dashboard' },
-            { to: '/manager/locations', label: 'Khu / Tang / Phong' },
-            { to: '/manager/asset-categories', label: 'Loai tai san' },
-            { to: '/manager/assets', label: 'Tai san' },
-            { to: '/manager/maintenance', label: 'Bao tri' },
-            { to: '/manager/liquidation-records', label: 'Thanh ly' },
-            { to: '/manager/inventory-checks', label: 'Kiem ke' },
-            { to: '/manager/damage-reports', label: 'Bao hong' },
-            { to: '/manager/handovers', label: 'Ban giao' },
+            { to: '/manager/locations', label: 'Khu / Tầng / Phòng' },
+            { to: '/manager/asset-categories', label: 'Loại tài sản' },
+            { to: '/manager/assets', label: 'Tài sản' },
+            { to: '/manager/maintenance', label: 'Bảo trì' },
+            { to: '/manager/liquidation-records', label: 'Thanh lý' },
+            { to: '/manager/inventory-checks', label: 'Kiểm kê' },
+            { to: '/manager/damage-reports', label: 'Báo hỏng' },
+            { to: '/manager/handovers', label: 'Bàn giao' },
           ]
         : [
             { to: '/student/dashboard', label: 'Dashboard' },
-            { to: '/student/damage-reports', label: 'Lich su bao hong' },
-            { to: '/student/damage-reports/new', label: 'Tao phieu moi' },
-            { to: '/student/handovers', label: 'Ban giao cho xac nhan' },
+            { to: '/student/damage-reports', label: 'Lịch sử báo hỏng' },
+            { to: '/student/damage-reports/new', label: 'Tạo phiếu mới' },
+            { to: '/student/handovers', label: 'Bàn giao cho xác nhận' },
           ];
 
   return (

@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '../lib/api-error';
 import { formatDate, formatDateTime } from '../lib/format';
 import { DamageReportStudentAssetsResponse, DamageReportsResponse } from '../types/damage-reports';
 import { AppNotification, NotificationsResponse } from '../types/notifications';
+import { DAMAGE_REPORT_STATUS } from '../constants/damage-reports';
 
 export function StudentDashboardPage() {
   const [roomData, setRoomData] = useState<DamageReportStudentAssetsResponse | null>(null);
@@ -25,7 +26,7 @@ export function StudentDashboardPage() {
     try {
       const [roomRes, reportsRes, notifRes] = await Promise.all([
         apiClient.get<DamageReportStudentAssetsResponse>('/damage-reports/my-assets'),
-        apiClient.get<DamageReportsResponse>('/damage-reports', { params: { status: 'PENDING', pageSize: 1 } }),
+        apiClient.get<DamageReportsResponse>('/damage-reports', { params: { status: DAMAGE_REPORT_STATUS.SUBMITTED, pageSize: 1 } }),
         apiClient.get<NotificationsResponse>('/notifications/my', { params: { pageSize: 5 } })
       ]);
 
@@ -167,7 +168,7 @@ export function StudentDashboardPage() {
                   <li key={asset.id} className="p-4 hover:bg-slate-50 transition flex items-center justify-between">
                     <div>
                       <h4 className="font-semibold text-slate-800">{asset.assetName}</h4>
-                      <p className="text-xs text-slate-500 mt-0.5">Mã: {asset.assetCode} • {asset.category.name}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">Mã: {asset.assetCode} • {asset.category?.name || 'Chưa có tên'}</p>
                     </div>
                     <Badge variant={asset.status === 'IN_USE' ? 'success' : 'warning'}>
                       {asset.status === 'IN_USE' ? 'Bình thường' : 'Có lỗi'}
@@ -187,7 +188,7 @@ export function StudentDashboardPage() {
               <CardDescription>Cập nhật từ Ban Quản lý</CardDescription>
             </div>
             <Link 
-              to="/notifications" 
+              to="/student/notifications" 
               className="text-sm font-medium text-emerald-600 hover:text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg transition"
             >
               Xem tất cả

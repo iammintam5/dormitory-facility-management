@@ -31,7 +31,7 @@ export function MaintenanceAssetHistoryPage() {
       );
       setRecords(response.data);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai lich su bao tri cua tai san.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải lịch sử bảo trì của tài sản.'));
     } finally {
       setIsLoading(false);
     }
@@ -44,13 +44,13 @@ export function MaintenanceAssetHistoryPage() {
           to={`${basePath}/maintenance`}
           className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >
-          Quay lai bao tri
+          Quay lại bảo trì
         </Link>
       </div>
 
       <SectionCard
-        title="Lich su bao tri tai san"
-        description="Theo doi cac lan bao tri, ket qua va phieu in lien quan cua tung tai san."
+        title="Lịch sử bảo trì tài sản"
+        description="Theo dõi các lần bảo trì, kết quả và phiếu in liên quan của từng tài sản."
       >
         {errorMessage && (
           <p className="mb-4 rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>
@@ -58,11 +58,11 @@ export function MaintenanceAssetHistoryPage() {
 
         {isLoading ? (
           <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-            Dang tai lich su bao tri...
+            Đang tải lịch sử bảo trì...
           </div>
         ) : records.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm text-slate-600">
-            Chua co lich su bao tri cho tai san nay.
+            Chưa có lịch sử bảo trì cho tài sản này.
           </div>
         ) : (
           <div className="space-y-4">
@@ -86,20 +86,20 @@ export function MaintenanceAssetHistoryPage() {
                       to={`${basePath}/maintenance/records/${record.id}/print`}
                       className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                     >
-                      In phieu
+                      In phiếu
                     </Link>
                   </div>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <InfoLine label="Loai bao tri" value={record.maintenanceType} />
-                  <InfoLine label="Lan cap nhat" value={formatDateTime(record.updatedAt ?? record.createdAt)} />
-                  <InfoLine label="Chi phi" value={String(record.cost ?? '--')} />
-                  <InfoLine label="Ngay bao tri tiep theo" value={formatDate(record.nextMaintenanceDate)} />
+                  <InfoLine label="Loại bảo trì" value={record.maintenanceType} />
+                  <InfoLine label="Lần cập nhật" value={formatDateTime(record.updatedAt ?? record.createdAt)} />
+                  <InfoLine label="Chi phí" value={String(record.cost ?? '--')} />
+                  <InfoLine label="Ngày bảo trì tiếp theo" value={formatDate(record.nextMaintenanceDate)} />
                 </div>
                 <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-                  <p className="font-medium text-slate-900">Noi dung</p>
+                  <p className="font-medium text-slate-900">Nội dung</p>
                   <p className="mt-2 leading-6">{record.content}</p>
-                  {record.note && <p className="mt-3 text-slate-600">Ghi chu: {record.note}</p>}
+                  {record.note && <p className="mt-3 text-slate-600">Ghi chú: {record.note}</p>}
                 </div>
               </article>
             ))}
