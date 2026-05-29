@@ -1,0 +1,265 @@
+import { zodResolver } from '@hookform/resolvers/zod';
+import axios from 'axios';
+import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
+import { useToast } from '../../toast/toast-context';
+import { EmptyState } from '../../components/admin/EmptyState';
+import { SectionCard } from '../../components/admin/SectionCard';
+import { apiClient } from '../../lib/axios';
+import { AssetCategory } from '../../types/assets';
+
+const categorySchema = z.object({
+  code: z.string().min(1, 'Vui lòng nhập mã loại tài sản.'),
+  name: z.string().min(1, 'Vui lòng nhập tên loại tài sản.'),
+  description: z.string().optional(),
+  maintenanceCycleMonths: z
+    .union([z.coerce.number().int().positive(), z.literal(''), z.undefined()])
+    .optional(),
+});
+
+type CategoryFormValues = z.infer<typeof categorySchema>;
+
+const defaultValues: CategoryFormValues = {
+  code: '',
+  name: '',
+  description: '',
+  maintenanceCycleMonths: '',
+};
+
+export function AssetCategoriesManagementPage() {
+  const { showToast } = useToast();
+  const [categories, setCategories] = useState<AssetCategory[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<AssetCategory | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CategoryFormValues>({
+    resolver: zodResolver(categorySchema),
+    defaultValues,
+  });
+
+  useEffect(() => {
+    void fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    setIsLoading(true);
+
+    try {
+      const response = await apiClient.get<AssetCategory[]>('/asset-categories');
+      setCategories(response.data);
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Không thể tải danh sách loại tài sản.'), 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const onSubmit = handleSubmit(async (values) => {
+    setIsSaving(true);
+
+    try {
+      const payload = {
+        code: values.code.trim(),
+        name: values.name.trim(),
+        description: values.description?.trim() || undefined,
+        maintenanceCycleMonths:
+          values.maintenanceCycleMonths === '' || values.maintenanceCycleMonths === undefined
+            ? undefined
+            : Number(values.maintenanceCycleMonths),
+      };
+
+      if (selectedCategory) {
+        await apiClient.patch(`/asset-categories/${selectedCategory.id}`, payload);
+        showToast('Cập nhật loại tài sản thành công.', 'success');
+      } else {
+        await apiClient.post('/asset-categories', payload);
+        showToast('Tạo loại tài sản thành công.', 'success');
+      }
+
+      setSelectedCategory(null);
+      reset(defaultValues);
+      await fetchCategories();
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Không thể lưu loại tài sản.'), 'error');
+    } finally {
+      setIsSaving(false);
+    }
+  });
+
+  const handleEdit = (category: AssetCategory) => {
+    setSelectedCategory(category);
+    reset({
+      code: category.code,
+      name: category.name,
+      description: category.description ?? '',
+      maintenanceCycleMonths: category.maintenanceCycleMonths ?? '',
+    });
+  };
+
+  const handleDelete = async (categoryId: number) => {
+    try {
+      await apiClient.delete(`/asset-categories/${categoryId}`);
+      showToast('Xóa loại tài sản thành công.', 'success');
+      await fetchCategories();
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Không thể xóa loại tài sản.'), 'error');
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <SectionCard
+        title="Quản lý loại tài sản"
+        description="Quản lý danh mục loại tài sản và chu kỳ bảo trì mặc định."
+      >
+        <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
+          <form className="space-y-4 rounded-2xl bg-slate-50 p-4" onSubmit={onSubmit}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-900">
+                {selectedCategory ? 'Cập nhật loại tài sản' : 'Tạo loại tài sản mới'}
+              </h3>
+              {selectedCategory && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory(null);
+                    reset(defaultValues);
+                  }}
+                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                >
+                  Bỏ chọn
+                </button>
+              )}
+            </div>
+
+            <Field label="Mã loại" error={errors.code?.message}>
+              <input {...register('code')} className={inputClassName} />
+            </Field>
+
+            <Field label="Tên loại" error={errors.name?.message}>
+              <input {...register('name')} className={inputClassName} />
+            </Field>
+
+            <Field label="Mô tả" error={errors.description?.message}>
+              <textarea {...register('description')} className={`${inputClassName} min-h-24`} />
+            </Field>
+
+            <Field
+              label="Chu kỳ bảo trì (tháng)"
+              error={errors.maintenanceCycleMonths?.message as string | undefined}
+            >
+              <input type="number" {...register('maintenanceCycleMonths')} className={inputClassName} />
+            </Field>
+
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
+            >
+              {isSaving ? 'Đang lưu...' : selectedCategory ? 'Cập nhật' : 'Tạo loại tài sản'}
+            </button>
+          </form>
+
+          {isLoading ? (
+            <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
+              Đang tải loại tài sản...
+            </div>
+          ) : categories.length === 0 ? (
+            <EmptyState
+              title="Chưa có loại tài sản nào"
+              description="Hãy tạo loại tài sản đầu tiên ở khung bên trái."
+            />
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-slate-200">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200 text-sm">
+                  <thead className="bg-slate-50 text-left text-slate-600">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Loại tài sản</th>
+                      <th className="px-4 py-3 font-medium">Chu kỳ bảo trì</th>
+                      <th className="px-4 py-3 font-medium">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {categories.map((category) => (
+                      <tr key={category.id}>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-900">{category.name}</p>
+                          <p className="text-slate-600">{category.code}</p>
+                          <p className="mt-1 text-xs text-slate-500">{category.description || '--'}</p>
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {category.maintenanceCycleMonths ? `${category.maintenanceCycleMonths} tháng` : 'Không có'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleEdit(category)}
+                              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                            >
+                              Sửa
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDelete(category.id)}
+                              className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50"
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+function Field({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block space-y-2">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      {children}
+      {error && <span className="text-xs text-rose-600">{error}</span>}
+    </label>
+  );
+}
+
+function getApiErrorMessage(error: unknown, fallback: string) {
+  if (axios.isAxiosError(error)) {
+    const message = error.response?.data?.message;
+    if (Array.isArray(message)) {
+      return message.join(', ');
+    }
+    if (typeof message === 'string') {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
+const inputClassName =
+  'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500';
