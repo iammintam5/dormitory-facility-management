@@ -39,9 +39,9 @@ export function LoginPage() {
       navigate(nextPath, { replace: true });
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        setErrorMessage(error.response?.data?.message ?? 'Dang nhap that bai.');
+        setErrorMessage(error.response?.data?.message ?? 'Đăng nhập thất bại.');
       } else {
-        setErrorMessage('Dang nhap that bai.');
+        setErrorMessage('Đăng nhập thất bại.');
       }
     } finally {
       setIsSubmitting(false);
@@ -55,15 +55,15 @@ export function LoginPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-600">
             Dormitory Facility Management
           </p>
-          <h1 className="text-3xl font-bold text-slate-900">Dang nhap he thong</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Đăng nhập hệ thống</h1>
           <p className="text-sm leading-6 text-slate-600">
-            Su dung ma nguoi dung va mat khau de truy cap khu vuc phu hop voi vai tro cua ban.
+            Sử dụng mã người dùng và mật khẩu để truy cập khu vực phù hợp với vai trò của bạn.
           </p>
         </div>
 
         <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-700">Ma nguoi dung</span>
+            <span className="text-sm font-medium text-slate-700">Mã người dùng</span>
             <input
               value={userCode}
               onChange={(event) => setUserCode(event.target.value)}
@@ -74,13 +74,13 @@ export function LoginPage() {
           </label>
 
           <label className="block space-y-2">
-            <span className="text-sm font-medium text-slate-700">Mat khau</span>
+            <span className="text-sm font-medium text-slate-700">Mật khẩu</span>
             <input
               type="password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               className="w-full rounded-xl border border-slate-200 px-4 py-3 outline-none transition focus:border-emerald-500"
-              placeholder="Nhap mat khau"
+              placeholder="Nhập mật khẩu"
               disabled={isSubmitting}
             />
           </label>
@@ -96,12 +96,12 @@ export function LoginPage() {
             disabled={isSubmitting || !userCode.trim() || !password.trim()}
             className="w-full rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            {isSubmitting ? 'Dang dang nhap...' : 'Dang nhap'}
+            {isSubmitting ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
         </form>
 
         <div className="mt-6 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-          <p className="font-semibold text-slate-900">Tai khoan seed mau</p>
+          <p className="font-semibold text-slate-900">Tài khoản seed mẫu</p>
           <p className="mt-2">ADMIN: `ADMIN001` / `admin123`</p>
           <p>QL CSVC: `QLCSVC001` / `qlcsvc123`</p>
           <p>STUDENT: `SV001` / `student123`</p>

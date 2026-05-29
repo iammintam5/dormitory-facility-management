@@ -28,7 +28,7 @@ export function LiquidationRecordPrintPreviewPage({ backTo }: { backTo?: string 
       );
       setRecord(response.data);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai bieu mau thanh ly.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải biểu mẫu thanh lý.'));
     }
   }
 
@@ -43,7 +43,7 @@ export function LiquidationRecordPrintPreviewPage({ backTo }: { backTo?: string 
   if (!record) {
     return (
       <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-        Dang tai bieu mau thanh ly...
+        Đang tải biểu mẫu thanh lý...
       </div>
     );
   }
@@ -58,7 +58,7 @@ export function LiquidationRecordPrintPreviewPage({ backTo }: { backTo?: string 
             to={backTo}
             className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
-            Quay lai
+            Quay lại
           </Link>
         ) : undefined
       }

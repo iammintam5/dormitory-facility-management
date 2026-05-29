@@ -82,7 +82,7 @@ export function InventoryCheckDetailPage() {
         ),
       );
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai chi tiet phieu kiem ke.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải chi tiết phiếu kiểm kê.'));
     } finally {
       setIsLoading(false);
     }
@@ -124,10 +124,10 @@ export function InventoryCheckDetailPage() {
         })),
       });
 
-      showToast('Da luu ket qua kiem ke.');
+      showToast('Đã lưu kết quả kiểm kê.');
       await loadInventoryCheck();
     } catch (error) {
-      const message = getApiErrorMessage(error, 'Khong the luu ket qua kiem ke.');
+      const message = getApiErrorMessage(error, 'Không thể lưu kết quả kiểm kê.');
       setErrorMessage(message);
       showToast(message, 'error');
     } finally {
@@ -147,10 +147,10 @@ export function InventoryCheckDetailPage() {
       await apiClient.post(`/inventory-checks/${inventoryCheck.id}/complete`, {
         generalNote: generalNote.trim() || undefined,
       });
-      showToast('Da hoan tat phieu kiem ke.');
+      showToast('Đã hoàn tất phiếu kiểm kê.');
       await loadInventoryCheck();
     } catch (error) {
-      const message = getApiErrorMessage(error, 'Khong the hoan tat phieu kiem ke.');
+      const message = getApiErrorMessage(error, 'Không thể hoàn tất phiếu kiểm kê.');
       setErrorMessage(message);
       showToast(message, 'error');
     } finally {
@@ -161,7 +161,7 @@ export function InventoryCheckDetailPage() {
   if (isLoading) {
     return (
       <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-        Dang tai chi tiet phieu kiem ke...
+        Đang tải chi tiết phiếu kiểm kê...
       </div>
     );
   }
@@ -169,7 +169,7 @@ export function InventoryCheckDetailPage() {
   if (!inventoryCheck) {
     return (
       <div className="rounded-2xl bg-rose-50 px-6 py-12 text-center text-sm text-rose-700">
-        {errorMessage || 'Khong tim thay phieu kiem ke.'}
+        {errorMessage || 'Không tìm thấy phiếu kiểm kê.'}
       </div>
     );
   }
@@ -183,13 +183,13 @@ export function InventoryCheckDetailPage() {
           to={`${basePath}/inventory-checks`}
           className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >
-          Quay lai danh sach
+          Quay lại danh sách
         </Link>
         <Link
           to={`${basePath}/inventory-checks/${inventoryCheck.id}/print`}
           className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
         >
-          In / Xuat bieu mau
+          In / Xuất biểu mẫu
         </Link>
       </div>
 
@@ -199,7 +199,7 @@ export function InventoryCheckDetailPage() {
 
       <SectionCard
         title="Chi tiet phieu kiem ke"
-        description="Nhap so luong thuc te, tinh trang tai san va doi chieu chenh lech ngay tren bang."
+        description="Nhập số lượng thực tế, tình trạng tài sản và đối chiếu chênh lệch ngày trên bảng."
       >
         <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
           <div className="space-y-6">
@@ -210,10 +210,10 @@ export function InventoryCheckDetailPage() {
                     {inventoryCheck.inventoryCode}
                   </p>
                   <h2 className="mt-2 text-xl font-bold text-slate-900">
-                    Phieu kiem ke phong {inventoryCheck.room?.roomCode ?? '--'}
+                    Phiếu kiểm kê phòng {inventoryCheck.room?.roomCode ?? '--'}
                   </h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    Kiem ke ngay {formatDate(inventoryCheck.checkDate)} | Nguoi lap{' '}
+                    Kiểm kê ngày {formatDate(inventoryCheck.checkDate)} | Người lập{' '}
                     {inventoryCheck.checkedByUser.fullName}
                   </p>
                 </div>
@@ -222,7 +222,7 @@ export function InventoryCheckDetailPage() {
 
               <dl className="mt-5 grid gap-4 md:grid-cols-2">
                 <InfoItem
-                  label="Phong"
+                  label="Phòng"
                   value={
                     inventoryCheck.room
                       ? `${inventoryCheck.room.roomCode} - ${inventoryCheck.room.floor?.block?.name ?? '--'}`
@@ -230,27 +230,27 @@ export function InventoryCheckDetailPage() {
                   }
                 />
                 <InfoItem
-                  label="Nguoi kiem ke"
+                  label="Người kiểm kê"
                   value={`${inventoryCheck.checkedByUser.fullName} (${inventoryCheck.checkedByUser.userCode})`}
                 />
-                <InfoItem label="Ngay tao" value={formatDateTime(inventoryCheck.createdAt)} />
+                <InfoItem label="Ngày tạo" value={formatDateTime(inventoryCheck.createdAt)} />
                 <InfoItem
-                  label="Hoan tat luc"
+                  label="Hoàn tất lúc"
                   value={formatDateTime(inventoryCheck.completedAt ?? inventoryCheck.updatedAt)}
                 />
               </dl>
             </div>
 
             <SectionCard
-              title="Ghi chu chung"
-              description="Cap nhat nhan xet tong quan cua dot kiem ke."
+              title="Ghi chú chung"
+              description="Cập nhật nhận xét tổng quan của đợt kiểm kê."
             >
               <textarea
                 value={generalNote}
                 onChange={(event) => setGeneralNote(event.target.value)}
                 disabled={!isDraft || isSubmitting}
                 className={`${inputClassName} min-h-32 disabled:bg-slate-100`}
-                placeholder="Them nhan xet tong quan cua phieu kiem ke neu can."
+                placeholder="Thêm nhận xét tổng quan của phiếu kiểm kê nếu cần."
               />
 
               {isDraft && (
@@ -261,7 +261,7 @@ export function InventoryCheckDetailPage() {
                     disabled={isSubmitting}
                     className="rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-400 disabled:opacity-60"
                   >
-                    Luu ket qua
+                    Lưu kết quả
                   </button>
                   <button
                     type="button"
@@ -269,7 +269,7 @@ export function InventoryCheckDetailPage() {
                     disabled={isSubmitting}
                     className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
                   >
-                    Hoan tat kiem ke
+                    Hoàn tất kiểm kê
                   </button>
                 </div>
               )}
@@ -277,20 +277,20 @@ export function InventoryCheckDetailPage() {
           </div>
 
           <SectionCard
-            title="Bang ket qua kiem ke"
-            description="Item co chenh lech hoac tinh trang xau se duoc highlight de de theo doi."
+            title="Bảng kết quả kiểm kê"
+            description="Item có chênh lệch hoặc tình trạng xấu sẽ được highlight để dễ theo dõi."
           >
             <div className="overflow-hidden rounded-2xl border border-slate-200">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">
                   <thead className="bg-slate-50 text-left text-slate-600">
                     <tr>
-                      <th className="px-4 py-3 font-medium">Tai san</th>
-                      <th className="px-4 py-3 font-medium">So luong HT</th>
-                      <th className="px-4 py-3 font-medium">So luong TT</th>
-                      <th className="px-4 py-3 font-medium">Chenh lech</th>
-                      <th className="px-4 py-3 font-medium">Tinh trang</th>
-                      <th className="px-4 py-3 font-medium">Ghi chu</th>
+                      <th className="px-4 py-3 font-medium">Tài sản</th>
+                      <th className="px-4 py-3 font-medium">Số lượng HT</th>
+                      <th className="px-4 py-3 font-medium">Số lượng TT</th>
+                      <th className="px-4 py-3 font-medium">Chênh lệch</th>
+                      <th className="px-4 py-3 font-medium">Tình trạng</th>
+                      <th className="px-4 py-3 font-medium">Ghi chú</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200 bg-white">
@@ -342,7 +342,7 @@ export function InventoryCheckDetailPage() {
                                   updateDraft(row.item.id, 'actualCondition', event.target.value)
                                 }
                                 className={`${inputClassName} min-w-44`}
-                                placeholder="VD: Tot, Hong, Xuong cap..."
+                                placeholder="VD: Tốt, Hỏng, Xuống cấp..."
                               />
                             ) : (
                               <span
@@ -358,7 +358,7 @@ export function InventoryCheckDetailPage() {
                                 value={row.note}
                                 onChange={(event) => updateDraft(row.item.id, 'note', event.target.value)}
                                 className={`${inputClassName} min-w-52`}
-                                placeholder="Ghi chu item"
+                                placeholder="Ghi chú item"
                               />
                             ) : (
                               <span className="text-slate-700">{row.note || '--'}</span>
@@ -393,7 +393,7 @@ function isPoorCondition(value?: string | null) {
   }
 
   const normalized = value.toLowerCase();
-  return ['hong', 'xau', 'xuong cap', 'kem', 'mat'].some((keyword) =>
+  return ['hỏng', 'xấu', 'xuống cấp', 'kém', 'mất'].some((keyword) =>
     normalized.includes(keyword),
   );
 }

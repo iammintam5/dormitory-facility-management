@@ -4,9 +4,10 @@ import { User } from './users';
 
 export type HandoverStatus =
   | 'DRAFT'
-  | 'WAITING_CONFIRMATION'
-  | 'CONFIRMED'
-  | 'RETURNED'
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'COMPLETED'
   | 'CANCELLED';
 
 export type HandoverItem = {

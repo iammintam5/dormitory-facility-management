@@ -12,11 +12,11 @@ const statusMap: Record<
   }
 > = {
   DRAFT: {
-    label: 'Dang nhap ket qua',
+    label: 'Đang nhập kết quả',
     className: 'bg-amber-50 text-amber-700 border border-amber-200',
   },
   COMPLETED: {
-    label: 'Da hoan tat',
+    label: 'Đã hoàn tất',
     className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
   },
 };

@@ -44,6 +44,12 @@ export class DamageReportsController {
     return this.damageReportsService.findMyAssets(currentUser);
   }
 
+  @Get('pending-count')
+  @Roles('ADMIN', 'QL_CSVC')
+  countPendingReports(@CurrentUser() currentUser: AuthUser) {
+    return this.damageReportsService.countPendingReports(currentUser);
+  }
+
   @Get(':id')
   @Roles('ADMIN', 'QL_CSVC', 'STUDENT')
   findOne(@CurrentUser() currentUser: AuthUser, @Param('id', ParseIntPipe) id: number) {

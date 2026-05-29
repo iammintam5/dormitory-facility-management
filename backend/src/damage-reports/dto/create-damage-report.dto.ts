@@ -16,5 +16,7 @@ export class CreateDamageReportDto {
   @IsNotEmpty()
   description!: string;
 
-
+  @IsString()
+  @IsNotEmpty()
+  location!: string;
 }

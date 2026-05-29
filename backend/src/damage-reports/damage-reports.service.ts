@@ -37,6 +37,7 @@ export class DamageReportsService {
           assetId: dto.assetId,
           roomId: dto.roomId,
           description: dto.description.trim(),
+          location: dto.location.trim(),
           status: DamageReportStatus.SUBMITTED,
         },
         include: this.damageReportInclude,
@@ -47,7 +48,7 @@ export class DamageReportsService {
         action: 'create',
         newStatus: DamageReportStatus.SUBMITTED,
         createdBy: currentUser.userId,
-        note: `Tao phieu bao hong cho phong ${studentRoom.room.roomCode}.`,
+        note: `Tạo phiếu báo hỏng cho phòng ${studentRoom.room.roomCode}.`,
       });
 
       await this.createAuditLog(tx, {
@@ -74,8 +75,8 @@ export class DamageReportsService {
         await tx.notification.createMany({
           data: facilityManagers.map((manager) => ({
             userId: manager.id,
-            title: 'Co phieu bao hong moi',
-            content: `Sinh vien vua tao phieu bao hong ${created.reportCode}.`,
+            title: 'Có phiếu báo hỏng mới',
+            content: `Sinh viên vừa tạo phiếu báo hỏng ${created.reportCode}.`,
             status: NotificationStatus.UNREAD,
             relatedTable: 'damage_reports',
             relatedId: created.id,
@@ -180,7 +181,7 @@ export class DamageReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException('Khong tim thay phieu bao hong.');
+      throw new NotFoundException('Không tìm thấy phiếu báo hỏng.');
     }
 
     this.ensureCanAccessReport(currentUser, report.reporterId);
@@ -194,7 +195,7 @@ export class DamageReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException('Khong tim thay phieu bao hong.');
+      throw new NotFoundException('Không tìm thấy phiếu báo hỏng.');
     }
 
     this.ensureCanAccessReport(currentUser, report.reporterId);
@@ -202,7 +203,7 @@ export class DamageReportsService {
     return {
       ...report,
       printable: {
-        title: 'QL_BM4 - Phieu bao hong tai san',
+        title: 'QL_BM4 - Phiếu báo hỏng tài sản',
         generatedAt: new Date().toISOString(),
         reporterLabel: `${report.reporter.fullName} (${report.reporter.userCode})`,
         assetLabel: `${report.asset.assetCode} - ${report.asset.assetName}`,
@@ -217,7 +218,7 @@ export class DamageReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException('Khong tim thay phieu bao hong.');
+      throw new NotFoundException('Không tìm thấy phiếu báo hỏng.');
     }
 
     this.ensureStudentOwnsPendingReport(currentUser, report);
@@ -233,6 +234,7 @@ export class DamageReportsService {
           roomId: nextRoomId,
           assetId: nextAssetId,
           description: dto.description === undefined ? undefined : dto.description.trim(),
+          location: dto.location === undefined ? undefined : dto.location.trim(),
         },
         include: this.damageReportInclude,
       });
@@ -245,11 +247,13 @@ export class DamageReportsService {
           roomId: report.roomId,
           assetId: report.assetId,
           description: report.description,
+          location: report.location,
         }),
         newValue: this.stringifyPayload({
           roomId: updated.roomId,
           assetId: updated.assetId,
           description: updated.description,
+          location: updated.location,
         }),
       });
 
@@ -264,8 +268,8 @@ export class DamageReportsService {
       allowedStatuses: [DamageReportStatus.SUBMITTED],
       nextStatus: DamageReportStatus.REVIEWING,
       note: dto.note,
-      notificationTitle: 'Phieu bao hong da duoc tiep nhan',
-      notificationContent: 'Yeu cau cua ban da duoc tiep nhan va se duoc xu ly.',
+      notificationTitle: 'Phiếu báo hỏng đã được tiếp nhận',
+      notificationContent: 'Yêu cầu của bạn đã được tiếp nhận và sẽ được xử lý.',
       auditAction: 'accept',
     });
   }
@@ -277,8 +281,8 @@ export class DamageReportsService {
       allowedStatuses: [DamageReportStatus.SUBMITTED, DamageReportStatus.REVIEWING],
       nextStatus: DamageReportStatus.REJECTED,
       note: dto.note,
-      notificationTitle: 'Phieu bao hong da bi tu choi',
-      notificationContent: 'Yeu cau cua ban da bi tu choi. Vui long xem ghi chu de biet them chi tiet.',
+      notificationTitle: 'Phiếu báo hỏng đã bị từ chối',
+      notificationContent: 'Yêu cầu của bạn đã bị từ chối. Vui lòng xem ghi chú để biết thêm chi tiết.',
       auditAction: 'reject',
     });
   }
@@ -290,8 +294,8 @@ export class DamageReportsService {
       allowedStatuses: [DamageReportStatus.REVIEWING],
       nextStatus: DamageReportStatus.IN_PROGRESS,
       note: dto.note,
-      notificationTitle: 'Phieu bao hong dang duoc xu ly',
-      notificationContent: 'Yeu cau cua ban dang duoc bo phan CSVC xu ly.',
+      notificationTitle: 'Phiếu báo hỏng đang được xử lý',
+      notificationContent: 'Yêu cầu của bạn đang được bộ phận CSVC xử lý.',
       auditAction: 'start_processing',
     });
   }
@@ -303,7 +307,7 @@ export class DamageReportsService {
       dto.assetStatus !== AssetStatus.UNDER_MAINTENANCE
     ) {
       throw new BadRequestException(
-        'Chi duoc cap nhat tai san sang AVAILABLE hoac UNDER_MAINTENANCE khi hoan tat.',
+        'Chỉ được cập nhật tài sản sang AVAILABLE hoặc UNDER_MAINTENANCE khi hoàn tất.',
       );
     }
 
@@ -316,7 +320,7 @@ export class DamageReportsService {
       });
 
       if (!report) {
-        throw new NotFoundException('Khong tim thay phieu bao hong.');
+        throw new NotFoundException('Không tìm thấy phiếu báo hỏng.');
       }
 
       this.ensureManagerCanProcess(currentUser);
@@ -350,11 +354,11 @@ export class DamageReportsService {
 
       await this.createNotification(tx, {
         userId: report.reporterId,
-        title: 'Phieu bao hong da hoan tat',
+        title: 'Phiếu báo hỏng đã hoàn tất',
         content:
           dto.assetStatus === AssetStatus.UNDER_MAINTENANCE
-            ? 'Phieu bao hong da hoan tat. Tai san da duoc dua vao trang thai bao tri.'
-            : 'Phieu bao hong da hoan tat. Tai san san sang su dung tro lai.',
+            ? 'Phiếu báo hỏng đã hoàn tất. Tài sản đã được đưa vào trạng thái bảo trì.'
+            : 'Phiếu báo hỏng đã hoàn tất. Tài sản sẵn sàng sử dụng trở lại.',
         relatedId: id,
       });
 
@@ -382,7 +386,7 @@ export class DamageReportsService {
     });
 
     if (!report) {
-      throw new NotFoundException('Khong tim thay phieu bao hong.');
+      throw new NotFoundException('Không tìm thấy phiếu báo hỏng.');
     }
 
     this.ensureStudentOwnsPendingReport(currentUser, report);
@@ -407,8 +411,8 @@ export class DamageReportsService {
 
       await this.createNotification(tx, {
         userId: report.reporterId,
-        title: 'Phieu bao hong da duoc huy',
-        content: 'Phieu bao hong cua ban da duoc huy.',
+        title: 'Phiếu báo hỏng đã được hủy',
+        content: 'Phiếu báo hỏng của bạn đã được hủy.',
         relatedId: id,
       });
 
@@ -439,6 +443,9 @@ export class DamageReportsService {
               },
             },
             assets: {
+              include: {
+                category: true,
+              },
               orderBy: {
                 assetCode: 'asc',
               },
@@ -462,6 +469,16 @@ export class DamageReportsService {
       room: activeAssignment.room,
       assets: activeAssignment.room.assets,
     };
+  }
+
+  async countPendingReports(currentUser: AuthUser) {
+    const where: Prisma.DamageReportWhereInput = {
+      status: DamageReportStatus.SUBMITTED,
+    };
+
+    const count = await this.prismaService.damageReport.count({ where });
+
+    return { count };
   }
 
   private get damageReportInclude() {
@@ -508,7 +525,7 @@ export class DamageReportsService {
 
   private ensureCanAccessReport(currentUser: AuthUser, reporterId: number) {
     if (currentUser.role === 'STUDENT' && reporterId !== currentUser.userId) {
-      throw new ForbiddenException('Ban khong co quyen xem phieu bao hong nay.');
+      throw new ForbiddenException('Bạn không có quyền xem phiếu báo hỏng này.');
     }
   }
 
@@ -517,27 +534,27 @@ export class DamageReportsService {
     report: { reporterId: number; status: DamageReportStatus },
   ) {
     if (currentUser.role !== 'STUDENT') {
-      throw new ForbiddenException('Chi sinh vien moi duoc thuc hien thao tac nay.');
+      throw new ForbiddenException('Chỉ sinh viên mới được thực hiện thao tác này.');
     }
 
     if (report.reporterId !== currentUser.userId) {
-      throw new ForbiddenException('Ban khong co quyen thao tac tren phieu bao hong nay.');
+      throw new ForbiddenException('Bạn không có quyền thao tác trên phiếu báo hỏng này.');
     }
 
     if (report.status !== DamageReportStatus.SUBMITTED) {
-      throw new ConflictException('Chi duoc sua hoac huy phieu khi trang thai con SUBMITTED.');
+      throw new ConflictException('Chỉ được phép chỉnh sửa/hủy phiếu báo hỏng khi đang ở trạng thái "Chờ xử lý" (SV_QĐ2).');
     }
   }
 
   private ensureManagerCanProcess(currentUser: AuthUser) {
     if (!['ADMIN', 'QL_CSVC'].includes(currentUser.role)) {
-      throw new ForbiddenException('Ban khong co quyen xu ly phieu bao hong.');
+      throw new ForbiddenException('Bạn không có quyền xử lý phiếu báo hỏng.');
     }
   }
 
   private ensureTransitionAllowed(currentStatus: DamageReportStatus, allowedStatuses: DamageReportStatus[]) {
     if (!allowedStatuses.includes(currentStatus)) {
-      throw new ConflictException('Khong the thuc hien chuyen trang thai voi phieu hien tai.');
+      throw new ConflictException('Không thể thực hiện chuyển trạng thái với phiếu hiện tại.');
     }
   }
 
@@ -560,7 +577,7 @@ export class DamageReportsService {
       });
 
       if (!report) {
-        throw new NotFoundException('Khong tim thay phieu bao hong.');
+        throw new NotFoundException('Không tìm thấy phiếu báo hỏng.');
       }
 
       this.ensureManagerCanProcess(currentUser);
@@ -615,7 +632,7 @@ export class DamageReportsService {
     });
 
     if (!roomStudent) {
-      throw new ForbiddenException('Sinh vien chi duoc bao hong tai san thuoc phong minh.');
+      throw new ForbiddenException('Sinh viên chỉ được báo hỏng tài sản thuộc phòng mình.');
     }
 
     const asset = await this.prismaService.asset.findUnique({
@@ -623,7 +640,7 @@ export class DamageReportsService {
     });
 
     if (!asset || asset.roomId !== roomId) {
-      throw new BadRequestException('Tai san khong thuoc phong da chon.');
+      throw new BadRequestException('Tài sản không thuộc phòng đã chọn.');
     }
 
     return roomStudent;

@@ -63,14 +63,14 @@ export class LocationsService {
     });
 
     if (floorCount > 0) {
-      throw new BadRequestException('Khong the xoa khu khi van con tang.');
+      throw new BadRequestException('Không thể xóa khu khi vẫn còn tầng.');
     }
 
     await this.prismaService.dormBuilding.delete({
       where: { id },
     });
 
-    return { message: 'Xoa khu thanh cong.' };
+    return { message: 'Xóa khu thành công.' };
   }
 
   async createFloor(dto: CreateFloorDto) {
@@ -130,11 +130,11 @@ export class LocationsService {
     });
 
     if (roomCount > 0) {
-      throw new BadRequestException('Khong the xoa tang khi van con phong.');
+      throw new BadRequestException('Không thể xóa tầng khi vẫn còn phòng.');
     }
 
     await this.prismaService.floor.delete({ where: { id } });
-    return { message: 'Xoa tang thanh cong.' };
+    return { message: 'Xóa tầng thành công.' };
   }
 
   async createRoom(dto: CreateRoomDto) {
@@ -153,9 +153,22 @@ export class LocationsService {
   }
 
   findRooms() {
-    return this.prismaService.room.findMany({
+    console.log('[LocationsService] Starting findRooms query with nested includes...');
+    const startTime = Date.now();
+    
+    const query = this.prismaService.room.findMany({
       include: this.roomInclude,
       orderBy: [{ floorId: 'asc' }, { roomCode: 'asc' }],
+    });
+
+    return query.then((result) => {
+      const duration = Date.now() - startTime;
+      console.log(`[LocationsService] findRooms completed in ${duration}ms, returned ${result.length} rooms`);
+      return result;
+    }).catch((error) => {
+      const duration = Date.now() - startTime;
+      console.error(`[LocationsService] findRooms failed after ${duration}ms:`, error);
+      throw error;
     });
   }
 
@@ -224,12 +237,12 @@ export class LocationsService {
 
     if (assignmentCount > 0 || assetCount > 0) {
       throw new BadRequestException(
-        'Khong the xoa phong khi dang co sinh vien hoac tai san lien quan.',
+        'Không thể xóa phòng khi đang có sinh viên hoặc tài sản liên quan.',
       );
     }
 
     await this.prismaService.room.delete({ where: { id } });
-    return { message: 'Xoa phong thanh cong.' };
+    return { message: 'Xóa phòng thành công.' };
   }
 
   async assignStudentToRoom(roomId: number, dto: AssignStudentRoomDto) {
@@ -326,7 +339,7 @@ export class LocationsService {
     const building = await this.prismaService.dormBuilding.findUnique({ where: { id } });
 
     if (!building) {
-      throw new NotFoundException('Khong tim thay khu.');
+      throw new NotFoundException('Không tìm thấy khu.');
     }
 
     return building;
@@ -345,7 +358,7 @@ export class LocationsService {
     });
 
     if (building) {
-      throw new ConflictException('Ma khu da ton tai.');
+      throw new ConflictException('Mã khu đã tồn tại.');
     }
   }
 
@@ -353,7 +366,7 @@ export class LocationsService {
     const floor = await this.prismaService.floor.findUnique({ where: { id } });
 
     if (!floor) {
-      throw new NotFoundException('Khong tim thay tang.');
+      throw new NotFoundException('Không tìm thấy tầng.');
     }
 
     return floor;
@@ -369,7 +382,7 @@ export class LocationsService {
     });
 
     if (!existingAssignment) {
-      throw new BadRequestException('Sinh vien hien khong o trong phong nay hoac da tra phong.');
+      throw new BadRequestException('Sinh viên hiện không ở trong phòng này hoặc đã trả phòng.');
     }
 
     return this.prismaService.roomStudent.update({
@@ -398,7 +411,7 @@ export class LocationsService {
     });
 
     if (floor) {
-      throw new ConflictException('So tang da ton tai trong khu nay.');
+      throw new ConflictException('Số tầng đã tồn tại trong khu này.');
     }
   }
 
@@ -406,7 +419,7 @@ export class LocationsService {
     const room = await this.prismaService.room.findUnique({ where: { id } });
 
     if (!room) {
-      throw new NotFoundException('Khong tim thay phong.');
+      throw new NotFoundException('Không tìm thấy phòng.');
     }
 
     return room;

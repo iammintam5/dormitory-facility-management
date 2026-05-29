@@ -1,6 +1,8 @@
 # Dormitory Facility Management
+=======
+# Dormitory Facility Management
 
-## Cau truc thu muc
+## Cấu trúc thư mục
 
 ```text
 .
@@ -41,9 +43,9 @@
     `-- vite.config.ts
 ```
 
-## Huong dan chay local
+## Hướng dẫn chạy local
 
-### 1. Tao file env
+### 1. Tạo file env
 
 Backend:
 
@@ -59,7 +61,7 @@ cd ../frontend
 copy .env.example .env
 ```
 
-### 2. Cai dependency
+### 2. Cài dependency
 
 ```bash
 cd frontend
@@ -68,9 +70,9 @@ cd ../backend
 npm install
 ```
 
-### 3. Chuan bi PostgreSQL va Prisma
+### 3. Chuẩn bị PostgreSQL và Prisma
 
-Cap nhat `DATABASE_URL` trong `backend/.env` theo database cua ban, sau do:
+Cập nhật `DATABASE_URL` trong `backend/.env` theo database, sau đó:
 
 ```bash
 cd backend
@@ -78,40 +80,23 @@ npx prisma generate
 npx prisma migrate dev --name init
 ```
 
-Neu ban dung Supabase, nen cau hinh them `DIRECT_URL` de Prisma migrate ket noi truc tiep toi database thay vi di qua pooler. Mau cau hinh:
-
-```env
-PORT=3000
-FRONTEND_URL=http://localhost:5173
-DATABASE_URL="postgresql://USER:PASSWORD@HOST:PORT/postgres?pgbouncer=true&connection_limit=1&schema=public"
-DIRECT_URL="postgresql://USER:PASSWORD@HOST:PORT/postgres?schema=public"
-```
-
-Goi y:
-
-- `DATABASE_URL`: dung cho runtime cua app, co the la connection pooler do Supabase cung cap.
-- `DIRECT_URL`: dung cho Prisma Migrate, nen la direct connection.
-- Neu ban dang dung PostgreSQL local, co the de `DATABASE_URL` va `DIRECT_URL` giong nhau.
-
-### 4. Chay backend
+### 4. Chạy backend
 
 ```bash
 cd backend
 npm run start:dev
 ```
 
-Backend se chay tai `http://localhost:3000` va co route:
+Backend sẽ chạy tại `http://localhost:3000` và có route:
 
 ```text
 GET /health
 => { "status": "ok" }
 ```
 
-### 5. Chay frontend
+### 5. Chạy frontend
 
 ```bash
 cd frontend
 npm run dev
 ```
-
-Frontend se chay tai `http://localhost:5173` va tu dong goi `GET http://localhost:3000/health`.

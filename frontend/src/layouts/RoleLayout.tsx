@@ -40,7 +40,7 @@ export function RoleLayout({ title, subtitle }: RoleLayoutProps) {
                 onClick={logout}
                 className="mt-3 rounded-lg bg-slate-900 px-3 py-2 text-white transition hover:bg-slate-700"
               >
-                Dang xuat
+                Đăng xuất
               </button>
             </div>
           </div>

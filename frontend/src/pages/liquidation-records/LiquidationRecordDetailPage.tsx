@@ -44,7 +44,7 @@ export function LiquidationRecordDetailPage() {
       const response = await apiClient.get<LiquidationRecord>(`/liquidation-records/${recordId}`);
       setRecord(response.data);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai chi tiet bien ban thanh ly.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải chi tiết biên bản thanh lý.'));
     } finally {
       setIsLoading(false);
     }
@@ -62,11 +62,11 @@ export function LiquidationRecordDetailPage() {
       await apiClient.post(`/liquidation-records/${record.id}/${endpoint}`, {
         note: note.trim() || undefined,
       });
-      showToast('Cap nhat workflow thanh cong.');
+      showToast('Cập nhật workflow thành công.');
       setNote('');
       await loadRecord();
     } catch (error) {
-      const message = getApiErrorMessage(error, 'Khong the cap nhat workflow thanh ly.');
+      const message = getApiErrorMessage(error, 'Không thể cập nhật workflow thanh lý.');
       setErrorMessage(message);
       showToast(message, 'error');
     } finally {
@@ -77,7 +77,7 @@ export function LiquidationRecordDetailPage() {
   if (isLoading) {
     return (
       <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-        Dang tai chi tiet bien ban thanh ly...
+        Đang tải chi tiết biên bản thanh lý...
       </div>
     );
   }
@@ -85,7 +85,7 @@ export function LiquidationRecordDetailPage() {
   if (!record) {
     return (
       <div className="rounded-2xl bg-rose-50 px-6 py-12 text-center text-sm text-rose-700">
-        {errorMessage || 'Khong tim thay bien ban thanh ly.'}
+        {errorMessage || 'Không tìm thấy biên bản thanh lý.'}
       </div>
     );
   }
@@ -97,13 +97,13 @@ export function LiquidationRecordDetailPage() {
           to={`${basePath}/liquidation-records`}
           className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
         >
-          Quay lai danh sach
+          Quay lại danh sách
         </Link>
         <Link
           to={`${basePath}/liquidation-records/${record.id}/print`}
           className="rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700"
         >
-          In bieu mau
+          In biểu mẫu
         </Link>
       </div>
 
@@ -112,8 +112,8 @@ export function LiquidationRecordDetailPage() {
       )}
 
       <SectionCard
-        title="Chi tiet bien ban thanh ly"
-        description="Theo doi thong tin tai san, ly do thanh ly va xu ly workflow duyet."
+        title="Chi tiết biên bản thanh lý"
+        description="Theo dõi thông tin tài sản, lý do thanh lý và xử lý workflow duyệt."
       >
         <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
           <div className="space-y-6">
@@ -136,37 +136,37 @@ export function LiquidationRecordDetailPage() {
 
               <dl className="mt-5 grid gap-4 md:grid-cols-2">
                 <InfoItem
-                  label="Nguoi lap"
+                  label="Người lập"
                   value={`${record.createdByUser.fullName} (${record.createdByUser.userCode})`}
                 />
-                <InfoItem label="Ngay lap" value={formatDate(record.liquidationDate)} />
-                <InfoItem label="Cap nhat gan nhat" value={formatDateTime(record.updatedAt ?? record.createdAt)} />
+                <InfoItem label="Ngày lập" value={formatDate(record.liquidationDate)} />
+                <InfoItem label="Cập nhật gần nhất" value={formatDateTime(record.updatedAt ?? record.createdAt)} />
                 <InfoItem
-                  label="Gia tri con lai"
+                  label="Giá trị còn lại"
                   value={record.estimatedRemainingValue ? String(record.estimatedRemainingValue) : '--'}
                 />
               </dl>
 
               <div className="mt-5 grid gap-4">
-                <Block label="Tinh trang tai san">{record.assetCondition}</Block>
-                <Block label="Ly do thanh ly">{record.reason}</Block>
-                <Block label="Ghi chu">{record.note || '--'}</Block>
+                <Block label="Tình trạng tài sản">{record.assetCondition}</Block>
+                <Block label="Lý do thanh lý">{record.reason}</Block>
+                <Block label="Ghi chú">{record.note || '--'}</Block>
               </div>
             </div>
           </div>
 
           <SectionCard
-            title="Workflow thanh ly"
-            description="QL_CSVC gui duyet, quan tri phe duyet va hoan tat thanh ly tai san."
+            title="Workflow thanh lý"
+            description="QL_CSVC gửi duyệt, quản trị phê duyệt và hoàn tất thanh lý tài sản."
           >
             <div className="space-y-4">
               <label className="block space-y-2">
-                <span className="text-sm font-medium text-slate-700">Ghi chu workflow</span>
+                <span className="text-sm font-medium text-slate-700">Ghi chú workflow</span>
                 <textarea
                   className={`${inputClassName} min-h-28`}
                   value={note}
                   onChange={(event) => setNote(event.target.value)}
-                  placeholder="Them ghi chu cho buoc xu ly hien tai."
+                  placeholder="Thêm ghi chú cho bước xử lý hiện tại."
                 />
               </label>
 
@@ -178,7 +178,7 @@ export function LiquidationRecordDetailPage() {
                     onClick={() => void runWorkflow('submit-approval')}
                     className="rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-400 disabled:opacity-60"
                   >
-                    Gui duyet
+                    Gửi duyệt
                   </button>
                 )}
 
@@ -190,7 +190,7 @@ export function LiquidationRecordDetailPage() {
                       onClick={() => void runWorkflow('approve')}
                       className="rounded-xl bg-sky-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sky-500 disabled:opacity-60"
                     >
-                      Phe duyet
+                      Phê duyệt
                     </button>
                     <button
                       type="button"
@@ -198,7 +198,7 @@ export function LiquidationRecordDetailPage() {
                       onClick={() => void runWorkflow('reject')}
                       className="rounded-xl border border-rose-200 px-4 py-3 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-60"
                     >
-                      Tu choi
+                      Từ chối
                     </button>
                   </>
                 )}
@@ -210,7 +210,7 @@ export function LiquidationRecordDetailPage() {
                     onClick={() => void runWorkflow('complete')}
                     className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:opacity-60"
                   >
-                    Hoan tat thanh ly
+                    Hoàn tất thanh lý
                   </button>
                 )}
 
@@ -221,15 +221,15 @@ export function LiquidationRecordDetailPage() {
                     onClick={() => void runWorkflow('cancel')}
                     className="rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
                   >
-                    Huy bien ban
+                    Hủy biên bản
                   </button>
                 )}
               </div>
 
               <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
                 <p>
-                  Tai san se chuyen sang <strong>PENDING_LIQUIDATION</strong> khi lap bien ban, va chuyen sang{' '}
-                  <strong>LIQUIDATED</strong> khi hoan tat.
+                  Tài sản sẽ chuyển sang <strong>PENDING_LIQUIDATION</strong> khi lập biên bản, và chuyển sang{' '}
+                  <strong>LIQUIDATED</strong> khi hoàn tất.
                 </p>
               </div>
             </div>

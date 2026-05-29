@@ -20,7 +20,7 @@ import { DamageReport, DamageReportStudentAssetsResponse } from '../../types/dam
 
 const updateSchema = z.object({
   assetId: z.coerce.number().int().positive(),
-  description: z.string().min(10, 'Mo ta toi thieu 10 ky tu.'),
+  description: z.string().min(10, 'Mô tả phải có ít nhất 10 ký tự.'),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
 });
 
@@ -93,7 +93,7 @@ export function DamageReportDetailPage() {
         priority: reportResponse.data.priority,
       });
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai chi tiet phieu bao hong.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải chi tiết phiếu báo hỏng.'));
     } finally {
       setIsLoading(false);
     }
@@ -114,11 +114,11 @@ export function DamageReportDetailPage() {
         description: values.description.trim(),
         priority: values.priority,
       });
-      showToast('Cap nhat phieu bao hong thanh cong.');
+      showToast('Cập nhật phiếu báo hỏng thành công.');
       setIsEditing(false);
       await loadData();
     } catch (error) {
-      const message = getApiErrorMessage(error, 'Khong the cap nhat phieu bao hong.');
+      const message = getApiErrorMessage(error, 'Không thể cập nhật phiếu báo hỏng.');
       setErrorMessage(message);
       showToast(message, 'error');
     } finally {
@@ -139,12 +139,12 @@ export function DamageReportDetailPage() {
         note: actionNote,
         ...(confirmAction.requireAssetStatus ? { assetStatus } : {}),
       });
-      showToast('Cap nhat trang thai thanh cong.');
+      showToast('Cập nhật trạng thái thành công.');
       setConfirmAction(null);
       setActionNote('');
       await loadData();
     } catch (error) {
-      const message = getApiErrorMessage(error, 'Khong the cap nhat trang thai.');
+      const message = getApiErrorMessage(error, 'Không thể cập nhật trạng thái.');
       setErrorMessage(message);
       showToast(message, 'error');
     } finally {
@@ -157,7 +157,7 @@ export function DamageReportDetailPage() {
       <div className="flex h-64 items-center justify-center rounded-2xl bg-slate-50">
         <div className="flex flex-col items-center gap-3">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-500"></div>
-          <p className="text-sm font-medium text-slate-500">Dang tai chi tiet phieu bao hong...</p>
+          <p className="text-sm font-medium text-slate-500">Đang tải chi tiết phiếu báo hỏng...</p>
         </div>
       </div>
     );
@@ -166,7 +166,7 @@ export function DamageReportDetailPage() {
   if (!report) {
     return (
       <div className="rounded-2xl bg-rose-50 px-6 py-12 text-center text-sm text-rose-700">
-        {errorMessage || 'Khong tim thay phieu bao hong.'}
+        {errorMessage || 'Không tìm thấy phiếu báo hỏng.'}
       </div>
     );
   }

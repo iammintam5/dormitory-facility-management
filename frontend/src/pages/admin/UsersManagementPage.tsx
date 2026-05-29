@@ -12,11 +12,11 @@ import { Role, User, UsersResponse } from '../../types/users';
 
 const userFormSchema = z.object({
   roleId: z.coerce.number().int().positive(),
-  fullName: z.string().min(1, 'Vui long nhap ho ten.'),
-  userCode: z.string().min(1, 'Vui long nhap ma nguoi dung.'),
-  email: z.string().email('Email khong hop le.').or(z.literal('')).optional(),
+  fullName: z.string().min(1, 'Vui lòng nhập họ tên.'),
+  userCode: z.string().min(1, 'Vui lòng nhập mã người dùng.'),
+  email: z.string().email('Email không hợp lệ.').or(z.literal('')).optional(),
   phone: z.string().optional(),
-  password: z.string().min(6, 'Mat khau toi thieu 6 ky tu.').optional(),
+  password: z.string().min(6, 'Mật khẩu tối thiểu 6 ký tự.').optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -86,7 +86,7 @@ export function UsersManagementPage() {
       setTotalPages(response.data.pagination.totalPages);
       setTotal(response.data.pagination.total);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai danh sach nguoi dung.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể tải danh sách người dùng.'));
     } finally {
       setIsLoading(false);
     }
@@ -107,20 +107,20 @@ export function UsersManagementPage() {
 
       if (selectedUser) {
         await apiClient.patch(`/users/${selectedUser.id}`, payload);
-        setFeedback('Cap nhat tai khoan thanh cong.');
+        setFeedback('Cập nhật tài khoản thành công.');
       } else {
         await apiClient.post('/users', {
           ...payload,
           password: values.password || 'student123',
         });
-        setFeedback('Tao tai khoan thanh cong.');
+        setFeedback('Tạo tài khoản thành công.');
       }
 
       reset(defaultValues);
       setSelectedUser(null);
       await fetchUsers(selectedUser ? page : 1);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the luu tai khoan.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể lưu tài khoản.'));
     } finally {
       setIsSaving(false);
     }
@@ -154,21 +154,21 @@ export function UsersManagementPage() {
       });
       await fetchUsers(page);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the cap nhat trang thai tai khoan.'));
+      setErrorMessage(getApiErrorMessage(error, 'Không thể cập nhật trạng thái tài khoản.'));
     }
   };
 
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Quan ly nguoi dung"
-        description="Tao tai khoan, cap nhat thong tin, khoa mo va gan role cho nguoi dung."
+        title="Quản lý người dùng"
+        description="Tạo tài khoản, cập nhật thông tin, khóa mở và gán role cho người dùng."
       >
         <div className="grid gap-6 lg:grid-cols-[1.15fr_1.85fr]">
           <form className="space-y-4 rounded-2xl bg-slate-50 p-4" onSubmit={onSubmit}>
             <div className="flex items-center justify-between">
               <h3 className="text-base font-semibold text-slate-900">
-                {selectedUser ? 'Cap nhat tai khoan' : 'Tao tai khoan moi'}
+                {selectedUser ? 'Cập nhật tài khoản' : 'Tạo tài khoản mới'}
               </h3>
               {selectedUser && (
                 <button
@@ -176,16 +176,16 @@ export function UsersManagementPage() {
                   onClick={handleCancelEdit}
                   className="text-sm font-medium text-slate-600 hover:text-slate-900"
                 >
-                  Bo chon
+                  Bỏ chọn
                 </button>
               )}
             </div>
 
-            <Field label="Ho ten" error={errors.fullName?.message}>
+            <Field label="Họ tên" error={errors.fullName?.message}>
               <input {...register('fullName')} className={inputClassName} />
             </Field>
 
-            <Field label="Ma nguoi dung" error={errors.userCode?.message}>
+            <Field label="Mã người dùng" error={errors.userCode?.message}>
               <input {...register('userCode')} className={inputClassName} />
             </Field>
 
@@ -203,12 +203,12 @@ export function UsersManagementPage() {
               <input {...register('email')} className={inputClassName} />
             </Field>
 
-            <Field label="So dien thoai" error={errors.phone?.message}>
+            <Field label="Số điện thoại" error={errors.phone?.message}>
               <input {...register('phone')} className={inputClassName} />
             </Field>
 
             <Field
-              label={selectedUser ? 'Mat khau moi (neu doi)' : 'Mat khau'}
+              label={selectedUser ? 'Mật khẩu mới (nếu đổi)' : 'Mật khẩu'}
               error={errors.password?.message}
             >
               <input type="password" {...register('password')} className={inputClassName} />
@@ -222,7 +222,7 @@ export function UsersManagementPage() {
               disabled={isSaving}
               className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
             >
-              {isSaving ? 'Dang luu...' : selectedUser ? 'Cap nhat tai khoan' : 'Tao tai khoan'}
+              {isSaving ? 'Đang lưu...' : selectedUser ? 'Cập nhật tài khoản' : 'Tạo tài khoản'}
             </button>
           </form>
 
@@ -232,10 +232,10 @@ export function UsersManagementPage() {
                 value={keyword}
                 onChange={(event) => setKeyword(event.target.value)}
                 className={inputClassName}
-                placeholder="Tim theo ten, ma, email..."
+                placeholder="Tìm theo tên, mã, email..."
               />
               <select value={roleCode} onChange={(event) => setRoleCode(event.target.value)} className={inputClassName}>
-                <option value="">Tat ca role</option>
+                <option value="">Tất cả role</option>
                 {roles.map((role) => (
                   <option key={role.id} value={role.code}>
                     {role.code}
@@ -243,7 +243,7 @@ export function UsersManagementPage() {
                 ))}
               </select>
               <select value={status} onChange={(event) => setStatus(event.target.value)} className={inputClassName}>
-                <option value="">Tat ca trang thai</option>
+                <option value="">Tất cả trạng thái</option>
                 <option value="ACTIVE">ACTIVE</option>
                 <option value="LOCKED">LOCKED</option>
               </select>
@@ -252,18 +252,18 @@ export function UsersManagementPage() {
                 onClick={() => void fetchUsers(1)}
                 className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
               >
-                Loc du lieu
+                Lọc dữ liệu
               </button>
             </div>
 
             {isLoading ? (
               <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-                Dang tai du lieu nguoi dung...
+                Đang tải dữ liệu người dùng...
               </div>
             ) : users.length === 0 ? (
               <EmptyState
-                title="Chua co nguoi dung phu hop"
-                description="Thu doi bo loc hoac tao tai khoan moi o khung ben trai."
+                title="Chưa có người dùng phù hợp"
+                description="Thay đổi bộ lọc hoặc tạo tài khoản mới ở khung bên trái."
               />
             ) : (
               <div className="overflow-hidden rounded-2xl border border-slate-200">
@@ -271,11 +271,11 @@ export function UsersManagementPage() {
                   <table className="min-w-full divide-y divide-slate-200 text-sm">
                     <thead className="bg-slate-50 text-left text-slate-600">
                       <tr>
-                        <th className="px-4 py-3 font-medium">Nguoi dung</th>
+                        <th className="px-4 py-3 font-medium">Người dùng</th>
                         <th className="px-4 py-3 font-medium">Role</th>
-                        <th className="px-4 py-3 font-medium">Trang thai</th>
-                        <th className="px-4 py-3 font-medium">Lan dang nhap</th>
-                        <th className="px-4 py-3 font-medium">Thao tac</th>
+                        <th className="px-4 py-3 font-medium">Trạng thái</th>
+                        <th className="px-4 py-3 font-medium">Lần đăng nhập</th>
+                        <th className="px-4 py-3 font-medium">Thao tác</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-200 bg-white">
@@ -306,14 +306,14 @@ export function UsersManagementPage() {
                                 onClick={() => handleEdit(user)}
                                 className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                               >
-                                Sua
+                                Sửa
                               </button>
                               <button
                                 type="button"
                                 onClick={() => void handleToggleStatus(user)}
                                 className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
                               >
-                                {user.status === 'ACTIVE' ? 'Khoa' : 'Mo khoa'}
+                                {user.status === 'ACTIVE' ? 'Khóa' : 'Mở khóa'}
                               </button>
                             </div>
                           </td>

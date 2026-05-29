@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { App } from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { AdminDashboardPage } from './pages/AdminDashboardPage';
 import { HandoverDetailPage } from './pages/handovers/HandoverDetailPage';
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
   {
     path: '/',
     element: <App />,
+    errorElement: <ErrorBoundary><div /></ErrorBoundary>,
   },
   {
     path: '/login',
@@ -50,6 +52,7 @@ export const router = createBrowserRouter([
   },
   {
     element: <ProtectedRoute />,
+    errorElement: <ErrorBoundary><div /></ErrorBoundary>,
     children: [
       {
         path: '/print/handover/:id',
@@ -310,6 +313,10 @@ export const router = createBrowserRouter([
               },
               {
                 path: 'handovers',
+                element: <StudentHandoversPage />,
+              },
+              {
+                path: 'my-room',
                 element: <StudentHandoversPage />,
               },
               {
