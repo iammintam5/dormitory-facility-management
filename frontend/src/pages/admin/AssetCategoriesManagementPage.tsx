@@ -1,265 +1,360 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import axios from 'axios';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { getApiErrorMessage } from '../../lib/api-client';
+import {
+  createAssetCategory,
+  deleteAssetCategory,
+  getAssetCategories,
+  updateAssetCategory,
+  type AssetCategoryRecord,
+} from '../../services/asset-categories';
 import { useToast } from '../../toast/toast-context';
-import { EmptyState } from '../../components/admin/EmptyState';
-import { SectionCard } from '../../components/admin/SectionCard';
-import { apiClient } from '../../lib/axios';
-import { AssetCategory } from '../../types/assets';
+
+import { 
+  Folder,
+  FolderOpen,
+  FolderMinus,
+  Folders,
+  Plus,
+  PencilSimple,
+  Trash,
+  Spinner
+} from '@phosphor-icons/react';
+import { Card, CardContent } from '../../components/ui/Card';
+import { SummaryCard } from '../../components/ui/SummaryCard';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
+import { Modal } from '../../components/ui/Modal';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 
 const categorySchema = z.object({
-  code: z.string().min(1, 'Vui long nhap ma loai tai san.'),
-  name: z.string().min(1, 'Vui long nhap ten loai tai san.'),
+  code: z.string().min(1, 'Nhập mã loại thiết bị.'),
+  name: z.string().min(1, 'Nhập tên loại thiết bị.'),
   description: z.string().optional(),
-  maintenanceCycleMonths: z
-    .union([z.coerce.number().int().positive(), z.literal(''), z.undefined()])
-    .optional(),
+  status: z.enum(['Đang sử dụng', 'Ngừng sử dụng']).default('Đang sử dụng'),
 });
 
 type CategoryFormValues = z.infer<typeof categorySchema>;
-
-const defaultValues: CategoryFormValues = {
-  code: '',
-  name: '',
-  description: '',
-  maintenanceCycleMonths: '',
+type AssetCategoryView = {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  quantity: number;
+  status: 'Đang sử dụng' | 'Ngừng sử dụng';
 };
 
 export function AssetCategoriesManagementPage() {
   const { showToast } = useToast();
-  const [categories, setCategories] = useState<AssetCategory[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<AssetCategory | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [categories, setCategories] = useState<AssetCategoryView[]>([]);
+  const [keyword, setKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Tất cả');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<AssetCategoryView | null>(null);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<CategoryFormValues>({
+  const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
-    defaultValues,
+    defaultValues: {
+      code: '',
+      name: '',
+      description: '',
+      status: 'Đang sử dụng',
+    },
   });
 
   useEffect(() => {
-    void fetchCategories();
+    void loadCategories();
   }, []);
 
-  const fetchCategories = async () => {
+  async function loadCategories() {
     setIsLoading(true);
-
     try {
-      const response = await apiClient.get<AssetCategory[]>('/asset-categories');
-      setCategories(response.data);
+      const response = await getAssetCategories();
+      setCategories(response.map(mapCategory));
     } catch (error) {
-      showToast(getApiErrorMessage(error, 'Khong the tai danh sach loai tai san.'), 'error');
+      showToast(getApiErrorMessage(error, 'Không thể tải danh mục thiết bị.'), 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  const openAddModal = () => {
+    setSelectedCategory(null);
+    form.reset({
+      code: '',
+      name: '',
+      description: '',
+      status: 'Đang sử dụng',
+    });
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (cat: AssetCategoryView) => {
+    setSelectedCategory(cat);
+    form.reset({
+      code: cat.code,
+      name: cat.name,
+      description: cat.description,
+      status: cat.status,
+    });
+    setIsModalOpen(true);
+  };
+
+  const onSubmit = async (data: CategoryFormValues) => {
+    setIsLoading(true);
+    try {
+      if (selectedCategory) {
+        await updateAssetCategory(selectedCategory.id, {
+          code: data.code,
+          name: data.name,
+          description: data.description || null,
+        });
+        showToast('Cập nhật loại thiết bị thành công.', 'success');
+      } else {
+        await createAssetCategory({
+          code: data.code,
+          name: data.name,
+          description: data.description || null,
+        });
+        showToast('Thêm loại thiết bị thành công.', 'success');
+      }
+      setIsModalOpen(false);
+      await loadCategories();
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Lưu thông tin thất bại.'), 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const onSubmit = handleSubmit(async (values) => {
-    setIsSaving(true);
+  const filteredCategories = useMemo(
+    () =>
+      categories.filter((category) => {
+        const matchKeyword =
+          !keyword ||
+          `${category.code} ${category.name} ${category.description}`.toLowerCase().includes(keyword.toLowerCase());
+        const matchStatus = statusFilter === 'Tất cả' || category.status === statusFilter;
+        return matchKeyword && matchStatus;
+      }),
+    [categories, keyword, statusFilter],
+  );
 
+  const totalCategories = filteredCategories.length;
+  const activeCategories = filteredCategories.filter((item) => item.status === 'Đang sử dụng').length;
+  const inactiveCategories = filteredCategories.filter((item) => item.status === 'Ngừng sử dụng').length;
+  const totalAssets = filteredCategories.reduce((sum, item) => sum + item.quantity, 0).toLocaleString('vi-VN');
+
+  const handleDelete = async (id: string) => {
     try {
-      const payload = {
-        code: values.code.trim(),
-        name: values.name.trim(),
-        description: values.description?.trim() || undefined,
-        maintenanceCycleMonths:
-          values.maintenanceCycleMonths === '' || values.maintenanceCycleMonths === undefined
-            ? undefined
-            : Number(values.maintenanceCycleMonths),
-      };
-
-      if (selectedCategory) {
-        await apiClient.patch(`/asset-categories/${selectedCategory.id}`, payload);
-        showToast('Cap nhat loai tai san thanh cong.', 'success');
-      } else {
-        await apiClient.post('/asset-categories', payload);
-        showToast('Tao loai tai san thanh cong.', 'success');
-      }
-
-      setSelectedCategory(null);
-      reset(defaultValues);
-      await fetchCategories();
+      await deleteAssetCategory(id);
+      showToast('Xóa loại thiết bị thành công.', 'success');
+      await loadCategories();
     } catch (error) {
-      showToast(getApiErrorMessage(error, 'Khong the luu loai tai san.'), 'error');
-    } finally {
-      setIsSaving(false);
-    }
-  });
-
-  const handleEdit = (category: AssetCategory) => {
-    setSelectedCategory(category);
-    reset({
-      code: category.code,
-      name: category.name,
-      description: category.description ?? '',
-      maintenanceCycleMonths: category.maintenanceCycleMonths ?? '',
-    });
-  };
-
-  const handleDelete = async (categoryId: number) => {
-    try {
-      await apiClient.delete(`/asset-categories/${categoryId}`);
-      showToast('Xoa loai tai san thanh cong.', 'success');
-      await fetchCategories();
-    } catch (error) {
-      showToast(getApiErrorMessage(error, 'Khong the xoa loai tai san.'), 'error');
+      showToast(getApiErrorMessage(error, 'Xóa loại thiết bị thất bại.'), 'error');
     }
   };
 
   return (
-    <div className="space-y-6">
-      <SectionCard
-        title="Quan ly loai tai san"
-        description="Quan ly danh muc loai tai san va chu ky bao tri mac dinh."
-      >
-        <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-          <form className="space-y-4 rounded-2xl bg-slate-50 p-4" onSubmit={onSubmit}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">
-                {selectedCategory ? 'Cap nhat loai tai san' : 'Tao loai tai san moi'}
-              </h3>
-              {selectedCategory && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedCategory(null);
-                    reset(defaultValues);
-                  }}
-                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
-                >
-                  Bo chon
-                </button>
-              )}
-            </div>
+    <div className="space-y-6 mx-auto max-w-7xl pb-10">
+      <PageHeader 
+        title="Loại thiết bị" 
+        description="Quản lý danh mục và phân loại tài sản."
+        actions={
+          <Button onClick={openAddModal} className="gap-2">
+            <Plus size={16} weight="bold" />
+            Thêm loại thiết bị
+          </Button>
+        }
+      />
 
-            <Field label="Ma loai" error={errors.code?.message}>
-              <input {...register('code')} className={inputClassName} />
-            </Field>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryCard 
+          label="Tổng loại thiết bị" 
+          value={String(totalCategories)} 
+          unit="loại" 
+          icon={<Folders size={24} weight="duotone" />} 
+          colorClass="text-blue-600 bg-blue-50 border-blue-100" 
+        />
+        <SummaryCard 
+          label="Đang sử dụng" 
+          value={String(activeCategories)} 
+          unit="loại" 
+          icon={<FolderOpen size={24} weight="duotone" />} 
+          colorClass="text-emerald-600 bg-emerald-50 border-emerald-100" 
+        />
+        <SummaryCard 
+          label="Ngừng sử dụng" 
+          value={String(inactiveCategories)} 
+          unit="loại" 
+          icon={<FolderMinus size={24} weight="duotone" />} 
+          colorClass="text-amber-600 bg-amber-50 border-amber-100" 
+        />
+        <SummaryCard 
+          label="Thiết bị thuộc loại" 
+          value={totalAssets} 
+          unit="thiết bị" 
+          icon={<Folder size={24} weight="duotone" />} 
+          colorClass="text-purple-600 bg-purple-50 border-purple-100" 
+        />
+      </div>
 
-            <Field label="Ten loai" error={errors.name?.message}>
-              <input {...register('name')} className={inputClassName} />
-            </Field>
-
-            <Field label="Mo ta" error={errors.description?.message}>
-              <textarea {...register('description')} className={`${inputClassName} min-h-24`} />
-            </Field>
-
-            <Field
-              label="Chu ky bao tri (thang)"
-              error={errors.maintenanceCycleMonths?.message as string | undefined}
-            >
-              <input type="number" {...register('maintenanceCycleMonths')} className={inputClassName} />
-            </Field>
-
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
-            >
-              {isSaving ? 'Dang luu...' : selectedCategory ? 'Cap nhat' : 'Tao loai tai san'}
-            </button>
-          </form>
-
-          {isLoading ? (
-            <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-              Dang tai loai tai san...
-            </div>
-          ) : categories.length === 0 ? (
-            <EmptyState
-              title="Chua co loai tai san nao"
-              description="Hay tao loai tai san dau tien o khung ben trai."
+      <Card className="border-border/50">
+        <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-end">
+          <div className="flex-1 w-full">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="Nhập tên loại thiết bị..."
             />
-          ) : (
-            <div className="overflow-hidden rounded-2xl border border-slate-200">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
-                  <thead className="bg-slate-50 text-left text-slate-600">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Loai tai san</th>
-                      <th className="px-4 py-3 font-medium">Chu ky bao tri</th>
-                      <th className="px-4 py-3 font-medium">Thao tac</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 bg-white">
-                    {categories.map((category) => (
-                      <tr key={category.id}>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-900">{category.name}</p>
-                          <p className="text-slate-600">{category.code}</p>
-                          <p className="mt-1 text-xs text-slate-500">{category.description || '--'}</p>
-                        </td>
-                        <td className="px-4 py-3 text-slate-700">
-                          {category.maintenanceCycleMonths ? `${category.maintenanceCycleMonths} thang` : 'Khong co'}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleEdit(category)}
-                              className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                            >
-                              Sua
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDelete(category.id)}
-                              className="rounded-lg border border-rose-200 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-50"
-                            >
-                              Xoa
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      </SectionCard>
+          </div>
+
+          <div className="w-full md:w-64">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Trạng thái</label>
+            <Select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option>Tất cả</option>
+              <option>Đang sử dụng</option>
+              <option>Ngừng sử dụng</option>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/50 overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Spinner size={32} className="animate-spin text-primary" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16 text-center">STT</TableHead>
+                <TableHead>Mã loại</TableHead>
+                <TableHead>Tên loại thiết bị</TableHead>
+                <TableHead>Mô tả</TableHead>
+                <TableHead className="text-center">Số lượng TB</TableHead>
+                <TableHead className="text-center">Trạng thái</TableHead>
+                <TableHead className="w-24 text-center">Thao tác</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredCategories.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                    Chưa có danh mục thiết bị.
+                  </TableCell>
+                </TableRow>
+              ) : filteredCategories.map((cat, idx) => (
+                <TableRow key={cat.id}>
+                  <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
+                  <TableCell className="font-bold text-foreground">{cat.code}</TableCell>
+                  <TableCell className="font-medium text-foreground">{cat.name}</TableCell>
+                  <TableCell className="text-muted-foreground">{cat.description || '-'}</TableCell>
+                  <TableCell className="text-center tabular-nums font-medium">{cat.quantity}</TableCell>
+                  <TableCell className="text-center">
+                    <span className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${cat.status === 'Đang sử dụng' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                      {cat.status}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => openEditModal(cat)}>
+                        <PencilSimple size={16} className="text-muted-foreground" />
+                      </Button>
+                      <Button variant="ghost" size="icon" onClick={() => void handleDelete(cat.id)}>
+                        <Trash size={16} className="text-rose-500" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+
+      <Modal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        title={selectedCategory ? 'Cập nhật loại thiết bị' : 'Thêm loại thiết bị'}
+        size="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsModalOpen(false)}>Hủy</Button>
+            <Button onClick={form.handleSubmit(onSubmit)} disabled={isLoading}>
+              {isLoading && <Spinner className="mr-2 animate-spin" />}
+              Lưu
+            </Button>
+          </>
+        }
+      >
+        <form id="category-form" className="space-y-4 py-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Mã loại <span className="text-destructive">*</span>
+            </label>
+            <Input 
+              {...form.register('code')} 
+              placeholder="VD: MAY_TINH" 
+              error={!!form.formState.errors.code}
+            />
+            {form.formState.errors.code && (
+              <p className="mt-1 text-xs text-destructive">{form.formState.errors.code.message}</p>
+            )}
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">
+              Tên loại thiết bị <span className="text-destructive">*</span>
+            </label>
+            <Input 
+              {...form.register('name')} 
+              placeholder="VD: Máy tính bàn" 
+              error={!!form.formState.errors.name}
+            />
+            {form.formState.errors.name && (
+              <p className="mt-1 text-xs text-destructive">{form.formState.errors.name.message}</p>
+            )}
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Mô tả</label>
+            <textarea 
+              {...form.register('description')} 
+              placeholder="Nhập mô tả..." 
+              rows={4} 
+              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
+            />
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-foreground">Trạng thái</label>
+            <Select {...form.register('status')}>
+              <option value="Đang sử dụng">Đang sử dụng</option>
+              <option value="Ngừng sử dụng">Ngừng sử dụng</option>
+            </Select>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
 
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-      {children}
-      {error && <span className="text-xs text-rose-600">{error}</span>}
-    </label>
-  );
+function mapCategory(category: AssetCategoryRecord): AssetCategoryView {
+  return {
+    id: category.id,
+    code: category.code,
+    name: category.name,
+    description: category.description ?? '',
+    quantity: 0,
+    status: 'Đang sử dụng',
+  };
 }
 
-function getApiErrorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError(error)) {
-    const message = error.response?.data?.message;
-    if (Array.isArray(message)) {
-      return message.join(', ');
-    }
-    if (typeof message === 'string') {
-      return message;
-    }
-  }
 
-  return fallback;
-}
-
-const inputClassName =
-  'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500';

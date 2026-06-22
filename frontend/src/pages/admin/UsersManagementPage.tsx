@@ -1,371 +1,574 @@
-import { zodResolver } from '@hookform/resolvers/zod';
-import axios from 'axios';
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { EmptyState } from '../../components/admin/EmptyState';
-import { PaginationBar } from '../../components/admin/PaginationBar';
-import { SectionCard } from '../../components/admin/SectionCard';
-import { apiClient } from '../../lib/axios';
-import { formatDateTime } from '../../lib/format';
-import { Role, User, UsersResponse } from '../../types/users';
+import { useEffect, useMemo, useState } from 'react';
+import { getApiErrorMessage } from '../../lib/api-client';
+import {
+  createUser,
+  getRoles,
+  getUsers,
+  lockUser,
+  resetUserPassword,
+  unlockUser,
+  updateUser,
+  type ManagedUser,
+  type UserRoleOption,
+} from '../../services/users';
+import { useToast } from '../../toast/toast-context';
 
-const userFormSchema = z.object({
-  roleId: z.coerce.number().int().positive(),
-  fullName: z.string().min(1, 'Vui long nhap ho ten.'),
-  userCode: z.string().min(1, 'Vui long nhap ma nguoi dung.'),
-  email: z.string().email('Email khong hop le.').or(z.literal('')).optional(),
-  phone: z.string().optional(),
-  password: z.string().min(6, 'Mat khau toi thieu 6 ky tu.').optional(),
-});
+import { 
+  Users,
+  ShieldCheck,
+  Briefcase,
+  GraduationCap,
+  LockKey,
+  Plus,
+  ArrowsClockwise,
+  PencilSimple,
+  LockOpen,
+  Lock,
+  Key,
+  Spinner
+} from '@phosphor-icons/react';
+import { Card, CardContent } from '../../components/ui/Card';
+import { SummaryCard } from '../../components/ui/SummaryCard';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Select } from '../../components/ui/Select';
+import { Modal } from '../../components/ui/Modal';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { Pagination } from '../../components/ui/Pagination';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 
-type UserFormValues = z.infer<typeof userFormSchema>;
+type UserFormState = {
+  roleId: string;
+  fullName: string;
+  username: string;
+  email: string;
+  phone: string;
+  studentCode: string;
+  password: string;
+  status: 'ACTIVE' | 'LOCKED';
+};
 
-const defaultValues: UserFormValues = {
-  roleId: 3,
+const emptyForm: UserFormState = {
+  roleId: '',
   fullName: '',
-  userCode: '',
+  username: '',
   email: '',
   phone: '',
+  studentCode: '',
   password: '',
+  status: 'ACTIVE',
+};
+
+const roleLabel: Record<UserRoleOption['code'], string> = {
+  ADMIN: 'Admin',
+  MANAGER: 'Quản lý CSVC',
+  STUDENT: 'Sinh viên',
 };
 
 export function UsersManagementPage() {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
+  const { showToast } = useToast();
+  const [users, setUsers] = useState<ManagedUser[]>([]);
+  const [roles, setRoles] = useState<UserRoleOption[]>([]);
   const [keyword, setKeyword] = useState('');
-  const [roleCode, setRoleCode] = useState('');
-  const [status, setStatus] = useState('');
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [feedback, setFeedback] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [roleCode, setRoleCode] = useState('ALL');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors },
-  } = useForm<UserFormValues>({
-    resolver: zodResolver(userFormSchema),
-    defaultValues,
-  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<ManagedUser | null>(null);
+  const [form, setForm] = useState<UserFormState>(emptyForm);
 
   useEffect(() => {
-    void Promise.all([fetchRoles(), fetchUsers(1)]);
-  }, []);
-
-  const fetchRoles = async () => {
-    const response = await apiClient.get<Role[]>('/users/roles');
-    setRoles(response.data);
-  };
-
-  const fetchUsers = async (nextPage = page) => {
-    setIsLoading(true);
-    setErrorMessage('');
-
-    try {
-      const response = await apiClient.get<UsersResponse>('/users', {
-        params: {
-          page: nextPage,
-          pageSize,
-          keyword: keyword || undefined,
-          roleCode: roleCode || undefined,
-          status: status || undefined,
-          includeLocked: true,
-        },
-      });
-
-      setUsers(response.data.items);
-      setPage(response.data.pagination.page);
-      setTotalPages(response.data.pagination.totalPages);
-      setTotal(response.data.pagination.total);
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai danh sach nguoi dung.'));
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const onSubmit = handleSubmit(async (values) => {
-    setIsSaving(true);
-    setFeedback('');
-    setErrorMessage('');
-
-    try {
-      const payload = {
-        ...values,
-        email: values.email?.trim() ? values.email.trim() : undefined,
-        phone: values.phone?.trim() ? values.phone.trim() : undefined,
-        password: values.password?.trim() ? values.password : undefined,
-      };
-
-      if (selectedUser) {
-        await apiClient.patch(`/users/${selectedUser.id}`, payload);
-        setFeedback('Cap nhat tai khoan thanh cong.');
-      } else {
-        await apiClient.post('/users', {
-          ...payload,
-          password: values.password || 'student123',
-        });
-        setFeedback('Tao tai khoan thanh cong.');
+    async function bootstrap() {
+      try {
+        const [roleOptions] = await Promise.all([getRoles()]);
+        setRoles(roleOptions);
+      } catch (error) {
+        showToast(getApiErrorMessage(error, 'Không thể tải danh sách vai trò.'), 'error');
       }
-
-      reset(defaultValues);
-      setSelectedUser(null);
-      await fetchUsers(selectedUser ? page : 1);
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the luu tai khoan.'));
-    } finally {
-      setIsSaving(false);
     }
-  });
 
-  const handleEdit = (user: User) => {
-    setSelectedUser(user);
-    setFeedback('');
-    setErrorMessage('');
-    reset({
+    void bootstrap();
+  }, [showToast]);
+
+  useEffect(() => {
+    async function loadUsers() {
+      setIsLoading(true);
+      try {
+        const response = await getUsers({
+          keyword: keyword || undefined,
+          roleCode: roleCode === 'ALL' ? undefined : roleCode,
+          status: statusFilter === 'ALL' ? undefined : statusFilter,
+          includeLocked: true,
+          page,
+          pageSize: 10,
+        });
+        setUsers(response.items);
+        setTotal(response.pagination.total);
+      } catch (error) {
+        showToast(getApiErrorMessage(error, 'Không thể tải danh sách tài khoản.'), 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    void loadUsers();
+  }, [keyword, page, roleCode, showToast, statusFilter]);
+
+  const stats = useMemo(() => {
+    const totalUsers = total;
+    const totalAdmins = users.filter((user) => user.role.code === 'ADMIN').length;
+    const totalManagers = users.filter((user) => user.role.code === 'MANAGER').length;
+    const totalStudents = users.filter((user) => user.role.code === 'STUDENT').length;
+    const lockedUsers = users.filter((user) => user.status === 'LOCKED').length;
+
+    return { totalUsers, totalAdmins, totalManagers, totalStudents, lockedUsers };
+  }, [total, users]);
+
+  const openCreateModal = () => {
+    setEditingUser(null);
+    setForm(emptyForm);
+    setIsCreateModalOpen(true);
+  };
+
+  const openEditModal = (user: ManagedUser) => {
+    setEditingUser(user);
+    setForm({
       roleId: user.role.id,
       fullName: user.fullName,
-      userCode: user.userCode,
+      username: user.username,
       email: user.email ?? '',
       phone: user.phone ?? '',
+      studentCode: user.studentCode ?? '',
       password: '',
+      status: user.status === 'LOCKED' ? 'LOCKED' : 'ACTIVE',
     });
+    setIsCreateModalOpen(true);
   };
 
-  const handleCancelEdit = () => {
-    setSelectedUser(null);
-    reset(defaultValues);
-    setFeedback('');
-    setErrorMessage('');
-  };
+  const saveUser = async () => {
+    if (!form.roleId || !form.fullName.trim() || !form.username.trim()) {
+      showToast('Vui lòng nhập đủ vai trò, họ tên và tên đăng nhập.', 'error');
+      return;
+    }
 
-  const handleToggleStatus = async (user: User) => {
+    if (!editingUser && !form.password.trim()) {
+      showToast('Mật khẩu là bắt buộc khi tạo mới.', 'error');
+      return;
+    }
+
+    setIsSubmitting(true);
     try {
-      await apiClient.patch(`/users/${user.id}/status`, {
-        status: user.status === 'ACTIVE' ? 'LOCKED' : 'ACTIVE',
+      if (editingUser) {
+        const updated = await updateUser(editingUser.id, {
+          roleId: form.roleId,
+          fullName: form.fullName.trim(),
+          username: form.username.trim(),
+          email: form.email.trim() || null,
+          phone: form.phone.trim() || null,
+          studentCode: form.studentCode.trim() || null,
+          password: form.password.trim() || undefined,
+        });
+
+        if (form.status === 'LOCKED' && updated.status !== 'LOCKED') {
+          await lockUser(editingUser.id);
+        }
+        if (form.status === 'ACTIVE' && updated.status === 'LOCKED') {
+          await unlockUser(editingUser.id);
+        }
+
+        showToast('Cập nhật tài khoản thành công.', 'success');
+      } else {
+        const created = await createUser({
+          roleId: form.roleId,
+          fullName: form.fullName.trim(),
+          username: form.username.trim(),
+          password: form.password.trim(),
+          email: form.email.trim() || undefined,
+          phone: form.phone.trim() || undefined,
+          studentCode: form.studentCode.trim() || undefined,
+        });
+
+        if (form.status === 'LOCKED') {
+          await lockUser(created.id);
+        }
+
+        showToast('Thêm tài khoản thành công.', 'success');
+      }
+
+      setIsCreateModalOpen(false);
+      setForm(emptyForm);
+      setPage(1);
+      const response = await getUsers({
+        keyword: keyword || undefined,
+        roleCode: roleCode === 'ALL' ? undefined : roleCode,
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        includeLocked: true,
+        page: 1,
+        pageSize: 10,
       });
-      await fetchUsers(page);
+      setUsers(response.items);
+      setTotal(response.pagination.total);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the cap nhat trang thai tai khoan.'));
+      showToast(getApiErrorMessage(error, 'Lưu tài khoản thất bại.'), 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const toggleLock = async (user: ManagedUser) => {
+    try {
+      if (user.status === 'LOCKED') {
+        await unlockUser(user.id);
+        showToast('Mở khóa tài khoản thành công.', 'success');
+      } else {
+        await lockUser(user.id);
+        showToast('Khóa tài khoản thành công.', 'success');
+      }
+      setUsers((current) =>
+        current.map((item) =>
+          item.id === user.id ? { ...item, status: user.status === 'LOCKED' ? 'ACTIVE' : 'LOCKED' } : item,
+        ),
+      );
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Cập nhật trạng thái tài khoản thất bại.'), 'error');
+    }
+  };
+
+  const handleResetPassword = async (user: ManagedUser) => {
+    const newPassword = window.prompt(`Nhập mật khẩu mới cho ${user.username}`, 'Temp123!');
+    if (!newPassword) return;
+
+    try {
+      await resetUserPassword(user.id, newPassword);
+      showToast('Đặt lại mật khẩu thành công.', 'success');
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Đặt lại mật khẩu thất bại.'), 'error');
     }
   };
 
   return (
-    <div className="space-y-6">
-      <SectionCard
-        title="Quan ly nguoi dung"
-        description="Tao tai khoan, cap nhat thong tin, khoa mo va gan role cho nguoi dung."
-      >
-        <div className="grid gap-6 lg:grid-cols-[1.15fr_1.85fr]">
-          <form className="space-y-4 rounded-2xl bg-slate-50 p-4" onSubmit={onSubmit}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-900">
-                {selectedUser ? 'Cap nhat tai khoan' : 'Tao tai khoan moi'}
-              </h3>
-              {selectedUser && (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className="text-sm font-medium text-slate-600 hover:text-slate-900"
-                >
-                  Bo chon
-                </button>
+    <div className="space-y-6 mx-auto max-w-7xl pb-10">
+      <PageHeader 
+        title="Tài khoản" 
+        description="Quản lý và phân quyền cho người dùng hệ thống."
+        actions={
+          <Button onClick={openCreateModal} className="gap-2">
+            <Plus size={16} weight="bold" />
+            Thêm tài khoản
+          </Button>
+        }
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <SummaryCard 
+          label="Tổng tài khoản" 
+          value={stats.totalUsers} 
+          icon={<Users size={24} weight="duotone" />} 
+          colorClass="text-blue-600 bg-blue-50 border-blue-100" 
+        />
+        <SummaryCard 
+          label="Admin" 
+          value={stats.totalAdmins} 
+          icon={<ShieldCheck size={24} weight="duotone" />} 
+          colorClass="text-indigo-600 bg-indigo-50 border-indigo-100" 
+        />
+        <SummaryCard 
+          label="Quản lý CSVC" 
+          value={stats.totalManagers} 
+          icon={<Briefcase size={24} weight="duotone" />} 
+          colorClass="text-emerald-600 bg-emerald-50 border-emerald-100" 
+        />
+        <SummaryCard 
+          label="Sinh viên" 
+          value={stats.totalStudents} 
+          icon={<GraduationCap size={24} weight="duotone" />} 
+          colorClass="text-amber-600 bg-amber-50 border-amber-100" 
+        />
+        <SummaryCard 
+          label="Bị khóa" 
+          value={stats.lockedUsers} 
+          icon={<LockKey size={24} weight="duotone" />} 
+          colorClass="text-rose-600 bg-rose-50 border-rose-100" 
+        />
+      </div>
+
+      <Card className="border-border/50">
+        <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-end">
+          <div className="flex-1 min-w-[250px]">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
+            <Input
+              value={keyword}
+              onChange={(e) => {
+                setPage(1);
+                setKeyword(e.target.value);
+              }}
+              placeholder="Nhập tên, email hoặc tên đăng nhập..."
+            />
+          </div>
+
+          <div className="w-full md:w-[150px]">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Vai trò</label>
+            <Select
+              value={roleCode}
+              onChange={(e) => {
+                setPage(1);
+                setRoleCode(e.target.value);
+              }}
+            >
+              <option value="ALL">Tất cả</option>
+              <option value="ADMIN">Admin</option>
+              <option value="MANAGER">Quản lý CSVC</option>
+              <option value="STUDENT">Sinh viên</option>
+            </Select>
+          </div>
+
+          <div className="w-full md:w-[150px]">
+            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Trạng thái</label>
+            <Select
+              value={statusFilter}
+              onChange={(e) => {
+                setPage(1);
+                setStatusFilter(e.target.value);
+              }}
+            >
+              <option value="ALL">Tất cả</option>
+              <option value="ACTIVE">Hoạt động</option>
+              <option value="LOCKED">Bị khóa</option>
+            </Select>
+          </div>
+
+          <div className="flex w-full md:w-auto">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setKeyword('');
+                setRoleCode('ALL');
+                setStatusFilter('ALL');
+                setPage(1);
+              }}
+              className="gap-2 w-full md:w-auto"
+            >
+              <ArrowsClockwise size={16} weight="bold" />
+              Làm mới
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/50 overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <Spinner size={32} className="animate-spin text-primary" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-16 text-center">STT</TableHead>
+                <TableHead>Tài khoản</TableHead>
+                <TableHead>Họ và tên</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Vai trò</TableHead>
+                <TableHead>Trạng thái</TableHead>
+                <TableHead>Ngày tạo</TableHead>
+                <TableHead className="text-center w-36">Thao tác</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {users.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                    Không có tài khoản nào.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                users.map((user, index) => (
+                  <TableRow key={user.id}>
+                    <TableCell className="text-center font-medium text-muted-foreground">
+                      {(page - 1) * 10 + index + 1}
+                    </TableCell>
+                    <TableCell className="font-semibold text-foreground">{user.username}</TableCell>
+                    <TableCell className="font-medium text-foreground">{user.fullName}</TableCell>
+                    <TableCell className="text-muted-foreground">{user.email ?? '--'}</TableCell>
+                    <TableCell>
+                      <span className="inline-flex rounded px-2.5 py-0.5 text-[11px] font-semibold bg-blue-100 text-blue-700">
+                        {roleLabel[user.role.code]}
+                      </span>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5">
+                        <div
+                          className={`h-2 w-2 rounded-full ${
+                            user.status === 'LOCKED' ? 'bg-rose-500' : 'bg-emerald-500'
+                          }`}
+                        />
+                        <span
+                          className={`font-semibold text-[12px] ${
+                            user.status === 'LOCKED' ? 'text-rose-600' : 'text-emerald-600'
+                          }`}
+                        >
+                          {user.status === 'LOCKED' ? 'Bị khóa' : 'Hoạt động'}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground tabular-nums">
+                      {new Date(user.createdAt).toLocaleDateString('vi-VN')}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => openEditModal(user)} 
+                          title="Sửa"
+                        >
+                          <PencilSimple size={16} className="text-muted-foreground" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => void toggleLock(user)} 
+                          title="Khóa/Mở khóa"
+                        >
+                          {user.status === 'LOCKED' ? (
+                            <LockOpen size={16} className="text-emerald-600" />
+                          ) : (
+                            <Lock size={16} className="text-amber-500" />
+                          )}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => void handleResetPassword(user)} 
+                          title="Làm mới mật khẩu"
+                        >
+                          <Key size={16} className="text-indigo-500" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
-            </div>
+            </TableBody>
+          </Table>
+        )}
 
-            <Field label="Ho ten" error={errors.fullName?.message}>
-              <input {...register('fullName')} className={inputClassName} />
-            </Field>
+        <Pagination
+          page={page}
+          totalPages={Math.max(1, Math.ceil(total / 10))}
+          total={total}
+          pageSize={10}
+          onPageChange={setPage}
+          label={`Hiển thị tối đa 10 tài khoản mỗi trang`}
+        />
+      </Card>
 
-            <Field label="Ma nguoi dung" error={errors.userCode?.message}>
-              <input {...register('userCode')} className={inputClassName} />
-            </Field>
-
-            <Field label="Role" error={errors.roleId?.message}>
-              <select {...register('roleId')} className={inputClassName}>
+      <Modal 
+        isOpen={isCreateModalOpen} 
+        onClose={() => setIsCreateModalOpen(false)} 
+        title={editingUser ? 'Cập nhật tài khoản' : 'Thêm tài khoản'}
+        size="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setIsCreateModalOpen(false)}>Hủy</Button>
+            <Button onClick={() => void saveUser()} disabled={isSubmitting}>
+              {isSubmitting && <Spinner className="mr-2 animate-spin" />}
+              Lưu
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 py-4 pr-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Vai trò *</label>
+              <Select
+                value={form.roleId}
+                onChange={(e) => setForm((current) => ({ ...current, roleId: e.target.value }))}
+              >
+                <option value="">Chọn vai trò</option>
                 {roles.map((role) => (
                   <option key={role.id} value={role.id}>
-                    {role.code} - {role.name}
+                    {roleLabel[role.code]}
                   </option>
                 ))}
-              </select>
-            </Field>
-
-            <Field label="Email" error={errors.email?.message}>
-              <input {...register('email')} className={inputClassName} />
-            </Field>
-
-            <Field label="So dien thoai" error={errors.phone?.message}>
-              <input {...register('phone')} className={inputClassName} />
-            </Field>
-
-            <Field
-              label={selectedUser ? 'Mat khau moi (neu doi)' : 'Mat khau'}
-              error={errors.password?.message}
-            >
-              <input type="password" {...register('password')} className={inputClassName} />
-            </Field>
-
-            {feedback && <p className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{feedback}</p>}
-            {errorMessage && <p className="rounded-xl bg-rose-50 px-3 py-2 text-sm text-rose-700">{errorMessage}</p>}
-
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="w-full rounded-xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-700 disabled:opacity-60"
-            >
-              {isSaving ? 'Dang luu...' : selectedUser ? 'Cap nhat tai khoan' : 'Tao tai khoan'}
-            </button>
-          </form>
-
-          <div className="space-y-4">
-            <div className="grid gap-3 md:grid-cols-4">
-              <input
-                value={keyword}
-                onChange={(event) => setKeyword(event.target.value)}
-                className={inputClassName}
-                placeholder="Tim theo ten, ma, email..."
-              />
-              <select value={roleCode} onChange={(event) => setRoleCode(event.target.value)} className={inputClassName}>
-                <option value="">Tat ca role</option>
-                {roles.map((role) => (
-                  <option key={role.id} value={role.code}>
-                    {role.code}
-                  </option>
-                ))}
-              </select>
-              <select value={status} onChange={(event) => setStatus(event.target.value)} className={inputClassName}>
-                <option value="">Tat ca trang thai</option>
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="LOCKED">LOCKED</option>
-              </select>
-              <button
-                type="button"
-                onClick={() => void fetchUsers(1)}
-                className="rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-500"
+              </Select>
+            </div>
+            
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Trạng thái *</label>
+              <Select
+                value={form.status}
+                onChange={(e) =>
+                  setForm((current) => ({
+                    ...current,
+                    status: e.target.value as 'ACTIVE' | 'LOCKED',
+                  }))
+                }
               >
-                Loc du lieu
-              </button>
+                <option value="ACTIVE">Hoạt động</option>
+                <option value="LOCKED">Bị khóa</option>
+              </Select>
             </div>
 
-            {isLoading ? (
-              <div className="rounded-2xl bg-slate-50 px-6 py-12 text-center text-sm text-slate-600">
-                Dang tai du lieu nguoi dung...
-              </div>
-            ) : users.length === 0 ? (
-              <EmptyState
-                title="Chua co nguoi dung phu hop"
-                description="Thu doi bo loc hoac tao tai khoan moi o khung ben trai."
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Họ và tên *</label>
+              <Input 
+                value={form.fullName} 
+                onChange={(e) => setForm((current) => ({ ...current, fullName: e.target.value }))} 
               />
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200 text-sm">
-                    <thead className="bg-slate-50 text-left text-slate-600">
-                      <tr>
-                        <th className="px-4 py-3 font-medium">Nguoi dung</th>
-                        <th className="px-4 py-3 font-medium">Role</th>
-                        <th className="px-4 py-3 font-medium">Trang thai</th>
-                        <th className="px-4 py-3 font-medium">Lan dang nhap</th>
-                        <th className="px-4 py-3 font-medium">Thao tac</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-200 bg-white">
-                      {users.map((user) => (
-                        <tr key={user.id}>
-                          <td className="px-4 py-3">
-                            <p className="font-semibold text-slate-900">{user.fullName}</p>
-                            <p className="text-slate-600">{user.userCode}</p>
-                            <p className="text-slate-500">{user.email || '--'}</p>
-                          </td>
-                          <td className="px-4 py-3 text-slate-700">{user.role.code}</td>
-                          <td className="px-4 py-3">
-                            <span
-                              className={`rounded-full px-3 py-1 text-xs font-semibold ${
-                                user.status === 'ACTIVE'
-                                  ? 'bg-emerald-100 text-emerald-700'
-                                  : 'bg-amber-100 text-amber-700'
-                              }`}
-                            >
-                              {user.status}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600">{formatDateTime(user.lastLoginAt)}</td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap gap-2">
-                              <button
-                                type="button"
-                                onClick={() => handleEdit(user)}
-                                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                              >
-                                Sua
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleToggleStatus(user)}
-                                className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
-                              >
-                                {user.status === 'ACTIVE' ? 'Khoa' : 'Mo khoa'}
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            </div>
+            
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Tên đăng nhập *</label>
+              <Input 
+                value={form.username} 
+                onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))} 
+              />
+            </div>
 
-                <div className="px-4">
-                  <PaginationBar page={page} totalPages={totalPages} total={total} onPageChange={(next) => void fetchUsers(next)} />
-                </div>
-              </div>
-            )}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Email</label>
+              <Input 
+                value={form.email} 
+                onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} 
+              />
+            </div>
+            
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Số điện thoại</label>
+              <Input 
+                value={form.phone} 
+                onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} 
+              />
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Mã sinh viên</label>
+              <Input 
+                value={form.studentCode} 
+                onChange={(e) => setForm((current) => ({ ...current, studentCode: e.target.value }))} 
+              />
+            </div>
+            
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                {editingUser ? 'Mật khẩu mới (nếu đổi)' : 'Mật khẩu *'}
+              </label>
+              <Input 
+                type="password" 
+                value={form.password} 
+                onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} 
+              />
+            </div>
           </div>
         </div>
-      </SectionCard>
+      </Modal>
     </div>
   );
 }
 
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-medium text-slate-700">{label}</span>
-      {children}
-      {error && <span className="text-xs text-rose-600">{error}</span>}
-    </label>
-  );
-}
 
-function getApiErrorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError(error)) {
-    const message = error.response?.data?.message;
-    if (Array.isArray(message)) {
-      return message.join(', ');
-    }
-    if (typeof message === 'string') {
-      return message;
-    }
-  }
-
-  return fallback;
-}
-
-const inputClassName =
-  'w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-emerald-500';

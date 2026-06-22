@@ -49,7 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`min-w-72 rounded-2xl border px-4 py-3 text-sm font-medium shadow-lg ${
+            className={`min-w-72 rounded-2xl border px-4 py-3 text-sm font-medium shadow-lg animate-fade-in-down ${
               toast.tone === 'success'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                 : 'border-rose-200 bg-rose-50 text-rose-700'

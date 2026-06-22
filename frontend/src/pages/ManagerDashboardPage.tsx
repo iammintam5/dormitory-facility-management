@@ -1,206 +1,201 @@
 import { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Skeleton, SkeletonStatCard } from '../components/ui/Skeleton';
+import { getApiErrorMessage } from '../lib/api-client';
+import { getDashboardSummary, type ManagerDashboardSummary } from '../services/reports';
+import { useToast } from '../toast/toast-context';
+import { 
+  Buildings, 
+  Door, 
+  Desktop, 
+  WarningOctagon,
+  Wrench,
+  Trash,
+  ArrowRight,
+  TrendUp,
+} from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
-import { apiClient } from '../lib/axios';
-import { getApiErrorMessage } from '../lib/api-error';
-import { formatDate, formatDateTime } from '../lib/format';
-import { Asset, AssetsResponse } from '../types/assets';
-import { DamageReport, DamageReportsResponse } from '../types/damage-reports';
-import { InventoryCheck, InventoryChecksResponse } from '../types/inventory-checks';
-import { DueAssetsResponse, MaintenancePlan, MaintenanceDashboardSummary } from '../types/maintenance';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
-import { Badge } from '../components/ui/Badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/Table';
-import { Button } from '../components/ui/Button';
 
 export function ManagerDashboardPage() {
-  const [summary, setSummary] = useState<MaintenanceDashboardSummary | null>(null);
-  const [pendingReports, setPendingReports] = useState<DamageReport[]>([]);
-  const [dueAssets, setDueAssets] = useState<MaintenancePlan[]>([]);
-  const [damagedAssets, setDamagedAssets] = useState<Asset[]>([]);
-  const [recentChecks, setRecentChecks] = useState<InventoryCheck[]>([]);
+  const { showToast } = useToast();
+  const [summary, setSummary] = useState<ManagerDashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState('');
 
   useEffect(() => {
-    void loadDashboard();
-  }, []);
-
-  const loadDashboard = async () => {
-    setIsLoading(true);
-    setErrorMessage('');
-
-    try {
-      const [summaryResponse, reportsResponse, dueAssetsResponse, damagedAssetsResponse, inventoryChecksResponse] =
-        await Promise.all([
-          apiClient.get<MaintenanceDashboardSummary>('/maintenance/dashboard-summary'),
-          apiClient.get<DamageReportsResponse>('/damage-reports', {
-            params: { status: 'PENDING', page: 1, pageSize: 5 },
-          }),
-          apiClient.get<DueAssetsResponse>('/maintenance/due-assets', {
-            params: { days: 7 },
-          }),
-          apiClient.get<AssetsResponse>('/assets', {
-            params: { status: 'DAMAGED', page: 1, pageSize: 5 },
-          }),
-          apiClient.get<InventoryChecksResponse>('/inventory-checks', {
-            params: { page: 1, pageSize: 5 },
-          }),
-        ]);
-
-      setSummary(summaryResponse.data);
-      setPendingReports(reportsResponse.data.items);
-      setDueAssets(dueAssetsResponse.data.items.slice(0, 5));
-      setDamagedAssets(damagedAssetsResponse.data.items);
-      setRecentChecks(inventoryChecksResponse.data.items);
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Khong the tai dashboard.'));
-    } finally {
-      setIsLoading(false);
+    async function loadSummary() {
+      try {
+        const data = await getDashboardSummary();
+        if (data.role === 'MANAGER') {
+          setSummary(data);
+        }
+      } catch (error) {
+        showToast(getApiErrorMessage(error, 'Không thể tải dữ liệu dashboard.'), 'error');
+      } finally {
+        setIsLoading(false);
+      }
     }
-  };
 
-  if (isLoading) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="text-muted-foreground animate-pulse">Đang tải dữ liệu...</div>
-      </div>
-    );
-  }
+    void loadSummary();
+  }, [showToast]);
+
+  const stats = [
+    { label: 'Tổng khu nhà', value: summary?.totalBuildings ?? 0, unit: 'khu', icon: Buildings, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+    { label: 'Tổng số phòng', value: summary?.totalRooms ?? 0, unit: 'phòng', icon: Door, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+    { label: 'Tổng số thiết bị', value: summary?.totalAssets ?? 0, unit: 'thiết bị', icon: Desktop, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-500/10' },
+    { label: 'Thiết bị hư hỏng', value: summary?.damagedAssets ?? 0, unit: 'thiết bị', icon: WarningOctagon, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10' },
+  ] as const;
 
   return (
     <div className="space-y-6">
-      {errorMessage && (
-        <div className="rounded-md bg-destructive/15 p-4 text-destructive font-medium">
-          {errorMessage}
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Bảng điều khiển vận hành
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Tổng quan dữ liệu và hoạt động cơ sở vật chất.
+          </p>
         </div>
-      )}
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Báo hỏng chờ xử lý</CardTitle>
-            <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{pendingReports.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Cần được xử lý khẩn cấp</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bảo trì sắp đến hạn</CardTitle>
-            <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-primary">{summary?.dueSoonCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">Trong 7 ngày tới</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Bảo trì quá hạn</CardTitle>
-            <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">{summary?.overdueCount ?? 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">Lập tức kiểm tra</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Tài sản đang hỏng</CardTitle>
-            <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            </svg>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{damagedAssets.length}</div>
-            <p className="text-xs text-muted-foreground mt-1">Cần thay thế/sửa chữa</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Báo hỏng chờ xử lý</CardTitle>
-            <CardDescription>Phiếu báo hỏng cần tiếp nhận ưu tiên</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {pendingReports.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">Không có dữ liệu</div>
-            ) : (
-              <div className="space-y-4">
-                {pendingReports.map(report => (
-                  <div key={report.id} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
-                    <div>
-                      <p className="font-medium">{report.reportCode}</p>
-                      <p className="text-sm text-muted-foreground">{report.asset?.assetName} - {report.room?.roomCode}</p>
+        {/* Stats Row */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <SkeletonStatCard key={i} />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map(({ label, value, unit, icon: Icon, color, bg }) => (
+              <Card key={label} className="group relative overflow-hidden">
+                <CardContent className="p-5 pt-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${bg}`}>
+                      <Icon size={22} weight="duotone" className={color} />
                     </div>
-                    <div className="flex gap-2">
-                      <Badge variant={report.priority === 'HIGH' ? 'destructive' : 'secondary'}>
-                        {report.priority}
-                      </Badge>
-                      <Link to={`/manager/damage-reports/${report.id}`}>
-                        <Button variant="outline" size="sm">Xem</Button>
-                      </Link>
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                      <div className="mt-1.5 flex items-baseline justify-end gap-1.5">
+                        <span className="text-2xl font-bold tabular-nums text-foreground">
+                          {value.toLocaleString('vi-VN')}
+                        </span>
+                        <span className="text-[11px] font-medium text-muted-foreground">{unit}</span>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Kiểm kê gần đây</CardTitle>
-            <CardDescription>Tiến độ kiểm kê tài sản</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {recentChecks.length === 0 ? (
-              <div className="text-center py-6 text-muted-foreground">Không có dữ liệu</div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mã phiếu</TableHead>
-                    <TableHead>Ngày</TableHead>
-                    <TableHead>Trạng thái</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {recentChecks.map(check => (
-                    <TableRow key={check.id}>
-                      <TableCell className="font-medium">
-                        <Link to={`/manager/inventory-checks/${check.id}`} className="hover:underline">
-                          {check.inventoryCode}
-                        </Link>
-                      </TableCell>
-                      <TableCell>{formatDate(check.checkDate)}</TableCell>
-                      <TableCell>
-                        <Badge variant={check.status === 'COMPLETED' ? 'success' : 'warning'}>
-                          {check.status}
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
+          {/* Operating Status */}
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/50 px-6 py-4">
+              <CardTitle className="text-base font-semibold text-foreground">
+                Tình hình vận hành
+              </CardTitle>
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                <TrendUp size={14} weight="bold" />
+                Trực tiếp
+              </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-3">
+              <MetricBox
+                label="Đang bảo trì"
+                value={summary?.maintenanceProcessing ?? 0}
+                icon={Wrench}
+                color="text-amber-600 dark:text-amber-400"
+                bg="bg-amber-50 dark:bg-amber-500/10"
+                isLoading={isLoading}
+              />
+              <MetricBox
+                label="Chờ thanh lý"
+                value={summary?.liquidationPending ?? 0}
+                icon={Trash}
+                color="text-rose-600 dark:text-rose-400"
+                bg="bg-rose-50 dark:bg-rose-500/10"
+                isLoading={isLoading}
+              />
+              <MetricBox
+                label="Thiết bị hư hỏng"
+                value={summary?.damagedAssets ?? 0}
+                icon={WarningOctagon}
+                color="text-blue-600 dark:text-blue-400"
+                bg="bg-blue-50 dark:bg-blue-500/10"
+                isLoading={isLoading}
+              />
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader className="border-b border-border/50 px-6 py-4">
+              <CardTitle className="text-base font-semibold text-foreground">
+                Thao tác nhanh
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 p-4 pt-5">
+              <QuickAction to="/manager/damage-reports" label="Xử lý báo hỏng" icon={WarningOctagon} />
+              <QuickAction to="/manager/maintenance" label="Bảo trì thiết bị" icon={Wrench} />
+              <QuickAction to="/manager/inventory-checks" label="Kiểm kê thiết bị" icon={Desktop} />
+              <QuickAction to="/manager/liquidations" label="Thanh lý thiết bị" icon={Trash} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
+  );
+}
+
+function MetricBox({ 
+  label, 
+  value, 
+  icon: Icon, 
+  color, 
+  bg,
+  isLoading,
+}: { 
+  label: string; 
+  value: number; 
+  icon: React.ElementType; 
+  color: string;
+  bg: string;
+  isLoading: boolean;
+}) {
+  return (
+    <div className="flex flex-col justify-between rounded-xl border border-border/50 bg-muted/20 p-5 transition-colors duration-150 hover:bg-muted/40">
+      <div className="flex items-center gap-2.5">
+        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${bg}`}>
+          <Icon size={16} className={color} weight="duotone" />
+        </div>
+        <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      </div>
+      {isLoading ? (
+        <Skeleton className="mt-4 h-8 w-16" />
+      ) : (
+        <div className={`mt-4 text-3xl font-bold tabular-nums tracking-tight ${color}`}>
+          {value.toLocaleString('vi-VN')}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickAction({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
+  return (
+    <Link
+      to={to}
+      className="group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-muted"
+    >
+      <div className="flex items-center gap-3">
+        <Icon size={18} weight="duotone" className="text-muted-foreground group-hover:text-primary" />
+        <span>{label}</span>
+      </div>
+      <ArrowRight size={14} className="text-muted-foreground/50 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
+    </Link>
   );
 }

@@ -1,350 +1,239 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/Card';
-import { apiClient } from '../lib/axios';
-import { ReportsSummary, MonthlyCount, AssetsByCategory, StatusBreakdown } from '../types/reports';
-import { getApiErrorMessage } from '../lib/api-error';
+import { Link } from 'react-router-dom';
+import { getApiErrorMessage } from '../lib/api-client';
+import { getDashboardSummary, type AdminDashboardSummary } from '../services/reports';
 import { useToast } from '../toast/toast-context';
-import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip,
-  LineChart, Line, XAxis, YAxis, CartesianGrid,
-  BarChart, Bar
-} from 'recharts';
+import { 
+  Users, 
+  GraduationCap, 
+  UserGear, 
+  Wrench, 
+  Desktop,
+  ArrowRight,
+  TrendUp,
+  Checks,
+  WarningCircle,
+  ClipboardText,
+  Lock,
+  UserCircle,
+} from '@phosphor-icons/react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+import { Skeleton, SkeletonStatCard } from '../components/ui/Skeleton';
 
-const STATUS_COLORS: Record<string, string> = {
-  'IN_USE': '#10b981',      // emerald-500
-  'IN_STORAGE': '#64748b',   // slate-500
-  'DAMAGED': '#f43f5e',      // rose-500
-  'LIQUIDATED': '#f59e0b'    // amber-500
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  'IN_USE': 'Đang sử dụng',
-  'IN_STORAGE': 'Trong kho',
-  'DAMAGED': 'Báo hỏng',
-  'LIQUIDATED': 'Đã thanh lý'
-};
+const recentActions = [
+  { label: 'Đồng bộ người dùng và phân quyền', icon: Users, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+  { label: 'Theo dõi kiểm kê, thanh lý và bảo trì', icon: Checks, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+  { label: 'Rà soát báo hỏng phát sinh gần đây', icon: WarningCircle, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+] as const;
 
 export function AdminDashboardPage() {
   const { showToast } = useToast();
-  
-  const [summary, setSummary] = useState<ReportsSummary | null>(null);
-  const [damageByMonth, setDamageByMonth] = useState<MonthlyCount[]>([]);
-  const [assetsByCategory, setAssetsByCategory] = useState<AssetsByCategory[]>([]);
-  
+  const [summary, setSummary] = useState<AdminDashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [dateRange, setDateRange] = useState({ fromDate: '', toDate: '' });
 
   useEffect(() => {
-    void loadDashboard();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadDashboard = async () => {
-    setIsLoading(true);
-    try {
-      const params = {};
-      if (dateRange.fromDate) Object.assign(params, { fromDate: dateRange.fromDate });
-      if (dateRange.toDate) Object.assign(params, { toDate: dateRange.toDate });
-
-      const [summaryRes, damageRes, categoryRes] = await Promise.all([
-        apiClient.get<ReportsSummary>('/reports/summary', { params }),
-        apiClient.get<MonthlyCount[]>('/reports/damage-reports-by-month', { params }),
-        apiClient.get<AssetsByCategory[]>('/reports/assets-by-category', { params })
-      ]);
-      setSummary(summaryRes.data);
-      setDamageByMonth(damageRes.data);
-      // Giới hạn hiển thị 6 danh mục có nhiều tài sản nhất
-      setAssetsByCategory(categoryRes.data.slice(0, 6));
-    } catch (error) {
-      showToast(getApiErrorMessage(error, 'Không thể tải dữ liệu Dashboard.'), 'error');
-    } finally {
-      setIsLoading(false);
+    async function loadSummary() {
+      try {
+        const data = await getDashboardSummary();
+        if (data.role === 'ADMIN') {
+          setSummary(data);
+        }
+      } catch (error) {
+        showToast(getApiErrorMessage(error, 'Không thể tải dữ liệu dashboard.'), 'error');
+      } finally {
+        setIsLoading(false);
+      }
     }
-  };
 
-  const handleFilter = (e: React.FormEvent) => {
-    e.preventDefault();
-    void loadDashboard();
-  };
+    void loadSummary();
+  }, [showToast]);
 
-  const clearFilter = () => {
-    setDateRange({ fromDate: '', toDate: '' });
-    // Tự động load lại sau khi clear state, cần timeout nhỏ để state kịp cập nhật
-    setTimeout(() => {
-      void loadDashboard();
-    }, 0);
-  };
-
-  if (isLoading && !summary) {
-    return (
-      <div className="flex h-[50vh] items-center justify-center">
-        <div className="text-slate-400 animate-pulse font-medium text-lg flex items-center gap-2">
-          <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-          Đang tổng hợp dữ liệu hệ thống...
-        </div>
-      </div>
-    );
-  }
-
-  // Chuẩn bị data cho biểu đồ tròn (Pie Chart)
-  const pieData = summary?.assetsByStatus.map(item => ({
-    name: STATUS_LABELS[item.status] || item.status,
-    value: item.count,
-    color: STATUS_COLORS[item.status] || '#94a3b8'
-  })) || [];
+  const stats = [
+    { label: 'Tổng người dùng', value: summary?.totalUsers ?? 0, icon: Users, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
+    { label: 'Tổng sinh viên', value: summary?.totalStudents ?? 0, icon: GraduationCap, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+    { label: 'Tổng quản lý', value: summary?.totalManagers ?? 0, icon: UserGear, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-500/10' },
+    { label: 'Tổng báo hỏng', value: summary?.totalDamageReports ?? 0, icon: Wrench, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10' },
+    { label: 'Tổng thiết bị', value: summary?.totalAssets ?? 0, icon: Desktop, color: 'text-cyan-600 dark:text-cyan-400', bg: 'bg-cyan-50 dark:bg-cyan-500/10' },
+  ] as const;
 
   return (
-    <div className="space-y-6 max-w-full mx-auto pb-10">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+    <div className="space-y-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header */}
         <div>
-          <h2 className="text-xl font-bold text-slate-800">Tổng quan Hệ thống</h2>
-          <p className="text-sm text-slate-500 mt-1">Cái nhìn toàn cảnh về tài sản và cơ sở vật chất.</p>
-        </div>
-        
-        <form onSubmit={handleFilter} className="flex items-center gap-2 text-sm w-full sm:w-auto">
-          <div className="flex items-center gap-2 bg-slate-50 p-1.5 rounded-lg border border-slate-200">
-            <input 
-              type="date" 
-              value={dateRange.fromDate}
-              onChange={e => setDateRange(prev => ({ ...prev, fromDate: e.target.value }))}
-              className="bg-transparent border-none outline-none text-slate-600 px-2 py-1 rounded cursor-pointer hover:bg-slate-100 transition" 
-              title="Từ ngày"
-            />
-            <span className="text-slate-300">-</span>
-            <input 
-              type="date" 
-              value={dateRange.toDate}
-              onChange={e => setDateRange(prev => ({ ...prev, toDate: e.target.value }))}
-              className="bg-transparent border-none outline-none text-slate-600 px-2 py-1 rounded cursor-pointer hover:bg-slate-100 transition" 
-              title="Đến ngày"
-            />
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            Bảng điều khiển quản trị
+          </h1>
+          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+            <Link to="/admin/dashboard" className="transition-colors hover:text-primary">
+              Trang chủ
+            </Link>
+            <span className="text-muted-foreground/40">/</span>
+            <span className="text-foreground font-medium">Bảng điều khiển</span>
           </div>
-          <button type="submit" className="px-4 py-2 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition shadow-sm">
-            Lọc
-          </button>
-          {(dateRange.fromDate || dateRange.toDate) && (
-            <button type="button" onClick={clearFilter} className="px-3 py-2 text-slate-500 hover:bg-slate-100 rounded-lg transition" title="Xóa bộ lọc">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          )}
-        </form>
-      </div>
+        </div>
 
-      {/* TOP STATS CARDS */}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {/* Card 1 */}
-        <Card className="border-emerald-100 shadow-sm hover:shadow-md transition">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-emerald-800">Tổng Tài Sản</CardTitle>
-            <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-slate-800">{summary?.totalAssets.toLocaleString() ?? 0}</div>
-            <p className="text-xs text-emerald-600 font-medium mt-1 flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
-              Trong toàn hệ thống
-            </p>
-          </CardContent>
-        </Card>
+        {/* Stats Row */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <SkeletonStatCard key={i} />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {stats.map(({ label, value, icon: Icon, color, bg }) => (
+              <Card key={label} className="group relative overflow-hidden">
+                <CardContent className="p-5 pt-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${bg}`}>
+                      <Icon size={20} weight="duotone" className={color} />
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+                      <h3 className="mt-1.5 text-2xl font-bold tabular-nums text-foreground">
+                        {value.toLocaleString('vi-VN')}
+                      </h3>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
-        {/* Card 2 */}
-        <Card className="border-sky-100 shadow-sm hover:shadow-md transition">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-sky-800">Không Gian & Cư Dân</CardTitle>
-            <div className="w-8 h-8 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-slate-800">{summary?.totalRooms.toLocaleString() ?? 0}</span>
-              <span className="text-sm text-slate-500 font-medium">phòng</span>
-            </div>
-            <p className="text-xs text-sky-600 font-medium mt-1 flex items-center gap-1">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>
-              {summary?.totalStudents.toLocaleString() ?? 0} sinh viên nội trú
-            </p>
-          </CardContent>
-        </Card>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 items-start">
+          <Card className="lg:col-span-2">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-border/50 px-6 py-4">
+              <CardTitle className="text-base font-semibold text-foreground">
+                Tổng quan hệ thống
+              </CardTitle>
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                <TrendUp size={14} weight="bold" />
+                {isLoading ? 'Đang tải...' : 'Trực tiếp'}
+              </div>
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 gap-4 p-6 sm:grid-cols-2">
+              <HighlightCard
+                label="Người dùng đang vận hành"
+                value={summary?.totalUsers ?? 0}
+                caption="Bao gồm quản trị, quản lý và sinh viên"
+                isLoading={isLoading}
+              />
+              <HighlightCard
+                label="Thiết bị đang theo dõi"
+                value={summary?.totalAssets ?? 0}
+                caption="Tổng tài sản hiện có trong hệ thống"
+                isLoading={isLoading}
+              />
+              <HighlightCard
+                label="Sinh viên nội trú"
+                value={summary?.totalStudents ?? 0}
+                caption="Nguồn dữ liệu lấy từ bảng users"
+                isLoading={isLoading}
+              />
+              <HighlightCard
+                label="Phiếu báo hỏng"
+                value={summary?.totalDamageReports ?? 0}
+                caption="Số lượng yêu cầu báo hỏng đã ghi nhận"
+                isLoading={isLoading}
+              />
+            </CardContent>
+          </Card>
 
-        {/* Card 3 */}
-        <Card className="border-rose-100 shadow-sm hover:shadow-md transition">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-rose-800">Báo Hỏng Chờ Xử Lý</CardTitle>
-            <div className="w-8 h-8 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-rose-600">{summary?.pendingDamageReports.toLocaleString() ?? 0}</div>
-            <p className="text-xs text-rose-600 font-medium mt-1 flex items-center gap-1">
-              Cần phân công kỹ thuật viên
-            </p>
-          </CardContent>
-        </Card>
+          <div className="space-y-6">
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader className="border-b border-border/50 px-6 py-4">
+                <CardTitle className="text-base font-semibold text-foreground">
+                  Thao tác nhanh
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 p-4 pt-5">
+                <QuickAction to="/admin/users" label="Quản lý người dùng" icon={Users} />
+                <QuickAction to="/admin/audit-logs" label="Nhật ký hệ thống" icon={ClipboardText} />
+                <QuickAction to="/admin/profile" label="Thông tin cá nhân" icon={UserCircle} />
+                <QuickAction to="/admin/change-password" label="Đổi mật khẩu" icon={Lock} />
+              </CardContent>
+            </Card>
 
-        {/* Card 4 */}
-        <Card className="border-amber-100 shadow-sm hover:shadow-md transition">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-semibold text-amber-800">Đến Hạn Bảo Trì</CardTitle>
-            <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /></svg>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-amber-600">{summary?.maintenanceDueCount.toLocaleString() ?? 0}</div>
-            <p className="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
-              Kế hoạch bảo trì sắp đến hạn
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* CHARTS GRID */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        
-        {/* PIE CHART - Tỷ lệ Trạng thái Tài sản */}
-        <Card className="lg:col-span-1 shadow-sm border-slate-200">
-          <CardHeader>
-            <CardTitle>Phân bổ Tài sản</CardTitle>
-            <CardDescription>Theo trạng thái hiện tại</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full relative">
-              {pieData.length === 0 ? (
-                <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">Không có dữ liệu</div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="45%"
-                      innerRadius={60}
-                      outerRadius={90}
-                      paddingAngle={5}
-                      dataKey="value"
-                      stroke="none"
-                    >
-                      {pieData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <RechartsTooltip 
-                      formatter={(value: number) => [`${value} tài sản`, 'Số lượng']}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              {pieData.map((entry, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></div>
-                  <span className="text-slate-600 font-medium truncate" title={entry.name}>{entry.name}</span>
+            {/* Recent Activity */}
+            <Card>
+              <CardHeader className="border-b border-border/50 px-6 py-4">
+                <CardTitle className="text-base font-semibold text-foreground">
+                  Hoạt động gần đây
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-5">
+                  {recentActions.map((item) => (
+                    <div key={item.label} className="flex items-start gap-3">
+                      <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.bg}`}>
+                        <item.icon size={16} weight="bold" className={item.color} />
+                      </div>
+                      <div className="space-y-0.5">
+                        <p className="text-sm font-medium leading-snug text-foreground">{item.label}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Hệ thống tự động đồng bộ.
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* LINE CHART - Tần suất Báo hỏng */}
-        <Card className="lg:col-span-2 shadow-sm border-slate-200">
-          <CardHeader>
-            <CardTitle>Tần suất Báo Hỏng</CardTitle>
-            <CardDescription>Số lượng phiếu báo hỏng được gửi lên theo từng tháng</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[340px] w-full relative mt-4">
-              {damageByMonth.length === 0 ? (
-                <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">Không có dữ liệu báo hỏng</div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={damageByMonth} margin={{ top: 5, right: 30, left: -20, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                    <XAxis 
-                      dataKey="month" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#64748b', fontSize: 12 }} 
-                      dy={10}
-                      tickFormatter={(val: string) => {
-                        const parts = val.split('-');
-                        if(parts.length === 2) return `T${parts[1]}/${parts[0].slice(2)}`;
-                        return val;
-                      }}
-                    />
-                    <YAxis 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#64748b', fontSize: 12 }} 
-                    />
-                    <RechartsTooltip 
-                      cursor={{ stroke: '#f43f5e', strokeWidth: 1, strokeDasharray: '3 3' }}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      labelFormatter={(label) => `Tháng: ${label}`}
-                      formatter={(value: number) => [value, 'Số phiếu']}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="count" 
-                      stroke="#f43f5e" 
-                      strokeWidth={3} 
-                      dot={{ r: 4, fill: '#f43f5e', strokeWidth: 2, stroke: '#fff' }} 
-                      activeDot={{ r: 6, strokeWidth: 0 }} 
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* BAR CHART - Danh mục Tài sản */}
-        <Card className="lg:col-span-3 shadow-sm border-slate-200">
-          <CardHeader>
-            <CardTitle>Top Danh Mục Tài Sản</CardTitle>
-            <CardDescription>Những loại tài sản chiếm số lượng lớn nhất trong hệ thống</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px] w-full relative">
-              {assetsByCategory.length === 0 ? (
-                <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-400">Không có dữ liệu danh mục</div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={assetsByCategory} layout="vertical" margin={{ top: 5, right: 30, left: 60, bottom: 5 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
-                    <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis 
-                      dataKey="categoryName" 
-                      type="category" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fill: '#475569', fontSize: 13, fontWeight: 500 }}
-                      width={120}
-                    />
-                    <RechartsTooltip 
-                      cursor={{ fill: '#f1f5f9' }}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                      formatter={(value: number) => [`${value} tài sản`, 'Số lượng']}
-                    />
-                    <Bar 
-                      dataKey="totalAssets" 
-                      fill="#0ea5e9" 
-                      radius={[0, 4, 4, 0]} 
-                      barSize={24}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                <Link
+                  to="/admin/audit-logs"
+                  className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-muted/50 px-4 py-2.5 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-muted"
+                >
+                  Xem tất cả nhật ký
+                  <ArrowRight size={14} />
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
-
     </div>
+  );
+}
+
+function HighlightCard({
+  label,
+  value,
+  caption,
+  isLoading,
+}: {
+  label: string;
+  value: number;
+  caption: string;
+  isLoading: boolean;
+}) {
+  return (
+    <div className="flex flex-col justify-between rounded-xl border border-border/50 bg-muted/20 p-5 transition-colors duration-150 hover:bg-muted/40">
+      <p className="text-sm font-medium text-muted-foreground">{label}</p>
+      {isLoading ? (
+        <Skeleton className="mt-3 h-8 w-20" />
+      ) : (
+        <div className="mt-3 text-3xl font-bold tabular-nums tracking-tight text-foreground">
+          {value.toLocaleString('vi-VN')}
+        </div>
+      )}
+      <p className="mt-3 text-xs text-muted-foreground/70">{caption}</p>
+    </div>
+  );
+}
+
+function QuickAction({ to, label, icon: Icon }: { to: string; label: string; icon: React.ElementType }) {
+  return (
+    <Link
+      to={to}
+      className="group flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-muted"
+    >
+      <div className="flex items-center gap-3">
+        <Icon size={18} weight="duotone" className="text-muted-foreground group-hover:text-primary" />
+        <span>{label}</span>
+      </div>
+      <ArrowRight size={14} className="text-muted-foreground/50 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
+    </Link>
   );
 }

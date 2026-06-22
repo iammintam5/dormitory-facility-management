@@ -1,4 +1,5 @@
 export default {
+    darkMode: 'class',
     content: ['./index.html', './src/**/*.{ts,tsx}'],
     theme: {
         extend: {
@@ -36,6 +37,10 @@ export default {
                     DEFAULT: 'hsl(var(--card))',
                     foreground: 'hsl(var(--card-foreground))',
                 },
+                sidebar: {
+                    bg: 'hsl(var(--sidebar-bg))',
+                    border: 'hsl(var(--sidebar-border))',
+                },
             },
             borderRadius: {
                 lg: 'var(--radius)',
@@ -43,7 +48,41 @@ export default {
                 sm: 'calc(var(--radius) - 4px)',
             },
             fontFamily: {
-                sans: ['Inter', 'sans-serif'],
+                sans: ['"Geist Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            },
+            keyframes: {
+                'skeleton-pulse': {
+                    '0%, 100%': { opacity: '1' },
+                    '50%': { opacity: '0.4' },
+                },
+                'fade-in': {
+                    from: { opacity: '0' },
+                    to: { opacity: '1' },
+                },
+                'fade-in-up': {
+                    from: { opacity: '0', transform: 'translateY(8px)' },
+                    to: { opacity: '1', transform: 'translateY(0)' },
+                },
+                'slide-in-right': {
+                    from: { transform: 'translateX(-100%)' },
+                    to: { transform: 'translateX(0)' },
+                },
+                'scale-in': {
+                    from: { opacity: '0', transform: 'scale(0.95)' },
+                    to: { opacity: '1', transform: 'scale(1)' },
+                },
+            },
+            animation: {
+                'skeleton-pulse': 'skeleton-pulse 2s ease-in-out infinite',
+                'fade-in': 'fade-in 0.2s ease-out',
+                'fade-in-up': 'fade-in-up 0.3s ease-out',
+                'slide-in-right': 'slide-in-right 0.25s ease-out',
+                'scale-in': 'scale-in 0.2s ease-out',
+            },
+            boxShadow: {
+                'card': '0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04)',
+                'card-hover': '0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.05)',
+                'header': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
             },
         },
     },

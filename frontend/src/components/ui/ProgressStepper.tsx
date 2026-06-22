@@ -13,13 +13,13 @@ const STEPS = [
 ];
 
 export function ProgressStepper({ currentStatus }: ProgressStepperProps) {
-  if (currentStatus === 'CANCELLED') return null;
+  if (currentStatus === 'REJECTED') return null;
 
   const currentIndex = STEPS.findIndex(s => s.id === currentStatus);
   const activeIndex = currentIndex === -1 ? 0 : currentIndex;
 
   return (
-    <div className="mb-6 rounded-2xl bg-white p-6 shadow-sm border border-slate-200">
+    <div className="mb-6 rounded-2xl bg-background p-6 shadow-sm border border-border/50">
       <div className="relative flex justify-between">
         {/* Connecting Line */}
         <div className="absolute left-0 top-1/2 -z-10 h-1 w-full -translate-y-1/2 bg-slate-100">

@@ -1,4 +1,5 @@
 declare const _default: {
+    darkMode: "class";
     content: string[];
     theme: {
         extend: {
@@ -36,6 +37,10 @@ declare const _default: {
                     DEFAULT: string;
                     foreground: string;
                 };
+                sidebar: {
+                    bg: string;
+                    border: string;
+                };
             };
             borderRadius: {
                 lg: string;
@@ -43,7 +48,65 @@ declare const _default: {
                 sm: string;
             };
             fontFamily: {
-                sans: [string, string];
+                sans: [string, string, string, string];
+            };
+            keyframes: {
+                'skeleton-pulse': {
+                    '0%, 100%': {
+                        opacity: string;
+                    };
+                    '50%': {
+                        opacity: string;
+                    };
+                };
+                'fade-in': {
+                    from: {
+                        opacity: string;
+                    };
+                    to: {
+                        opacity: string;
+                    };
+                };
+                'fade-in-up': {
+                    from: {
+                        opacity: string;
+                        transform: string;
+                    };
+                    to: {
+                        opacity: string;
+                        transform: string;
+                    };
+                };
+                'slide-in-right': {
+                    from: {
+                        transform: string;
+                    };
+                    to: {
+                        transform: string;
+                    };
+                };
+                'scale-in': {
+                    from: {
+                        opacity: string;
+                        transform: string;
+                    };
+                    to: {
+                        opacity: string;
+                        transform: string;
+                    };
+                };
+            };
+            animation: {
+                'skeleton-pulse': string;
+                'fade-in': string;
+                'fade-in-up': string;
+                'slide-in-right': string;
+                'scale-in': string;
+            };
+            boxShadow: {
+                card: string;
+                'card-hover': string;
+                header: string;
             };
         };
     };

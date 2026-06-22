@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { formatDate, formatDateTime } from '../../../lib/format';
+import { formatDateOnly, formatDateTime } from '../../../lib/date';
 import { InventoryCheckExportResponse } from '../../../types/inventory-checks';
 import {
   PrintLayout,
@@ -21,7 +21,7 @@ export function InventoryCheckPrintForm({
     <PrintLayout title="PHIẾU KIỂM KÊ TÀI SẢN PHÒNG" onPrint={onPrint} backAction={backAction}>
       <div className="mb-6 text-center italic">
         <p>Mã phiếu: {inventoryCheck.inventoryCode}</p>
-        <p>Hôm nay, ngày {formatDate(inventoryCheck.checkDate)}, chúng tôi tiến hành kiểm kê tài sản:</p>
+        <p>Hôm nay, ngày {formatDateOnly(inventoryCheck.checkDate)}, chúng tôi tiến hành kiểm kê tài sản:</p>
       </div>
 
       <PrintSection title="I. THÔNG TIN CHUNG">
