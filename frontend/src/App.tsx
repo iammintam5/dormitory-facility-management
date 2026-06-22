@@ -11,7 +11,7 @@ export function App() {
   switch (user.role) {
     case 'ADMIN':
       return <Navigate to="/admin/dashboard" replace />;
-    case 'QL_CSVC':
+    case 'MANAGER':
       return <Navigate to="/manager/dashboard" replace />;
     case 'STUDENT':
       return <Navigate to="/student/dashboard" replace />;

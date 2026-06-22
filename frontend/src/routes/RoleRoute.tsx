@@ -24,7 +24,7 @@ function getDashboardPath(role: UserRole) {
   switch (role) {
     case 'ADMIN':
       return '/admin/dashboard';
-    case 'QL_CSVC':
+    case 'MANAGER':
       return '/manager/dashboard';
     case 'STUDENT':
       return '/student/dashboard';

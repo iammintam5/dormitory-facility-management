@@ -11,7 +11,7 @@ export type User = {
   userCode: string;
   email?: string | null;
   phone?: string | null;
-  status: 'ACTIVE' | 'LOCKED';
+  status: 'ACTIVE' | 'LOCKED' | 'INACTIVE';
   lastLoginAt?: string | null;
   createdAt: string;
   updatedAt?: string | null;

@@ -80,11 +80,3 @@ export type MaintenanceDashboardSummary = {
   totalRecords: number;
 };
 
-export type MaintenanceRecordExportResponse = MaintenanceRecord & {
-  printable: {
-    title: string;
-    generatedAt: string;
-    assetLabel: string;
-    performedByLabel: string;
-  };
-};

@@ -1,438 +1,521 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useAuth } from '../../auth/auth-context';
-import { apiClient } from '../../lib/axios';
-import { getApiErrorMessage } from '../../lib/api-error';
-import { formatDate, formatDateTime } from '../../lib/format';
 import { useToast } from '../../toast/toast-context';
-import { Asset } from '../../types/assets';
-import {
-  DueAssetsResponse,
-  MaintenancePlan,
-  MaintenancePlansResponse,
-  MaintenanceRecord,
-  MaintenanceRecordsResponse,
-} from '../../types/maintenance';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/Card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/Table';
+import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
-import { Badge } from '../../components/ui/Badge';
-import { PaginationBar } from '../../components/admin/PaginationBar';
+import { PageHeader } from '../../components/ui/PageHeader';
+import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
+import { 
+  Plus, 
+  MagnifyingGlass, 
+  ArrowsClockwise, 
+  Funnel,
+  Wrench,
+  Clock,
+  Gear,
+  Package,
+  CheckCircle,
+  Eye,
+  PencilSimple
+} from '@phosphor-icons/react';
 
-const planSchema = z.object({
-  assetId: z.coerce.number().int().positive(),
-  cycleMonths: z.coerce.number().int().min(1),
-  nextDueDate: z.string().min(1, 'Vui lòng chọn ngày đến hạn.'),
-  isActive: z.boolean(),
-  note: z.string().optional(),
+const ticketSchema = z.object({
+  reportCode: z.string().min(1, 'Chọn mã báo hỏng.'),
+  technician: z.string().min(1, 'Chọn kỹ thuật viên.'),
+  createdDate: z.string().min(1, 'Chọn ngày tạo.'),
+  deadline: z.string().optional(),
+  priority: z.string().min(1, 'Chọn ưu tiên.'),
+  status: z.string().min(1, 'Chọn trạng thái.'),
+  workType: z.string().min(1, 'Chọn loại công việc.'),
+  notes: z.string().optional(),
+  estTime: z.string().optional(),
+  estCost: z.string().optional(),
+  fundingSource: z.string().optional(),
 });
 
-type PlanFormValues = z.infer<typeof planSchema>;
+type TicketFormValues = z.infer<typeof ticketSchema>;
+
+type TicketMock = {
+  id: number;
+  code: string;
+  reportCode: string;
+  asset: string;
+  room: string;
+  building: string;
+  priority: 'Thấp' | 'Trung bình' | 'Cao';
+  status: 'Chờ xử lý' | 'Đang xử lý' | 'Chờ vật tư' | 'Hoàn thành' | 'Đã hủy';
+  technician: string;
+  createdDate: string;
+};
+
+const mockTickets: TicketMock[] = [
+  { id: 1, code: 'SC00048', reportCode: 'BH001', asset: 'Quạt trần', room: 'A101', building: 'Khu A', priority: 'Cao', status: 'Chờ xử lý', technician: '-', createdDate: '13/05/2026 09:20' },
+  { id: 2, code: 'SC00047', reportCode: 'BH002', asset: 'Máy lạnh', room: 'B203', building: 'Khu B', priority: 'Trung bình', status: 'Đang xử lý', technician: 'Trần Văn K', createdDate: '13/05/2026 08:45' },
+  { id: 3, code: 'SC00046', reportCode: 'BH003', asset: 'Ổ cắm điện', room: 'C305', building: 'Khu C', priority: 'Cao', status: 'Chờ vật tư', technician: 'Lê Minh T', createdDate: '12/05/2026 16:10' },
+  { id: 4, code: 'SC00045', reportCode: 'BH004', asset: 'Đèn phòng', room: 'A202', building: 'Khu A', priority: 'Thấp', status: 'Hoàn thành', technician: 'Phạm Quốc H', createdDate: '12/05/2026 15:30' },
+  { id: 5, code: 'SC00044', reportCode: 'BH005', asset: 'Cửa sổ', room: 'B101', building: 'Khu B', priority: 'Trung bình', status: 'Đang xử lý', technician: 'Trần Văn K', createdDate: '12/05/2026 11:05' },
+];
 
 export function MaintenanceManagementPage() {
-  const { user } = useAuth();
   const { showToast } = useToast();
-  const basePath = user?.role === 'ADMIN' ? '/admin' : '/manager';
-  const [assets, setAssets] = useState<Asset[]>([]);
-  const [plans, setPlans] = useState<MaintenancePlan[]>([]);
-  const [records, setRecords] = useState<MaintenanceRecord[]>([]);
-  const [dueAssets, setDueAssets] = useState<DueAssetsResponse | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<MaintenancePlan | null>(null);
-  const [planPage, setPlanPage] = useState(1);
-  const [planTotalPages, setPlanTotalPages] = useState(1);
-  const [planTotal, setPlanTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSavingPlan, setIsSavingPlan] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  
+  const [tickets] = useState<TicketMock[]>(mockTickets);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<TicketMock | null>(null);
+  
+  const [activeTab, setActiveTab] = useState('Tất cả');
+  
+  // Filter states
+  const [searchKeyword, setSearchKeyword] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Tất cả');
+  const [priorityFilter, setPriorityFilter] = useState('Tất cả');
+  const [technicianFilter, setTechnicianFilter] = useState('Tất cả');
 
-  const planForm = useForm<PlanFormValues>({
-    resolver: zodResolver(planSchema),
+  // Compute unique technicians for filter dropdown
+  const technicianOptions = useMemo(() => {
+    const unique = [...new Set(mockTickets.map(t => t.technician).filter(t => t !== '-'))];
+    return unique;
+  }, []);
+
+  // Filtered tickets based on tab, search, and filters
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(ticket => {
+      // Tab filter
+      if (activeTab !== 'Tất cả' && ticket.status !== activeTab) return false;
+      
+      // Status filter
+      if (statusFilter !== 'Tất cả' && ticket.status !== statusFilter) return false;
+      
+      // Priority filter
+      if (priorityFilter !== 'Tất cả' && ticket.priority !== priorityFilter) return false;
+      
+      // Technician filter
+      if (technicianFilter !== 'Tất cả' && ticket.technician !== technicianFilter) return false;
+      
+      // Search keyword
+      if (searchKeyword) {
+        const kw = searchKeyword.toLowerCase();
+        const matchCode = ticket.code.toLowerCase().includes(kw);
+        const matchReportCode = ticket.reportCode.toLowerCase().includes(kw);
+        const matchAsset = ticket.asset.toLowerCase().includes(kw);
+        const matchRoom = ticket.room.toLowerCase().includes(kw);
+        const matchBuilding = ticket.building.toLowerCase().includes(kw);
+        const matchTechnician = ticket.technician.toLowerCase().includes(kw);
+        if (!(matchCode || matchReportCode || matchAsset || matchRoom || matchBuilding || matchTechnician)) return false;
+      }
+      
+      return true;
+    });
+  }, [tickets, activeTab, searchKeyword, statusFilter, priorityFilter, technicianFilter]);
+
+  // Summary counts from all tickets (unfiltered)
+  const summaryCounts = useMemo(() => {
+    return {
+      total: tickets.length,
+      pending: tickets.filter(t => t.status === 'Chờ xử lý').length,
+      inProgress: tickets.filter(t => t.status === 'Đang xử lý').length,
+      waitingMaterial: tickets.filter(t => t.status === 'Chờ vật tư').length,
+      completed: tickets.filter(t => t.status === 'Hoàn thành').length,
+    };
+  }, [tickets]);
+
+  const form = useForm<TicketFormValues>({
+    resolver: zodResolver(ticketSchema),
     defaultValues: {
-      assetId: 0,
-      cycleMonths: 3,
-      nextDueDate: '',
-      isActive: true,
-      note: '',
+      reportCode: '',
+      technician: '',
+      createdDate: '2026-05-13',
+      deadline: '',
+      priority: 'Trung bình',
+      status: 'Chờ xử lý',
+      workType: 'Sửa chữa',
+      notes: '',
+      estTime: '',
+      estCost: '',
+      fundingSource: '',
     },
   });
 
-  useEffect(() => {
-    void loadAll();
-  }, []);
+  const handleFilter = () => {
+    // Filters applied via useMemo — just triggers re-render if needed
+    // No additional action needed since filtering is reactive
+  };
 
-  const loadAll = async () => {
+  const handleResetFilters = () => {
+    setSearchKeyword('');
+    setStatusFilter('Tất cả');
+    setPriorityFilter('Tất cả');
+    setTechnicianFilter('Tất cả');
+    setActiveTab('Tất cả');
+  };
+
+  const openCreateModal = () => {
+    form.reset();
+    setIsEditMode(false);
+    setIsCreateModalOpen(true);
+  };
+
+  const openDetailModal = (ticket: TicketMock) => {
+    setSelectedTicket(ticket);
+    setIsDetailModalOpen(true);
+  };
+
+  const openEditModal = (ticket: TicketMock) => {
+    setSelectedTicket(ticket);
+    setIsEditMode(true);
+    form.reset({
+      reportCode: ticket.reportCode,
+      technician: ticket.technician,
+      createdDate: ticket.createdDate.split(' ')[0].split('/').reverse().join('-'),
+      deadline: '',
+      priority: ticket.priority,
+      status: ticket.status,
+      workType: 'Sửa chữa',
+      notes: '',
+      estTime: '',
+      estCost: '',
+      fundingSource: '',
+    });
+    setIsCreateModalOpen(true);
+  };
+
+  const onSubmit = async (data: TicketFormValues) => {
     setIsLoading(true);
-    setErrorMessage('');
-
     try {
-      const [assetsResponse, plansResponse, dueResponse, recordsResponse] = await Promise.all([
-        apiClient.get<{ items: Asset[] }>('/assets', {
-          params: { page: 1, pageSize: 100 },
-        }),
-        apiClient.get<MaintenancePlansResponse>('/maintenance/plans', {
-          params: { page: 1, pageSize: 10 },
-        }),
-        apiClient.get<DueAssetsResponse>('/maintenance/due-assets', {
-          params: { days: 14 },
-        }),
-        apiClient.get<MaintenanceRecordsResponse>('/maintenance/records', {
-          params: { page: 1, pageSize: 6 },
-        }),
-      ]);
-
-      setAssets(assetsResponse.data.items);
-      setPlans(plansResponse.data.items);
-      setPlanPage(plansResponse.data.pagination.page);
-      setPlanTotalPages(plansResponse.data.pagination.totalPages);
-      setPlanTotal(plansResponse.data.pagination.total);
-      setDueAssets(dueResponse.data);
-      setRecords(recordsResponse.data.items);
+      await new Promise(resolve => setTimeout(resolve, 600));
+      showToast('Tạo phiếu sửa chữa thành công.', 'success');
+      setIsCreateModalOpen(false);
     } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Không thể tải dữ liệu bảo trì.'));
+      showToast('Lưu thông tin thất bại.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const loadPlans = async (nextPage = planPage) => {
-    const response = await apiClient.get<MaintenancePlansResponse>('/maintenance/plans', {
-      params: { page: nextPage, pageSize: 10 },
-    });
-
-    setPlans(response.data.items);
-    setPlanPage(response.data.pagination.page);
-    setPlanTotalPages(response.data.pagination.totalPages);
-    setPlanTotal(response.data.pagination.total);
-  };
-
-  const submitPlan = planForm.handleSubmit(async (values) => {
-    setIsSavingPlan(true);
-    setErrorMessage('');
-
-    try {
-      if (selectedPlan) {
-        await apiClient.patch(`/maintenance/plans/${selectedPlan.id}`, values);
-        showToast('Cập nhật kế hoạch bảo trì thành công.');
-      } else {
-        await apiClient.post('/maintenance/plans', values);
-        showToast('Tạo kế hoạch bảo trì thành công.');
-      }
-
-      planForm.reset({
-        assetId: 0,
-        cycleMonths: 3,
-        nextDueDate: '',
-        isActive: true,
-        note: '',
-      });
-      setSelectedPlan(null);
-      await loadAll();
-    } catch (error) {
-      const message = getApiErrorMessage(error, 'Không thể lưu kế hoạch bảo trì.');
-      setErrorMessage(message);
-      showToast(message, 'error');
-    } finally {
-      setIsSavingPlan(false);
+  const renderStatusBadge = (status: string) => {
+    switch (status) {
+      case 'Chờ xử lý': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-700">Chờ xử lý</span>;
+      case 'Đang xử lý': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-700">Đang xử lý</span>;
+      case 'Chờ vật tư': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-700">Chờ vật tư</span>;
+      case 'Hoàn thành': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-700">Hoàn thành</span>;
+      case 'Đã hủy': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-700">Đã hủy</span>;
+      default: return null;
     }
-  });
-
-  const handleEditPlan = (plan: MaintenancePlan) => {
-    setSelectedPlan(plan);
-    planForm.reset({
-      assetId: plan.assetId,
-      cycleMonths: plan.cycleMonths,
-      nextDueDate: plan.nextDueDate.slice(0, 10),
-      isActive: plan.isActive,
-      note: plan.note ?? '',
-    });
   };
 
-  const cancelEdit = () => {
-    setSelectedPlan(null);
-    planForm.reset({
-      assetId: 0,
-      cycleMonths: 3,
-      nextDueDate: '',
-      isActive: true,
-      note: '',
-    });
+  const renderPriority = (priority: string) => {
+    switch (priority) {
+      case 'Cao': return <span className="text-destructive font-bold text-xs">Cao</span>;
+      case 'Trung bình': return <span className="text-amber-500 font-bold text-xs">Trung bình</span>;
+      case 'Thấp': return <span className="text-emerald-500 font-bold text-xs">Thấp</span>;
+      default: return null;
+    }
   };
 
   return (
-    <div className="space-y-6">
-      {errorMessage && (
-        <div className="rounded-md bg-destructive/15 p-4 text-sm font-medium text-destructive">
-          {errorMessage}
-        </div>
-      )}
+    <div className="space-y-6 mx-auto max-w-7xl pb-10">
+      <PageHeader 
+        title="Sửa chữa - Bảo trì" 
+        breadcrumbs={[
+          { label: 'Nghiệp vụ', href: '#' },
+          { label: 'Sửa chữa - Bảo trì' }
+        ]}
+        actions={
+          <Button onClick={openCreateModal} className="gap-2">
+            <Plus size={16} weight="bold" />
+            Tạo phiếu sửa chữa mới
+          </Button>
+        }
+      />
 
-      {isLoading ? (
-        <div className="flex justify-center p-8 text-muted-foreground animate-pulse">
-          Đang tải dữ liệu bảo trì...
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Đến hạn trong 14 ngày</CardTitle>
-                <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-amber-500">{dueAssets?.summary.dueSoonCount ?? 0}</div>
-              </CardContent>
-            </Card>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <Card className="border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
+              <Wrench size={24} weight="duotone" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tổng phiếu</p>
+              <p className="text-2xl font-bold text-foreground">{summaryCounts.total}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
+              <Clock size={24} weight="duotone" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Chờ xử lý</p>
+              <p className="text-2xl font-bold text-foreground">{summaryCounts.pending}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500 shrink-0">
+              <Gear size={24} weight="duotone" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Đang xử lý</p>
+              <p className="text-2xl font-bold text-foreground">{summaryCounts.inProgress}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-600 shrink-0">
+              <Package size={24} weight="duotone" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Chờ vật tư</p>
+              <p className="text-2xl font-bold text-foreground">{summaryCounts.waitingMaterial}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50">
+          <CardContent className="p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
+              <CheckCircle size={24} weight="duotone" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Hoàn thành</p>
+              <p className="text-2xl font-bold text-foreground">{summaryCounts.completed}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Quá hạn bảo trì</CardTitle>
-                <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-destructive">{dueAssets?.summary.overdueCount ?? 0}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Lịch sử gần đây</CardTitle>
-                <svg className="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                </svg>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-primary">{records.length}</div>
-              </CardContent>
-            </Card>
+      <Card className="border-border/50">
+        <CardContent className="p-5 flex flex-wrap gap-4 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Tìm kiếm (Mã phiếu, thiết bị, phòng...)</label>
+            <div className="relative">
+              <Input 
+            placeholder="Nhập từ khóa..." 
+            className="pl-9" 
+            value={searchKeyword}
+            onChange={e => setSearchKeyword(e.target.value)}
+          />
+              <MagnifyingGlass size={16} className="absolute left-3 top-2.5 text-muted-foreground" />
+            </div>
           </div>
+          <div className="w-full md:w-36">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Trạng thái</label>
+            <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              <option>Tất cả</option>
+              <option>Chờ xử lý</option>
+              <option>Đang xử lý</option>
+              <option>Chờ vật tư</option>
+              <option>Hoàn thành</option>
+              <option>Đã hủy</option>
+            </Select>
+          </div>
+          <div className="w-full md:w-32">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Ưu tiên</label>
+            <Select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)}>
+              <option>Tất cả</option>
+              <option>Cao</option>
+              <option>Trung bình</option>
+              <option>Thấp</option>
+            </Select>
+          </div>
+          <div className="w-full md:w-40">
+            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Kỹ thuật viên</label>
+            <Select value={technicianFilter} onChange={e => setTechnicianFilter(e.target.value)}>
+              <option>Tất cả</option>
+              {technicianOptions.map(t => (
+                <option key={t}>{t}</option>
+              ))}
+            </Select>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button className="gap-2" onClick={handleFilter}>
+              <Funnel size={16} weight="bold" />
+              Lọc
+            </Button>
+            <Button variant="outline" className="gap-2" onClick={handleResetFilters}>
+              <ArrowsClockwise size={16} weight="bold" />
+              Làm mới
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
-          <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
-            <Card>
-              <CardHeader>
-                <CardTitle>{selectedPlan ? 'Cập nhật kế hoạch bảo trì' : 'Tạo kế hoạch bảo trì'}</CardTitle>
-                <CardDescription>Mỗi tài sản chỉ nên có một kế hoạch bảo trì đang hoạt động.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form className="space-y-4" onSubmit={submitPlan}>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Tài sản</label>
-                    <Select {...planForm.register('assetId', { valueAsNumber: true })} error={!!planForm.formState.errors.assetId}>
-                      <option value={0}>Chọn tài sản</option>
-                      {assets.map((asset) => (
-                        <option key={asset.id} value={asset.id}>
-                          {asset.assetCode} - {asset.assetName}
-                        </option>
-                      ))}
-                    </Select>
-                    {planForm.formState.errors.assetId && <p className="text-xs text-destructive">{planForm.formState.errors.assetId.message}</p>}
-                  </div>
+      <Card className="border-border/50 overflow-hidden">
+        <div className="flex items-center gap-6 border-b border-border/50 px-6 bg-muted/20">
+          {['Tất cả', 'Chờ xử lý', 'Đang xử lý', 'Chờ vật tư', 'Hoàn thành', 'Đã hủy'].map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`py-4 text-sm font-bold tracking-wider transition-colors border-b-2 ${
+                activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
+        </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Chu kỳ (tháng)</label>
-                      <Input type="number" min={1} {...planForm.register('cycleMonths', { valueAsNumber: true })} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Ngày đến hạn tiếp theo</label>
-                      <Input type="date" {...planForm.register('nextDueDate')} />
-                      {planForm.formState.errors.nextDueDate && <p className="text-xs text-destructive">{planForm.formState.errors.nextDueDate.message}</p>}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Ghi chú</label>
-                    <textarea
-                      className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      {...planForm.register('note')}
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input type="checkbox" id="isActive" className="rounded border-gray-300" {...planForm.register('isActive')} />
-                    <label htmlFor="isActive" className="text-sm font-medium">Đang hoạt động</label>
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <Button type="submit" disabled={isSavingPlan} className="flex-1">
-                      {isSavingPlan ? 'Đang lưu...' : selectedPlan ? 'Cập nhật' : 'Tạo mới'}
-                    </Button>
-                    {selectedPlan && (
-                      <Button type="button" variant="outline" onClick={cancelEdit}>
-                        Hủy
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-muted/30 text-muted-foreground border-b border-border/50">
+              <tr>
+                <th className="px-4 py-4 text-center font-semibold w-12">STT</th>
+                <th className="px-4 py-4 text-center font-semibold">Mã phiếu</th>
+                <th className="px-4 py-4 text-center font-semibold">Mã báo hỏng</th>
+                <th className="px-4 py-4 font-semibold text-left">Thiết bị</th>
+                <th className="px-4 py-4 text-center font-semibold">Phòng</th>
+                <th className="px-4 py-4 text-center font-semibold">Khu nhà</th>
+                <th className="px-4 py-4 text-center font-semibold">Ưu tiên</th>
+                <th className="px-4 py-4 text-center font-semibold">Trạng thái</th>
+                <th className="px-4 py-4 text-center font-semibold">Kỹ thuật viên</th>
+                <th className="px-4 py-4 text-center font-semibold">Ngày tạo</th>
+                <th className="px-4 py-4 text-center font-semibold w-24">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border/50 text-foreground">
+              {filteredTickets.map((ticket, idx) => (
+                <tr key={ticket.id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3.5 text-center font-medium text-muted-foreground">{idx + 1}</td>
+                  <td className="px-4 py-3.5 text-center font-bold">{ticket.code}</td>
+                  <td className="px-4 py-3.5 text-center font-semibold text-primary">{ticket.reportCode}</td>
+                  <td className="px-4 py-3.5">{ticket.asset}</td>
+                  <td className="px-4 py-3.5 text-center">{ticket.room}</td>
+                  <td className="px-4 py-3.5 text-center">{ticket.building}</td>
+                  <td className="px-4 py-3.5 text-center">{renderPriority(ticket.priority)}</td>
+                  <td className="px-4 py-3.5 text-center">{renderStatusBadge(ticket.status)}</td>
+                  <td className="px-4 py-3.5 text-center font-medium">{ticket.technician}</td>
+                  <td className="px-4 py-3.5 text-center tabular-nums">{ticket.createdDate}</td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <Button variant="ghost" size="icon" onClick={() => openDetailModal(ticket)} title="Xem chi tiết">
+                        <Eye size={16} className="text-primary" />
                       </Button>
-                    )}
-                  </div>
-                </form>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Tài sản đến hạn bảo trì</CardTitle>
-                <CardDescription>Tài sản đã quá hạn hoặc đến hạn trong 14 ngày tới.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!dueAssets || dueAssets.items.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-8 text-center text-muted-foreground">
-                    <p>Hệ thống hiện không có tài sản nào cần bảo trì gấp.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {dueAssets.items.map((plan) => {
-                      const isOverdue = new Date(plan.nextDueDate) < new Date();
-                      return (
-                        <div
-                          key={plan.id}
-                          className={`flex items-center justify-between rounded-lg border p-4 ${
-                            isOverdue ? 'border-destructive/30 bg-destructive/10' : 'border-amber-500/30 bg-amber-500/10'
-                          }`}
-                        >
-                          <div>
-                            <p className="font-semibold">{plan.asset.assetCode} - {plan.asset.assetName}</p>
-                            <p className="text-sm text-muted-foreground">Đến hạn: {formatDate(plan.nextDueDate)}</p>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => handleEditPlan(plan)}>Sửa</Button>
-                            <Link to={`${basePath}/maintenance/assets/${plan.assetId}/history`}>
-                              <Button variant="secondary" size="sm">Lịch sử</Button>
-                            </Link>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Danh sách kế hoạch bảo trì</CardTitle>
-              <CardDescription>Theo dõi các kế hoạch đang hoạt động và xem nhanh lịch sử.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {plans.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">Chưa có kế hoạch bảo trì nào được tạo.</div>
-              ) : (
-                <>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tài sản</TableHead>
-                        <TableHead>Chu kỳ / Đến hạn</TableHead>
-                        <TableHead>Trạng thái</TableHead>
-                        <TableHead className="text-right">Lịch sử</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {plans.map((plan) => (
-                        <TableRow key={plan.id}>
-                          <TableCell>
-                            <p className="font-semibold">{plan.asset.assetCode} - {plan.asset.assetName}</p>
-                            <p className="text-xs text-muted-foreground">Tạo bởi {plan.createdByUser.fullName}</p>
-                          </TableCell>
-                          <TableCell>
-                            <p>{plan.cycleMonths} tháng</p>
-                            <p className="text-xs text-muted-foreground">{formatDate(plan.nextDueDate)}</p>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={plan.isActive ? 'success' : 'secondary'}>
-                              {plan.isActive ? 'Đang hoạt động' : 'Ngừng'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button variant="outline" size="sm" onClick={() => handleEditPlan(plan)}>Sửa</Button>
-                              <Link to={`${basePath}/maintenance/assets/${plan.assetId}/history`}>
-                                <Button variant="secondary" size="sm">Lịch sử</Button>
-                              </Link>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <div className="mt-4">
-                    <PaginationBar
-                      page={planPage}
-                      totalPages={planTotalPages}
-                      total={planTotal}
-                      onPageChange={(next) => void loadPlans(next)}
-                    />
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Phiếu bảo trì gần đây</CardTitle>
-                <CardDescription>Xem lại các biên bản bảo trì tài sản mới được ghi nhận.</CardDescription>
-              </div>
-              <Link to={`${basePath}/maintenance/records/new`}>
-                <Button>Tạo phiếu bảo trì</Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {records.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">Chưa có phiếu bảo trì nào.</div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Phiếu bảo trì</TableHead>
-                      <TableHead>Tài sản</TableHead>
-                      <TableHead>Kết quả</TableHead>
-                      <TableHead className="text-right">Tác vụ</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {records.map((record) => (
-                      <TableRow key={record.id}>
-                        <TableCell>
-                          <p className="font-semibold">{record.maintenanceCode}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(record.maintenanceDate)} - {record.maintenanceType}
-                          </p>
-                        </TableCell>
-                        <TableCell>
-                          <p className="font-medium">{record.asset.assetName}</p>
-                          <p className="text-xs text-muted-foreground">{record.asset.assetCode}</p>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{record.resultStatus}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Link to={`${basePath}/maintenance/assets/${record.assetId}/history`}>
-                              <Button variant="outline" size="sm">Lịch sử</Button>
-                            </Link>
-                            <Link to={`${basePath}/maintenance/records/${record.id}/print`}>
-                              <Button variant="secondary" size="sm">In phiếu</Button>
-                            </Link>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+                      <Button variant="ghost" size="icon" onClick={() => openEditModal(ticket)} title="Sửa">
+                        <PencilSimple size={16} className="text-primary" />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
+      </Card>
+
+      <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} size="lg">              <ModalHeader>
+          <ModalTitle>{isEditMode ? 'Cập nhật phiếu sửa chữa' : 'Tạo phiếu sửa chữa mới'}</ModalTitle>
+        </ModalHeader>
+        <form onSubmit={form.handleSubmit(onSubmit)}>
+          <ModalBody className="space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider border-b border-border/50 pb-2">THÔNG TIN BÁO HỎNG</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Mã báo hỏng <span className="text-destructive">*</span></label>
+                  <Select {...form.register('reportCode')}>
+                    <option value="">Chọn mã báo hỏng</option>
+                    <option value="BH001">BH001</option>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Người báo</label>
+                  <Input value="Tự động hiển thị" readOnly disabled />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Phòng / Khu</label>
+                  <Input value="Tự động hiển thị" readOnly disabled />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider border-b border-border/50 pb-2">THÔNG TIN PHIẾU SỬA CHỮA</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Kỹ thuật viên <span className="text-destructive">*</span></label>
+                  <Select {...form.register('technician')}>
+                    <option value="">Chọn kỹ thuật viên</option>
+                    <option value="Trần Văn K">Trần Văn K</option>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Ngày tạo <span className="text-destructive">*</span></label>
+                  <Input type="date" {...form.register('createdDate')} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Hạn xử lý</label>
+                  <Input type="date" {...form.register('deadline')} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Ưu tiên <span className="text-destructive">*</span></label>
+                  <Select {...form.register('priority')}>
+                    <option value="Trung bình">Trung bình</option>
+                    <option value="Cao">Cao</option>
+                    <option value="Thấp">Thấp</option>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Trạng thái <span className="text-destructive">*</span></label>
+                  <Select {...form.register('status')}>
+                    <option value="Chờ xử lý">Chờ xử lý</option>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={() => setIsCreateModalOpen(false)}>Hủy bỏ</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? 'Đang lưu...' : 'Lưu phiếu'}
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
+
+      <Modal isOpen={isDetailModalOpen} onClose={() => setIsDetailModalOpen(false)} size="lg">
+        <ModalHeader>
+          <ModalTitle>Chi tiết phiếu sửa chữa</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          {selectedTicket && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-muted/20 p-4 rounded-xl border border-border/50">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Mã phiếu</p>
+                  <p className="font-bold">{selectedTicket.code}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Trạng thái</p>
+                  {renderStatusBadge(selectedTicket.status)}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Thiết bị</p>
+                  <p className="font-medium">{selectedTicket.asset}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Phòng</p>
+                  <p className="font-medium">{selectedTicket.room}</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">Chi tiết thông tin phiếu sửa chữa có thể được hiển thị ở đây dựa trên dữ liệu thực tế.</p>
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button onClick={() => setIsDetailModalOpen(false)}>Đóng</Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

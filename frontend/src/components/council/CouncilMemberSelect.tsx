@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
+import { searchMockUsers } from '../../lib/frontend-mock';
+import { User } from '../../types/users';
+import { useToast } from '../../toast/toast-context';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { User, UsersResponse } from '../../types/users';
-import { apiClient } from '../../lib/axios';
-import { useToast } from '../../toast/toast-context';
 
 export interface CouncilMemberState {
   user: User;
@@ -16,7 +16,11 @@ interface CouncilMemberSelectProps {
   disabled?: boolean;
 }
 
-export function CouncilMemberSelect({ members, onChange, disabled }: CouncilMemberSelectProps) {
+export function CouncilMemberSelect({
+  members,
+  onChange,
+  disabled,
+}: CouncilMemberSelectProps) {
   const { showToast } = useToast();
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
@@ -25,16 +29,12 @@ export function CouncilMemberSelect({ members, onChange, disabled }: CouncilMemb
   const handleSearch = async () => {
     if (!searchKeyword.trim() || disabled) return;
     setIsSearching(true);
+
     try {
-      const res = await apiClient.get<UsersResponse>('/users', {
-        params: { keyword: searchKeyword, pageSize: 5 },
-      });
-      const filtered = res.data.items.filter(
-        (u) => !members.some((m) => m.user.id === u.id),
-      );
-      setSearchResults(filtered);
-    } catch (error) {
-      showToast('Lỗi khi tìm kiếm người dùng.', 'error');
+      const results = await searchMockUsers(searchKeyword);
+      setSearchResults(results.filter((user) => !members.some((member) => member.user.id === user.id)));
+    } catch {
+      showToast('Không thể tìm kiếm thành viên hội đồng.', 'error');
     } finally {
       setIsSearching(false);
     }
@@ -43,18 +43,20 @@ export function CouncilMemberSelect({ members, onChange, disabled }: CouncilMemb
   const handleAddMember = (user: User) => {
     if (disabled) return;
     onChange([...members, { user, roleInCouncil: 'Ủy viên' }]);
-    setSearchResults((prev) => prev.filter((u) => u.id !== user.id));
+    setSearchResults((current) => current.filter((item) => item.id !== user.id));
   };
 
   const handleRemoveMember = (userId: number) => {
     if (disabled) return;
-    onChange(members.filter((m) => m.user.id !== userId));
+    onChange(members.filter((member) => member.user.id !== userId));
   };
 
-  const handleRoleChange = (userId: number, role: string) => {
+  const handleRoleChange = (userId: number, roleInCouncil: string) => {
     if (disabled) return;
     onChange(
-      members.map((m) => (m.user.id === userId ? { ...m, roleInCouncil: role } : m)),
+      members.map((member) =>
+        member.user.id === userId ? { ...member, roleInCouncil } : member,
+      ),
     );
   };
 
@@ -63,12 +65,12 @@ export function CouncilMemberSelect({ members, onChange, disabled }: CouncilMemb
       <div className="space-y-4">
         <div className="flex gap-2">
           <Input
-            placeholder="Tìm kiếm người dùng (Mã NV, Tên...)"
+            placeholder="Tìm kiếm người dùng theo mã hoặc tên"
             value={searchKeyword}
-            onChange={(e) => setSearchKeyword(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
+            onChange={(event) => setSearchKeyword(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
                 void handleSearch();
               }
             }}
@@ -81,21 +83,26 @@ export function CouncilMemberSelect({ members, onChange, disabled }: CouncilMemb
             disabled={isSearching || !searchKeyword.trim() || disabled}
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
             </svg>
           </Button>
         </div>
 
         {searchResults.length > 0 && (
-          <div className="border border-slate-200 rounded-lg max-h-48 overflow-y-auto">
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="bg-slate-50 sticky top-0">
+              <thead className="sticky top-0 bg-slate-50">
                 <tr>
                   <th className="px-4 py-2 text-left font-medium text-slate-500">Người dùng</th>
                   <th className="px-4 py-2 text-right font-medium text-slate-500">Thao tác</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-slate-200">
+              <tbody className="divide-y divide-slate-200 bg-white">
                 {searchResults.map((user) => (
                   <tr key={user.id} className="hover:bg-slate-50">
                     <td className="px-4 py-2 whitespace-nowrap">
@@ -111,7 +118,12 @@ export function CouncilMemberSelect({ members, onChange, disabled }: CouncilMemb
                         disabled={disabled}
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 4v16m8-8H4"
+                          />
                         </svg>
                       </Button>
                     </td>
@@ -124,9 +136,9 @@ export function CouncilMemberSelect({ members, onChange, disabled }: CouncilMemb
       </div>
 
       <div>
-        <h4 className="text-sm font-medium text-slate-900 mb-2">Thành viên hiện tại</h4>
+        <h4 className="mb-2 text-sm font-medium text-slate-900">Thành viên hiện tại</h4>
         {members.length === 0 ? (
-          <div className="text-sm text-slate-500 italic text-center py-4 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 py-4 text-center text-sm italic text-slate-500">
             Chưa có thành viên nào
           </div>
         ) : (
@@ -134,19 +146,17 @@ export function CouncilMemberSelect({ members, onChange, disabled }: CouncilMemb
             {members.map((member) => (
               <div
                 key={member.user.id}
-                className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border border-slate-200"
+                className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3"
               >
                 <div className="flex-1">
-                  <div className="font-medium text-slate-900 text-sm">
-                    {member.user.fullName}
-                  </div>
+                  <div className="text-sm font-medium text-slate-900">{member.user.fullName}</div>
                   <div className="text-xs text-slate-500">{member.user.userCode}</div>
                 </div>
                 <div className="w-1/3">
                   <Input
-                    placeholder="Chức danh (vd: Trưởng ban)"
+                    placeholder="Vai trò trong hội đồng"
                     value={member.roleInCouncil}
-                    onChange={(e) => handleRoleChange(member.user.id, e.target.value)}
+                    onChange={(event) => handleRoleChange(member.user.id, event.target.value)}
                     required
                     disabled={disabled}
                   />
@@ -154,12 +164,17 @@ export function CouncilMemberSelect({ members, onChange, disabled }: CouncilMemb
                 <Button
                   type="button"
                   variant="ghost"
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 px-2"
+                  className="px-2 text-red-600 hover:bg-red-50 hover:text-red-700"
                   onClick={() => handleRemoveMember(member.user.id)}
                   disabled={disabled}
                 >
                   <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
                   </svg>
                 </Button>
               </div>

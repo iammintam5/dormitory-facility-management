@@ -1,14 +1,14 @@
 import {
   createContext,
-  ReactNode,
+  type ReactNode,
   useContext,
   useEffect,
   useMemo,
   useState,
 } from 'react';
-import { apiClient } from '../lib/axios';
 import { clearStoredAuth, getStoredAuth, setStoredAuth } from '../lib/auth-storage';
-import { AuthUser, LoginResponse } from '../types/auth';
+import { getMe, login as loginRequest, logout as logoutRequest } from '../services/auth';
+import { type AuthUser, type BackendAuthUser } from '../types/auth';
 
 type LoginPayload = {
   userCode: string;
@@ -21,13 +21,16 @@ type AuthContextValue = {
   isBootstrapping: boolean;
   user: AuthUser | null;
   login: (payload: LoginPayload) => Promise<AuthUser>;
-  logout: () => void;
+  refreshUser: () => Promise<void>;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => getStoredAuth()?.user ?? null);
+  const [user, setUser] = useState<AuthUser | null>(() =>
+    normalizeStoredUser(getStoredAuth()?.user ?? null),
+  );
   const [accessToken, setAccessToken] = useState<string | null>(
     () => getStoredAuth()?.accessToken ?? null,
   );
@@ -36,19 +39,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const bootstrap = async () => {
       const storedAuth = getStoredAuth();
-
       if (!storedAuth?.accessToken) {
         setIsBootstrapping(false);
         return;
       }
 
       try {
-        const response = await apiClient.get<AuthUser>('/auth/me');
-        setUser(response.data);
-        setStoredAuth({
-          accessToken: storedAuth.accessToken,
-          user: response.data,
-        });
+        const currentUser = await getMe();
+        const mappedUser = mapBackendUser(currentUser);
+        setUser(mappedUser);
+        setAccessToken(storedAuth.accessToken);
+        setStoredAuth({ accessToken: storedAuth.accessToken, user: mappedUser });
       } catch {
         clearStoredAuth();
         setUser(null);
@@ -67,17 +68,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAuthenticated: Boolean(accessToken && user),
       isBootstrapping,
       user,
-      login: async (payload) => {
-        const response = await apiClient.post<LoginResponse>('/auth/login', payload);
-        setAccessToken(response.data.accessToken);
-        setUser(response.data.user);
-        setStoredAuth(response.data);
-        return response.data.user;
+      login: async ({ userCode, password }) => {
+        const response = await loginRequest({
+          username: userCode.trim(),
+          password: password.trim(),
+        });
+        const mappedUser = mapBackendUser(response.user);
+        setAccessToken(response.accessToken);
+        setUser(mappedUser);
+        setStoredAuth({ accessToken: response.accessToken, user: mappedUser });
+        return mappedUser;
       },
-      logout: () => {
-        clearStoredAuth();
-        setAccessToken(null);
-        setUser(null);
+      refreshUser: async () => {
+        const currentUser = await getMe();
+        const mappedUser = mapBackendUser(currentUser);
+        setUser(mappedUser);
+
+        const storedToken = getStoredAuth()?.accessToken ?? accessToken;
+        if (storedToken) {
+          setStoredAuth({ accessToken: storedToken, user: mappedUser });
+        }
+      },
+      logout: async () => {
+        try {
+          if (accessToken) {
+            await logoutRequest();
+          }
+        } catch {
+          // Let the UI clear local auth even if server logout is unavailable.
+        } finally {
+          clearStoredAuth();
+          setAccessToken(null);
+          setUser(null);
+        }
       },
     }),
     [accessToken, isBootstrapping, user],
@@ -86,12 +109,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
+function normalizeStoredUser(user: AuthUser | null) {
+  if (!user) return null;
+  if ((user.role as string) !== 'QL_CSVC') return user;
+  return { ...user, role: 'MANAGER' as const };
+}
+
+function mapBackendUser(user: BackendAuthUser): AuthUser {
+  return {
+    id: user.id,
+    fullName: user.fullName,
+    userCode: user.username,
+    role: user.role.code,
+    email: user.email,
+    phone: user.phone,
+    studentCode: user.studentCode,
+    status: user.status,
+    lastLoginAt: user.lastLoginAt,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    profile: user.profile,
+  };
+}
+
 export function useAuth() {
   const context = useContext(AuthContext);
-
   if (!context) {
     throw new Error('useAuth must be used within AuthProvider.');
   }
-
   return context;
 }

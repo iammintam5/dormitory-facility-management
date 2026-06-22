@@ -55,12 +55,3 @@ export type DamageReportStudentAssetsResponse = {
   assets: Asset[];
 };
 
-export type DamageReportExportResponse = DamageReport & {
-  printable: {
-    title: string;
-    generatedAt: string;
-    reporterLabel: string;
-    assetLabel: string;
-    roomLabel: string;
-  };
-};

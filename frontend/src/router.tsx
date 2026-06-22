@@ -1,332 +1,129 @@
-import { createBrowserRouter } from 'react-router-dom';
+import React, { Suspense } from 'react';
+import { createBrowserRouter, Navigate, Outlet } from 'react-router-dom';
 import { App } from './App';
-import { ErrorBoundary } from './components/ErrorBoundary';
 import { DashboardLayout } from './layouts/DashboardLayout';
-import { AdminDashboardPage } from './pages/AdminDashboardPage';
-import { HandoverDetailPage } from './pages/handovers/HandoverDetailPage';
-import { HandoverPrintPage } from './pages/handovers/HandoverPrintPage';
-import { InventoryCheckDetailPage } from './pages/inventory-checks/InventoryCheckDetailPage';
-import { InventoryCheckPrintPage } from './pages/inventory-checks/InventoryCheckPrintPage';
-import { LoginPage } from './pages/LoginPage';
-import { MaintenanceAssetHistoryPage } from './pages/maintenance/MaintenanceAssetHistoryPage';
-import { MaintenanceRecordPrintPage } from './pages/maintenance/MaintenanceRecordPrintPage';
-import { NotificationsPage } from './pages/NotificationsPage';
-import { DamageReportPrintPreviewPage } from './pages/print/DamageReportPrintPreviewPage';
-import { HandoverPrintPreviewPage } from './pages/print/HandoverPrintPreviewPage';
-import { InventoryCheckPrintPreviewPage } from './pages/print/InventoryCheckPrintPreviewPage';
-import { LiquidationRecordPrintPreviewPage } from './pages/print/LiquidationRecordPrintPreviewPage';
-import { MaintenanceRecordPrintPreviewPage } from './pages/print/MaintenanceRecordPrintPreviewPage';
-import { LiquidationRecordDetailPage } from './pages/liquidation-records/LiquidationRecordDetailPage';
-import { LiquidationRecordPrintPage } from './pages/liquidation-records/LiquidationRecordPrintPage';
-import { DamageReportDetailPage } from './pages/damage-reports/DamageReportDetailPage';
-import { AuditLogsPage } from './pages/admin/AuditLogsPage';
-import { AssetCategoriesManagementPage } from './pages/admin/AssetCategoriesManagementPage';
-import { AssetsManagementPage } from './pages/admin/AssetsManagementPage';
-import { LocationsManagementPage } from './pages/admin/LocationsManagementPage';
-import { UsersManagementPage } from './pages/admin/UsersManagementPage';
-import { InventoryCheckCreatePage } from './pages/manager/InventoryCheckCreatePage';
-import { InventoryChecksManagementPage } from './pages/manager/InventoryChecksManagementPage';
-import { MaintenanceManagementPage } from './pages/manager/MaintenanceManagementPage';
-import { MaintenanceRecordCreatePage } from './pages/manager/MaintenanceRecordCreatePage';
-import { LiquidationRecordsManagementPage } from './pages/manager/LiquidationRecordsManagementPage';
-import { HandoverCreatePage } from './pages/manager/HandoverCreatePage';
-import { HandoversManagementPage } from './pages/admin/HandoversManagementPage';
-import { ManagerDashboardPage } from './pages/ManagerDashboardPage';
-import { DamageReportsManagementPage } from './pages/manager/DamageReportsManagementPage';
-import { StudentDashboardPage } from './pages/StudentDashboardPage';
-import { StudentCreateDamageReportPage } from './pages/student/StudentCreateDamageReportPage';
-import { StudentDamageReportsHistoryPage } from './pages/student/StudentDamageReportsHistoryPage';
-import { StudentHandoversPage } from './pages/student/StudentHandoversPage';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { RoleRoute } from './routes/RoleRoute';
 
+// LoginPage is statically imported as it's the entry point
+import { LoginPage } from './pages/LoginPage';
+
+// Lazy-loaded page components for code splitting
+const AdminDashboardPage = React.lazy(() => import('./pages/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
+const ChangePasswordPage = React.lazy(() => import('./pages/ChangePasswordPage').then(m => ({ default: m.ChangePasswordPage })));
+const DamageReportDetailPage = React.lazy(() => import('./pages/damage-reports/DamageReportDetailPage').then(m => ({ default: m.DamageReportDetailPage })));
+
+const MaintenanceAssetHistoryPage = React.lazy(() => import('./pages/maintenance/MaintenanceAssetHistoryPage').then(m => ({ default: m.MaintenanceAssetHistoryPage })));
+const ManagerDashboardPage = React.lazy(() => import('./pages/ManagerDashboardPage').then(m => ({ default: m.ManagerDashboardPage })));
+const ProfilePage = React.lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
+const InventoryCheckPrintPreviewPage = React.lazy(() => import('./pages/print/InventoryCheckPrintPreviewPage').then(m => ({ default: m.InventoryCheckPrintPreviewPage })));
+const StudentDashboardPage = React.lazy(() => import('./pages/StudentDashboardPage').then(m => ({ default: m.StudentDashboardPage })));
+const AuditLogsPage = React.lazy(() => import('./pages/admin/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
+const UsersManagementPage = React.lazy(() => import('./pages/admin/UsersManagementPage').then(m => ({ default: m.UsersManagementPage })));
+const AssetCategoriesManagementPage = React.lazy(() => import('./pages/admin/AssetCategoriesManagementPage').then(m => ({ default: m.AssetCategoriesManagementPage })));
+const AssetsManagementPage = React.lazy(() => import('./pages/admin/AssetsManagementPage').then(m => ({ default: m.AssetsManagementPage })));
+const LocationsManagementPage = React.lazy(() => import('./pages/admin/LocationsManagementPage').then(m => ({ default: m.LocationsManagementPage })));
+const RoomStudentsManagementPage = React.lazy(() => import('./pages/admin/RoomStudentsManagementPage').then(m => ({ default: m.RoomStudentsManagementPage })));
+const RoomsManagementPage = React.lazy(() => import('./pages/admin/RoomsManagementPage').then(m => ({ default: m.RoomsManagementPage })));
+const InventoryChecksManagementPage = React.lazy(() => import('./pages/manager/InventoryChecksManagementPage').then(m => ({ default: m.InventoryChecksManagementPage })));
+const EquipmentTransactionsPage = React.lazy(() => import('./pages/manager/EquipmentTransactionsPage').then(m => ({ default: m.EquipmentTransactionsPage })));
+const ImportEquipmentPage = React.lazy(() => import('./pages/manager/ImportEquipmentPage').then(m => ({ default: m.ImportEquipmentPage })));
+const ExportEquipmentPage = React.lazy(() => import('./pages/manager/ExportEquipmentPage').then(m => ({ default: m.ExportEquipmentPage })));
+const LiquidationRecordsManagementPage = React.lazy(() => import('./pages/manager/LiquidationRecordsManagementPage').then(m => ({ default: m.LiquidationRecordsManagementPage })));
+const MaintenanceManagementPage = React.lazy(() => import('./pages/manager/MaintenanceManagementPage').then(m => ({ default: m.MaintenanceManagementPage })));
+const MaintenanceRecordCreatePage = React.lazy(() => import('./pages/manager/MaintenanceRecordCreatePage').then(m => ({ default: m.MaintenanceRecordCreatePage })));
+const DamageReportsManagementPage = React.lazy(() => import('./pages/manager/DamageReportsManagementPage').then(m => ({ default: m.DamageReportsManagementPage })));
+const StudentDamageReportsHistoryPage = React.lazy(() => import('./pages/student/StudentDamageReportsHistoryPage').then(m => ({ default: m.StudentDamageReportsHistoryPage })));
+const StudentRoomAssetsPage = React.lazy(() => import('./pages/student/StudentRoomAssetsPage').then(m => ({ default: m.StudentRoomAssetsPage })));
+const StudentRoomPage = React.lazy(() => import('./pages/student/StudentRoomPage').then(m => ({ default: m.StudentRoomPage })));
+
+// Shared loading fallback for Suspense
+function PageLoader() {
+  return (
+    <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
+        <p className="text-sm font-medium text-muted-foreground">Đang tải...</p>
+      </div>
+    </div>
+  );
+}
+
+function SuspenseLayout() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <Outlet />
+    </Suspense>
+  );
+}
+
+const adminChildren = [
+  { index: true, element: <Navigate to="dashboard" replace /> },
+  { path: 'dashboard', element: <AdminDashboardPage /> },
+  { path: 'users', element: <UsersManagementPage /> },
+  { path: 'audit-logs', element: <AuditLogsPage /> },
+  { path: 'profile', element: <ProfilePage /> },
+  { path: 'change-password', element: <ChangePasswordPage /> },
+];
+
+const managerChildren = [
+  { index: true, element: <Navigate to="dashboard" replace /> },
+  { path: 'dashboard', element: <ManagerDashboardPage /> },
+  { path: 'locations', element: <LocationsManagementPage /> },
+  { path: 'rooms', element: <RoomsManagementPage /> },
+  { path: 'room-students', element: <RoomStudentsManagementPage /> },
+  { path: 'asset-categories', element: <AssetCategoriesManagementPage /> },
+  { path: 'assets', element: <AssetsManagementPage /> },
+  { path: 'damage-reports', element: <DamageReportsManagementPage /> },
+  { path: 'damage-reports/:id', element: <DamageReportDetailPage /> },
+  { path: 'maintenance', element: <MaintenanceManagementPage /> },
+  { path: 'maintenance/records/new', element: <MaintenanceRecordCreatePage /> },
+  { path: 'maintenance/assets/:assetId/history', element: <MaintenanceAssetHistoryPage /> },          { path: 'inventory-checks', element: <InventoryChecksManagementPage /> },
+  { path: 'inventory-checks/:id/print', element: <InventoryCheckPrintPreviewPage /> },
+  { path: 'liquidations', element: <LiquidationRecordsManagementPage /> },
+  { path: 'asset-transactions', element: <EquipmentTransactionsPage /> },
+  { path: 'asset-transactions/import', element: <ImportEquipmentPage /> },
+  { path: 'asset-transactions/export', element: <ExportEquipmentPage /> },
+  { path: 'profile', element: <ProfilePage /> },
+  { path: 'change-password', element: <ChangePasswordPage /> },
+];
+
+const studentChildren = [
+  { index: true, element: <Navigate to="dashboard" replace /> },
+  { path: 'dashboard', element: <StudentDashboardPage /> },
+  { path: 'room', element: <StudentRoomPage /> },
+  { path: 'room-assets', element: <StudentRoomAssetsPage /> },
+  { path: 'damage-reports', element: <StudentDamageReportsHistoryPage /> },
+  { path: 'damage-reports/:id', element: <DamageReportDetailPage /> },
+  { path: 'profile', element: <ProfilePage /> },
+  { path: 'change-password', element: <ChangePasswordPage /> },
+];
+
 export const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <App />,
-    errorElement: <ErrorBoundary><div /></ErrorBoundary>,
-  },
-  {
-    path: '/login',
-    element: <LoginPage />,
-  },
+  { path: '/', element: <App /> },
+  { path: '/login', element: <LoginPage /> },
   {
     element: <ProtectedRoute />,
-    errorElement: <ErrorBoundary><div /></ErrorBoundary>,
     children: [
       {
-        path: '/print/handover/:id',
-        element: <HandoverPrintPreviewPage />,
-      },
-      {
-        path: '/print/inventory/:id',
-        element: <InventoryCheckPrintPreviewPage />,
-      },
-      {
-        path: '/print/damage-report/:id',
-        element: <DamageReportPrintPreviewPage />,
-      },
-      {
-        path: '/print/liquidation/:id',
-        element: <LiquidationRecordPrintPreviewPage />,
-      },
-      {
-        path: '/print/maintenance/:id',
-        element: <MaintenanceRecordPrintPreviewPage />,
-      },
-      {
-        element: <RoleRoute allowedRoles={['ADMIN']} />,
+        element: <SuspenseLayout />,
         children: [
+          { path: '/print/inventory/:id', element: <InventoryCheckPrintPreviewPage /> },
           {
-            path: '/admin',
-            element: <DashboardLayout />,
-            children: [
-              {
-                path: 'dashboard',
-                element: <AdminDashboardPage />,
-              },
-              {
-                path: 'users',
-                element: <UsersManagementPage />,
-              },
-              {
-                path: 'locations',
-                element: <LocationsManagementPage />,
-              },
-              {
-                path: 'asset-categories',
-                element: <AssetCategoriesManagementPage />,
-              },
-              {
-                path: 'assets',
-                element: <AssetsManagementPage />,
-              },
-              {
-                path: 'handovers',
-                element: <HandoversManagementPage />,
-              },
-              {
-                path: 'notifications',
-                element: <NotificationsPage />,
-              },
-              {
-                path: 'audit-logs',
-                element: <AuditLogsPage />,
-              },
-              {
-                path: 'maintenance',
-                element: <MaintenanceManagementPage />,
-              },
-              {
-                path: 'maintenance/records/new',
-                element: <MaintenanceRecordCreatePage />,
-              },
-              {
-                path: 'maintenance/assets/:assetId/history',
-                element: <MaintenanceAssetHistoryPage />,
-              },
-              {
-                path: 'maintenance/records/:id/print',
-                element: <MaintenanceRecordPrintPage />,
-              },
-              {
-                path: 'liquidations',
-                element: <LiquidationRecordsManagementPage />,
-              },
-              {
-                path: 'liquidations/:id',
-                element: <LiquidationRecordDetailPage />,
-              },
-              {
-                path: 'liquidations/:id/print',
-                element: <LiquidationRecordPrintPage />,
-              },
-              {
-                path: 'inventory-checks',
-                element: <InventoryChecksManagementPage />,
-              },
-              {
-                path: 'inventory-checks/new',
-                element: <InventoryCheckCreatePage />,
-              },
-              {
-                path: 'inventory-checks/:id',
-                element: <InventoryCheckDetailPage />,
-              },
-              {
-                path: 'inventory-checks/:id/print',
-                element: <InventoryCheckPrintPage />,
-              },
-              {
-                path: 'damage-reports',
-                element: <DamageReportsManagementPage />,
-              },
-              {
-                path: 'damage-reports/:id',
-                element: <DamageReportDetailPage />,
-              },
-              {
-                path: 'handovers',
-                element: <HandoversManagementPage />,
-              },
-              {
-                path: 'handovers/new',
-                element: <HandoverCreatePage />,
-              },
-              {
-                path: 'handovers/:id',
-                element: <HandoverDetailPage />,
-              },
-              {
-                path: 'handovers/:id/print',
-                element: <HandoverPrintPage />,
-              },
-            ],
+            element: <RoleRoute allowedRoles={['ADMIN']} />,
+            children: [{ path: '/admin', element: <DashboardLayout />, children: adminChildren }],
           },
-        ],
-      },
-      {
-        element: <RoleRoute allowedRoles={['QL_CSVC']} />,
-        children: [
           {
-            path: '/manager',
-            element: <DashboardLayout />,
-            children: [
-              {
-                path: 'dashboard',
-                element: <ManagerDashboardPage />,
-              },
-              {
-                path: 'locations',
-                element: <LocationsManagementPage />,
-              },
-              {
-                path: 'asset-categories',
-                element: <AssetCategoriesManagementPage />,
-              },
-              {
-                path: 'assets',
-                element: <AssetsManagementPage />,
-              },
-              {
-                path: 'notifications',
-                element: <NotificationsPage />,
-              },
-              {
-                path: 'maintenance',
-                element: <MaintenanceManagementPage />,
-              },
-              {
-                path: 'maintenance/records/new',
-                element: <MaintenanceRecordCreatePage />,
-              },
-              {
-                path: 'maintenance/assets/:assetId/history',
-                element: <MaintenanceAssetHistoryPage />,
-              },
-              {
-                path: 'maintenance/records/:id/print',
-                element: <MaintenanceRecordPrintPage />,
-              },
-              {
-                path: 'liquidations',
-                element: <LiquidationRecordsManagementPage />,
-              },
-              {
-                path: 'liquidations/:id',
-                element: <LiquidationRecordDetailPage />,
-              },
-              {
-                path: 'liquidations/:id/print',
-                element: <LiquidationRecordPrintPage />,
-              },
-              {
-                path: 'inventory-checks',
-                element: <InventoryChecksManagementPage />,
-              },
-              {
-                path: 'inventory-checks/new',
-                element: <InventoryCheckCreatePage />,
-              },
-              {
-                path: 'inventory-checks/:id',
-                element: <InventoryCheckDetailPage />,
-              },
-              {
-                path: 'inventory-checks/:id/print',
-                element: <InventoryCheckPrintPage />,
-              },
-              {
-                path: 'damage-reports',
-                element: <DamageReportsManagementPage />,
-              },
-              {
-                path: 'damage-reports/:id',
-                element: <DamageReportDetailPage />,
-              },
-              {
-                path: 'handovers',
-                element: <HandoversManagementPage />,
-              },
-              {
-                path: 'handovers/new',
-                element: <HandoverCreatePage />,
-              },
-              {
-                path: 'handovers/:id',
-                element: <HandoverDetailPage />,
-              },
-              {
-                path: 'handovers/:id/print',
-                element: <HandoverPrintPage />,
-              },
-            ],
+            element: <RoleRoute allowedRoles={['MANAGER']} />,
+            children: [{ path: '/manager', element: <DashboardLayout />, children: managerChildren }],
           },
-        ],
-      },
-      {
-        element: <RoleRoute allowedRoles={['STUDENT']} />,
-        children: [
           {
-            path: '/student',
-            element: <DashboardLayout />,
-            children: [
-              {
-                path: 'dashboard',
-                element: <StudentDashboardPage />,
-              },
-              {
-                path: 'notifications',
-                element: <NotificationsPage />,
-              },
-              {
-                path: 'damage-reports',
-                element: <StudentDamageReportsHistoryPage />,
-              },
-              {
-                path: 'damage-reports/new',
-                element: <StudentCreateDamageReportPage />,
-              },
-              {
-                path: 'damage-reports/:id',
-                element: <DamageReportDetailPage />,
-              },
-              {
-                path: 'handovers',
-                element: <StudentHandoversPage />,
-              },
-              {
-                path: 'my-room',
-                element: <StudentHandoversPage />,
-              },
-              {
-                path: 'handovers/:id',
-                element: <HandoverDetailPage />,
-              },
-            ],
+            element: <RoleRoute allowedRoles={['STUDENT']} />,
+            children: [{ path: '/student', element: <DashboardLayout />, children: studentChildren }],
           },
         ],
       },
     ],
   },
+  { path: '*', element: <Navigate to="/" replace /> },
 ]);

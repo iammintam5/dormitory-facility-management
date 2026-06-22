@@ -2,9 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { SectionCard } from '../../components/admin/SectionCard';
 import { useAuth } from '../../auth/auth-context';
-import { apiClient } from '../../lib/axios';
-import { getApiErrorMessage } from '../../lib/api-error';
-import { formatDate, formatDateTime } from '../../lib/format';
+import { getMockMaintenanceHistory } from '../../lib/frontend-mock';
+import { formatDateOnly, formatDateTime } from '../../lib/date';
 import { MaintenanceRecord } from '../../types/maintenance';
 
 export function MaintenanceAssetHistoryPage() {
@@ -21,21 +20,18 @@ export function MaintenanceAssetHistoryPage() {
     void loadHistory();
   }, [numericAssetId]);
 
-  const loadHistory = async () => {
+  async function loadHistory() {
     setIsLoading(true);
     setErrorMessage('');
 
     try {
-      const response = await apiClient.get<MaintenanceRecord[]>(
-        `/maintenance/assets/${numericAssetId}/history`,
-      );
-      setRecords(response.data);
-    } catch (error) {
-      setErrorMessage(getApiErrorMessage(error, 'Không thể tải lịch sử bảo trì của tài sản.'));
+      setRecords(await getMockMaintenanceHistory(numericAssetId));
+    } catch {
+      setErrorMessage('Không thể tải lịch sử bảo trì của tài sản.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -75,7 +71,7 @@ export function MaintenanceAssetHistoryPage() {
                       {record.asset.assetCode} - {record.asset.assetName}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      {formatDate(record.maintenanceDate)} | {record.performedByUser.fullName}
+                      {formatDateOnly(record.maintenanceDate)} | {record.performedByUser.fullName}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -94,7 +90,7 @@ export function MaintenanceAssetHistoryPage() {
                   <InfoLine label="Loại bảo trì" value={record.maintenanceType} />
                   <InfoLine label="Lần cập nhật" value={formatDateTime(record.updatedAt ?? record.createdAt)} />
                   <InfoLine label="Chi phí" value={String(record.cost ?? '--')} />
-                  <InfoLine label="Ngày bảo trì tiếp theo" value={formatDate(record.nextMaintenanceDate)} />
+                  <InfoLine label="Ngày bảo trì tiếp theo" value={formatDateOnly(record.nextMaintenanceDate)} />
                 </div>
                 <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
                   <p className="font-medium text-slate-900">Nội dung</p>
