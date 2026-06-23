@@ -103,7 +103,7 @@ export function DashboardLayout() {
   };
 
   const basePath = getBasePath(user.role);
-  const navGroups = getNavGroups(user.role);
+  const navGroups = getNavGroups(user.role, pendingDamageCount);
 
   const sidebarContent = (
     <nav className="flex-1 space-y-1 px-3 py-4 text-[13px] font-medium">
@@ -262,7 +262,7 @@ function getBasePath(role: UserRole) {
   }
 }
 
-function getNavGroups(role: UserRole): NavGroup[] {
+function getNavGroups(role: UserRole, pendingDamageCount: number = 0): NavGroup[] {
   if (role === 'ADMIN') {
     return [
       {

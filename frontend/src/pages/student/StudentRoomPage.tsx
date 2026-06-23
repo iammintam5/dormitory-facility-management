@@ -17,7 +17,8 @@ import {
   UserCircle,
   Spinner
 } from '@phosphor-icons/react';
-import { getMockStudentAssets, getMockRoomStudents } from '../../lib/frontend-mock';
+import { getRooms } from '../../services/locations';
+import { getAssets } from '../../services/assets';
 import { Room } from '../../types/locations';
 import { User } from '../../types/users';
 
@@ -29,12 +30,23 @@ export function StudentRoomPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getMockStudentAssets();
-        setRoom(data.room);
-        if (data.room) {
-          const students = await getMockRoomStudents(data.room.id);
-          setRoommates(students);
+        const rooms = await getRooms();
+        const studentRoom = rooms.length > 0 ? rooms[0] : null;
+        if (studentRoom) {
+          setRoom({
+            id: parseInt(studentRoom.id),
+            floorId: 1,
+            roomCode: studentRoom.roomCode,
+            capacity: studentRoom.capacity,
+            floor: {
+              id: 1,
+              buildingId: parseInt(studentRoom.buildingId),
+              floorNumber: studentRoom.floorNumber,
+              building: { id: parseInt(studentRoom.buildingId), code: studentRoom.buildingCode, name: studentRoom.buildingName, createdAt: '' }
+            }
+          });
         }
+        setRoommates([]);
       } catch {
         // silent fallback
       } finally {

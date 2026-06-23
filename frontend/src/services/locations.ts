@@ -1,5 +1,4 @@
 import { apiClient, unwrapApiResponse } from '../lib/api-client';
-import { getMockBuildingRecords, createMockBuildingRecord, updateMockBuildingRecord, deleteMockBuildingRecord, getMockRoomRecords } from '../lib/frontend-mock';
 
 export type BuildingRecord = {
   id: string;
@@ -18,12 +17,8 @@ export type BuildingRecord = {
 };
 
 export async function getBuildings() {
-  try {
-    const response = await apiClient.get('/locations/buildings');
-    return unwrapApiResponse<BuildingRecord[]>(response.data);
-  } catch {
-    return getMockBuildingRecords() as unknown as BuildingRecord[];
-  }
+  const response = await apiClient.get('/locations/buildings');
+  return unwrapApiResponse<BuildingRecord[]>(response.data);
 }
 
 export async function createBuilding(payload: {
@@ -33,12 +28,8 @@ export async function createBuilding(payload: {
   status?: 'ACTIVE' | 'INACTIVE';
   description?: string | null;
 }) {
-  try {
-    const response = await apiClient.post('/locations/buildings', payload);
-    return unwrapApiResponse<BuildingRecord>(response.data);
-  } catch {
-    return createMockBuildingRecord(payload) as unknown as BuildingRecord;
-  }
+  const response = await apiClient.post('/locations/buildings', payload);
+  return unwrapApiResponse<BuildingRecord>(response.data);
 }
 
 export async function updateBuilding(
@@ -51,21 +42,13 @@ export async function updateBuilding(
     description?: string | null;
   },
 ) {
-  try {
-    const response = await apiClient.patch(`/locations/buildings/${id}`, payload);
-    return unwrapApiResponse<BuildingRecord>(response.data);
-  } catch {
-    return updateMockBuildingRecord(id, payload) as unknown as BuildingRecord;
-  }
+  const response = await apiClient.patch(`/locations/buildings/${id}`, payload);
+  return unwrapApiResponse<BuildingRecord>(response.data);
 }
 
 export async function deleteBuilding(id: string) {
-  try {
-    const response = await apiClient.delete(`/locations/buildings/${id}`);
-    return unwrapApiResponse<{ message: string }>(response.data);
-  } catch {
-    return deleteMockBuildingRecord(id) as unknown as { message: string };
-  }
+  const response = await apiClient.delete(`/locations/buildings/${id}`);
+  return unwrapApiResponse<{ message: string }>(response.data);
 }
 
 export type RoomRecord = {
@@ -88,10 +71,29 @@ export type RoomRecord = {
 };
 
 export async function getRooms(params?: Record<string, string | number | boolean | undefined>) {
-  try {
-    const response = await apiClient.get('/locations/rooms', { params });
-    return unwrapApiResponse<RoomRecord[]>(response.data);
-  } catch {
-    return getMockRoomRecords(params) as unknown as RoomRecord[];
-  }
+  const response = await apiClient.get('/locations/rooms', { params });
+  return unwrapApiResponse<RoomRecord[]>(response.data);
+}
+
+export async function createRoom(payload: {
+  roomCode: string;
+  floorId: number;
+  capacity?: number;
+  note?: string;
+}) {
+  const response = await apiClient.post('/rooms', payload);
+  return unwrapApiResponse(response.data);
+}
+
+export async function updateRoom(
+  id: number,
+  payload: { roomCode?: string; capacity?: number; note?: string },
+) {
+  const response = await apiClient.patch(`/rooms/${id}`, payload);
+  return unwrapApiResponse(response.data);
+}
+
+export async function deleteRoom(id: number) {
+  const response = await apiClient.delete(`/rooms/${id}`);
+  return unwrapApiResponse(response.data);
 }

@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Modal } from '../../components/ui/Modal';
 import { useToast } from '../../toast/toast-context';
-import { getMockRoomRecords } from '../../lib/frontend-mock';
+import { getRooms, createRoom, updateRoom, deleteRoom } from '../../services/locations';
 
 import { 
   Door,
@@ -100,7 +100,7 @@ export function RoomsManagementPage() {
   async function loadRooms() {
     setIsFetching(true);
     try {
-      const data = await getMockRoomRecords();
+      const data = await getRooms();
       setRooms(data);
     } catch {
       showToast('Lỗi khi tải danh sách phòng.', 'error');
@@ -149,8 +149,22 @@ export function RoomsManagementPage() {
   const onSubmit = async (data: RoomFormValues) => {
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      showToast(selectedRoom ? 'Cập nhật phòng thành công.' : 'Thêm phòng thành công.', 'success');
+      if (selectedRoom) {
+        await updateRoom(Number(selectedRoom.id), {
+          roomCode: data.code,
+          capacity: data.capacity,
+          note: data.description || undefined,
+        });
+        showToast('Cập nhật phòng thành công.', 'success');
+      } else {
+        await createRoom({
+          roomCode: data.code,
+          floorId: Number(data.floor),
+          capacity: data.capacity,
+          note: data.description || undefined,
+        });
+        showToast('Thêm phòng thành công.', 'success');
+      }
       setIsModalOpen(false);
       await loadRooms();
     } catch {
@@ -166,9 +180,14 @@ export function RoomsManagementPage() {
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
-    setRooms(prev => prev.filter(r => r.id !== deleteTarget.id));
-    setDeleteTarget(null);
-    showToast('Xóa phòng thành công.', 'success');
+    try {
+      await deleteRoom(Number(deleteTarget.id));
+      setRooms(prev => prev.filter(r => r.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      showToast('Xóa phòng thành công.', 'success');
+    } catch {
+      showToast('Xóa phòng thất bại.', 'error');
+    }
   };
 
   const totalRooms = rooms.length;

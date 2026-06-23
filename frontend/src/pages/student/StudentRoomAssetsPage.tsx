@@ -18,7 +18,8 @@ import {
   Wrench,
   Spinner
 } from '@phosphor-icons/react';
-import { getMockStudentAssets } from '../../lib/frontend-mock';
+import { getAssets } from '../../services/assets';
+import { getRooms } from '../../services/locations';
 import { Asset } from '../../types/assets';
 
 export function StudentRoomAssetsPage() {
@@ -31,11 +32,23 @@ export function StudentRoomAssetsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const data = await getMockStudentAssets();
-        setRoomAssets(data.assets);
-        setRoomCode(data.room?.roomCode || 'A101');
-        const bldg = data.room?.floor?.building;
-        setBuildingCode(bldg?.code || 'A');
+        const rooms = await getRooms();
+        const firstRoom = rooms[0];
+        if (firstRoom) {
+          setRoomCode(firstRoom.roomCode);
+          setBuildingCode(firstRoom.buildingCode);
+        }
+        const assetData = await getAssets({ pageSize: 100 });
+        setRoomAssets(assetData.items.map((a: any) => ({
+          id: parseInt(a.id),
+          categoryId: 1,
+          assetCode: a.assetCode,
+          assetName: a.assetName,
+          status: a.status,
+          description: a.description,
+          yearInUse: null,
+          createdAt: a.createdAt
+        })));
       } catch {
         // silent
       } finally {

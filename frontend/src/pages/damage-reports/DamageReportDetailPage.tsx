@@ -10,7 +10,8 @@ import { Field } from '../../components/ui/Field';
 import { Modal } from '../../components/ui/Modal';
 import { ProgressStepper } from '../../components/ui/ProgressStepper';
 import { useAuth } from '../../auth/auth-context';
-import { getMockDamageReport, getMockStudentAssets, runMockDamageWorkflow, updateMockDamageReport } from '../../lib/frontend-mock';
+import { getDamageReportById, updateDamageReport, acceptDamageReport, rejectDamageReport, startProcessingReport, completeReport, cancelReport } from '../../services/damage-reports';
+import { getAssets } from '../../services/assets';
 import { formatDateTime } from '../../lib/date';
 import { useToast } from '../../toast/toast-context';
 import { DamageReport, DamageReportStudentAssetsResponse } from '../../types/damage-reports';
@@ -58,23 +59,28 @@ export function DamageReportDetailPage() {
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const [reportResponse, assetResponse] = await Promise.all([
-        getMockDamageReport(reportId),
-        isStudent ? getMockStudentAssets() : Promise.resolve({ room: null, assets: [] }),
-      ]);
-
-      if (!reportResponse) {
-        setReport(null);
-        setErrorMessage('Không tìm thấy phiếu báo hỏng.');
-        return;
-      }
-
+      const reportResponse = await getDamageReportById(reportId);
       setReport(reportResponse);
-      setStudentAssets(assetResponse);
+      if (isStudent) {
+        const assetData = await getAssets({ pageSize: 100 });
+        setStudentAssets({
+          room: null,
+          assets: assetData.items.map((a: any) => ({
+            id: parseInt(a.id),
+            categoryId: 1,
+            assetCode: a.assetCode,
+            assetName: a.assetName,
+            status: a.status,
+            description: a.description,
+            yearInUse: null,
+            createdAt: a.createdAt
+          }))
+        });
+      }
       form.reset({
         assetId: reportResponse.assetId,
         description: reportResponse.description,
-        priority: reportResponse.priority,
+        priority: reportResponse.priority as any,
       });
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải chi tiết phiếu báo hỏng.');
@@ -87,9 +93,9 @@ export function DamageReportDetailPage() {
     if (!report) return;
     setIsSubmitting(true);
     try {
-      await updateMockDamageReport(report.id, {
+      await updateDamageReport(report.id, {
         assetId: values.assetId,
-        description: values.description.trim(),
+        description: values.description,
         priority: values.priority,
       });
       showToast('Đã cập nhật phiếu báo hỏng.');
@@ -108,7 +114,15 @@ export function DamageReportDetailPage() {
     if (!report || !confirmAction) return;
     setIsSubmitting(true);
     try {
-      await runMockDamageWorkflow(report.id, confirmAction.endpoint, actionNote, confirmAction.requireAssetStatus ? assetStatus : undefined);
+      const workflowMap: Record<string, (id: number) => Promise<any>> = {
+        'accept': acceptDamageReport,
+        'reject': rejectDamageReport,
+        'start-processing': startProcessingReport,
+        'complete': completeReport,
+        'cancel': cancelReport,
+      };
+      const fn = workflowMap[confirmAction.endpoint];
+      if (fn) await fn(report.id);
       showToast('Đã cập nhật trạng thái phiếu.');
       setConfirmAction(null);
       setActionNote('');

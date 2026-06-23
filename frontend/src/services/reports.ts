@@ -1,5 +1,4 @@
 import { apiClient, unwrapApiResponse } from '../lib/api-client';
-import { getMockAdminDashboardSummary, getMockManagerDashboardSummary, getMockStudentDashboardSummary } from '../lib/frontend-mock';
 
 export type AdminDashboardSummary = {
   role: 'ADMIN';
@@ -35,16 +34,9 @@ export type StudentDashboardSummary = {
   damageReportProcessing: number;
 };
 
-export async function getDashboardSummary(roleHint?: string) {
-  try {
-    const response = await apiClient.get('/reports/summary');
-    return unwrapApiResponse<
-      AdminDashboardSummary | ManagerDashboardSummary | StudentDashboardSummary
-    >(response.data);
-  } catch {
-    if (roleHint === 'ADMIN') return getMockAdminDashboardSummary() as unknown as AdminDashboardSummary;
-    if (roleHint === 'MANAGER') return getMockManagerDashboardSummary() as unknown as ManagerDashboardSummary;
-    if (roleHint === 'STUDENT') return getMockStudentDashboardSummary() as unknown as StudentDashboardSummary;
-    return getMockAdminDashboardSummary() as unknown as AdminDashboardSummary;
-  }
+export async function getDashboardSummary() {
+  const response = await apiClient.get('/reports/summary');
+  return unwrapApiResponse<
+    AdminDashboardSummary | ManagerDashboardSummary | StudentDashboardSummary
+  >(response.data);
 }
