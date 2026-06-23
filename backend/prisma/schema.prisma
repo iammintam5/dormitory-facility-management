@@ -1,0 +1,516 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ===========================
+// ENUMS
+// ===========================
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+  INACTIVE
+}
+
+enum AssetStatus {
+  AVAILABLE
+  IN_USE
+  UNDER_MAINTENANCE
+  DAMAGED
+  PENDING_LIQUIDATION
+  LIQUIDATED
+}
+
+enum DamageReportStatus {
+  SUBMITTED
+  REVIEWING
+  APPROVED
+  REJECTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum DamageReportPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum InventoryCheckStatus {
+  DRAFT
+  COMPLETED
+}
+
+enum LiquidationStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  COMPLETED
+  CANCELLED
+}
+
+enum MaintenanceType {
+  SCHEDULED
+  AD_HOC
+  AFTER_INVENTORY
+}
+
+enum MaintenanceResultStatus {
+  GOOD
+  NEED_MONITORING
+  NEED_REPAIR
+  RECOMMEND_LIQUIDATION
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+}
+
+// ===========================
+// AUTH & USERS
+// ===========================
+
+model Role {
+  id          Int      @id @default(autoincrement())
+  code        String   @unique
+  name        String
+  description String?
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id          Int        @id @default(autoincrement())
+  fullName    String
+  userCode    String     @unique
+  password    String     // bcrypt hash
+  email       String?
+  phone       String?
+  studentCode String?
+  status      UserStatus @default(ACTIVE)
+  lastLoginAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  roleId  Int
+  role    Role   @relation(fields: [roleId], references: [id])
+
+  profile                    Profile?
+  roomStudentAssignments     RoomStudentAssignment[]
+  ownedAssets                Asset[]                    @relation("AssetCheckedByUser")
+  createdMaintenancePlans    MaintenancePlan[]
+  performedMaintenanceRecords MaintenanceRecord[]
+  createdInventoryChecks     InventoryCheck[]           @relation("CheckedByUser")
+  createdLiquidationRecords  LiquidationRecord[]
+  damageReports              DamageReport[]             @relation("Reporter")
+  damageReportLogs           DamageReportLog[]
+  councilMemberships         CouncilMember[]
+  notifications              Notification[]
+  auditLogs                  AuditLog[]
+
+  @@map("users")
+}
+
+model Profile {
+  id            Int     @id @default(autoincrement())
+  avatarUrl     String?
+  gender        String?
+  dateOfBirth   String? // ISO date string
+  address       String?
+  faculty       String?
+  className     String?
+  emergencyName String?
+  emergencyPhone String?
+  notes         String?
+
+  userId Int   @unique
+  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("profiles")
+}
+
+// ===========================
+// LOCATIONS
+// ===========================
+
+model DormBuilding {
+  id        Int      @id @default(autoincrement())
+  code      String   @unique
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  floors Floor[]
+
+  @@map("dorm_buildings")
+}
+
+model Floor {
+  id          Int    @id @default(autoincrement())
+  floorNumber Int
+  name        String?
+
+  buildingId Int
+  building   DormBuilding @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  rooms Room[]
+
+  @@map("floors")
+}
+
+model Room {
+  id        Int      @id @default(autoincrement())
+  roomCode  String   @unique
+  capacity  Int?
+  note      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  floorId Int
+  floor   Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
+
+  roomStudentAssignments RoomStudentAssignment[]
+  assets                 Asset[]
+  damageReports          DamageReport[]
+  inventoryChecks        InventoryCheck[]
+
+  @@map("rooms")
+}
+
+model RoomStudentAssignment {
+  id        Int      @id @default(autoincrement())
+  startDate DateTime
+  endDate   DateTime?
+  isActive  Boolean  @default(true)
+
+  roomId    Int
+  room      Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  studentId Int
+  student   User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@map("room_student_assignments")
+}
+
+// ===========================
+// ASSETS
+// ===========================
+
+model AssetCategory {
+  id                    Int      @id @default(autoincrement())
+  code                  String   @unique
+  name                  String
+  description           String?
+  maintenanceCycleMonths Int?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  assets Asset[]
+
+  @@map("asset_categories")
+}
+
+model Asset {
+  id          Int         @id @default(autoincrement())
+  assetCode   String      @unique
+  assetName   String
+  status      AssetStatus @default(AVAILABLE)
+  yearInUse   Int?
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  categoryId Int
+  category   AssetCategory @relation(fields: [categoryId], references: [id])
+
+  roomId Int?
+  room   Room? @relation(fields: [roomId], references: [id])
+
+  checkedByUserId Int?
+  checkedByUser   User?  @relation("AssetCheckedByUser", fields: [checkedByUserId], references: [id])
+
+  assetHistories       AssetHistory[]
+  damageReports        DamageReport[]
+  maintenancePlans     MaintenancePlan[]
+  maintenanceRecords   MaintenanceRecord[]
+  inventoryCheckItems  InventoryCheckItem[]
+  liquidationItems     LiquidationItem[]
+  normalizedSearch     NormalizedSearch?
+
+  @@map("assets")
+}
+
+model AssetHistory {
+  id        Int      @id @default(autoincrement())
+  action    String
+  oldStatus AssetStatus?
+  newStatus AssetStatus?
+  oldRoomId Int?
+  newRoomId Int?
+  note      String?
+  createdAt DateTime @default(now())
+
+  assetId Int
+  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("asset_histories")
+}
+
+// ===========================
+// DAMAGE REPORTS
+// ===========================
+
+model DamageReport {
+  id          Int                 @id @default(autoincrement())
+  reportCode  String              @unique
+  description String
+  location    String?
+  priority    DamageReportPriority @default(MEDIUM)
+  status      DamageReportStatus  @default(SUBMITTED)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  reporterId Int
+  reporter   User  @relation("Reporter", fields: [reporterId], references: [id])
+
+  assetId Int
+  asset   Asset @relation(fields: [assetId], references: [id])
+
+  roomId Int
+  room   Room @relation(fields: [roomId], references: [id])
+
+  damageReportLogs DamageReportLog[]
+
+  @@map("damage_reports")
+}
+
+model DamageReportLog {
+  id        Int         @id @default(autoincrement())
+  action    String
+  oldStatus DamageReportStatus?
+  newStatus DamageReportStatus?
+  note      String?
+  createdAt DateTime    @default(now())
+
+  damageReportId Int
+  damageReport   DamageReport @relation(fields: [damageReportId], references: [id], onDelete: Cascade)
+
+  createdByUserId Int
+  createdByUser   User @relation(fields: [createdByUserId], references: [id])
+
+  @@map("damage_report_logs")
+}
+
+// ===========================
+// MAINTENANCE
+// ===========================
+
+model MaintenancePlan {
+  id          Int      @id @default(autoincrement())
+  cycleMonths Int
+  nextDueDate DateTime
+  isActive    Boolean  @default(true)
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  assetId   Int
+  asset     Asset  @relation(fields: [assetId], references: [id])
+  createdBy Int
+  creator   User   @relation(fields: [createdBy], references: [id])
+
+  maintenanceRecords MaintenanceRecord[]
+
+  @@map("maintenance_plans")
+}
+
+model MaintenanceRecord {
+  id                  Int                    @id @default(autoincrement())
+  maintenanceCode     String                 @unique
+  maintenanceDate     DateTime
+  maintenanceType     MaintenanceType
+  content             String
+  resultStatus        MaintenanceResultStatus
+  nextMaintenanceDate DateTime?
+  cost                Decimal?               @db.Decimal(12, 2)
+  materialNote        String?
+  note                String?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  planId Int?
+  plan   MaintenancePlan? @relation(fields: [planId], references: [id])
+
+  assetId      Int
+  asset        Asset @relation(fields: [assetId], references: [id])
+  performedBy  Int
+  performer    User  @relation(fields: [performedBy], references: [id])
+
+  @@map("maintenance_records")
+}
+
+// ===========================
+// INVENTORY CHECKS
+// ===========================
+
+model InventoryCheck {
+  id            Int                  @id @default(autoincrement())
+  inventoryCode String               @unique
+  checkDate     DateTime
+  status        InventoryCheckStatus @default(DRAFT)
+  generalNote   String?
+  completedAt   DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  roomId    Int?
+  room      Room? @relation(fields: [roomId], references: [id])
+  checkedBy Int
+  checker   User  @relation("CheckedByUser", fields: [checkedBy], references: [id])
+
+  inventoryCheckItems InventoryCheckItem[]
+  councilMembers      CouncilMember[]
+
+  @@map("inventory_checks")
+}
+
+model InventoryCheckItem {
+  id               Int    @id @default(autoincrement())
+  systemQuantity   Int    @default(1)
+  actualQuantity   Int    @default(1)
+  difference       Int    @default(0)
+  actualCondition  String?
+  note             String?
+
+  inventoryCheckId Int
+  inventoryCheck   InventoryCheck @relation(fields: [inventoryCheckId], references: [id], onDelete: Cascade)
+
+  assetId Int
+  asset   Asset @relation(fields: [assetId], references: [id])
+
+  @@map("inventory_check_items")
+}
+
+// ===========================
+// LIQUIDATION
+// ===========================
+
+model LiquidationRecord {
+  id              Int              @id @default(autoincrement())
+  liquidationCode String           @unique
+  liquidationDate DateTime
+  status          LiquidationStatus @default(DRAFT)
+  note            String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  createdBy Int
+  creator   User  @relation(fields: [createdBy], references: [id])
+
+  liquidationItems LiquidationItem[]
+  councilMembers   CouncilMember[]
+
+  @@map("liquidation_records")
+}
+
+model LiquidationItem {
+  id                     Int    @id @default(autoincrement())
+  assetCondition         String
+  reason                 String
+  estimatedRemainingValue Decimal? @db.Decimal(12, 2)
+
+  liquidationRecordId Int
+  liquidationRecord   LiquidationRecord @relation(fields: [liquidationRecordId], references: [id], onDelete: Cascade)
+
+  assetId Int
+  asset   Asset @relation(fields: [assetId], references: [id])
+
+  @@map("liquidation_items")
+}
+
+// ===========================
+// COUNCIL (shared polymorphic)
+// ===========================
+
+model CouncilMember {
+  id            Int    @id @default(autoincrement())
+  roleInCouncil String
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id])
+
+  inventoryCheckId   Int?
+  inventoryCheck     InventoryCheck?   @relation(fields: [inventoryCheckId], references: [id], onDelete: Cascade)
+  liquidationRecordId Int?
+  liquidationRecord  LiquidationRecord? @relation(fields: [liquidationRecordId], references: [id], onDelete: Cascade)
+
+  @@map("council_members")
+}
+
+// ===========================
+// NOTIFICATIONS
+// ===========================
+
+model Notification {
+  id           Int                @id @default(autoincrement())
+  title        String
+  content      String
+  status       NotificationStatus @default(UNREAD)
+  relatedTable String?
+  relatedId    Int?
+  createdAt    DateTime           @default(now())
+  readAt       DateTime?
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ===========================
+// AUDIT LOGS
+// ===========================
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  tableName String
+  recordId  Int?
+  content   String?
+  oldValue  String?
+  newValue  String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  userId Int?
+  user   User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ===========================
+// INDEXES
+// ===========================
+
+model NormalizedSearch {
+  id     Int     @id @default(autoincrement())
+  search String?
+
+  assetId Int   @unique
+  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@map("normalized_searches")
+}
