@@ -12,7 +12,8 @@ import { Input } from '../../components/ui/Input';
 import { Select as UISelect } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../auth/auth-context';
-import { createMockLiquidationRecord, getMockAssets, getMockLiquidationRecords, runMockLiquidationWorkflow } from '../../lib/frontend-mock';
+import { createLiquidationRecord, getLiquidationRecords, submitApprovalLiquidation, approveLiquidation, rejectLiquidation, completeLiquidation, cancelLiquidation } from '../../services/liquidation-records';
+import { getAssets } from '../../services/assets';
 import { formatDateOnly } from '../../lib/date';
 import { useToast } from '../../toast/toast-context';
 import { Asset } from '../../types/assets';
@@ -94,10 +95,10 @@ export function LiquidationRecordsManagementPage() {
     setErrorMessage('');
     try {
       const [assetResponse, liquidationResponse] = await Promise.all([
-        getMockAssets(),
-        getMockLiquidationRecords({ page: 1, pageSize: 100 }),
+        getAssets({ pageSize: 100 }),
+        getLiquidationRecords({ page: 1, pageSize: 100 }),
       ]);
-      setAssets(assetResponse);
+      setAssets(assetResponse.items.map((a: any) => ({ id: parseInt(a.id), categoryId: 1, assetCode: a.assetCode, assetName: a.assetName, status: a.status, description: a.description, yearInUse: null, createdAt: a.createdAt })));
       setRecords(liquidationResponse.items);
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Không thể tải dữ liệu thanh lý.');
@@ -204,19 +205,13 @@ export function LiquidationRecordsManagementPage() {
     setIsSubmitting(true);
     setErrorMessage('');
     try {
-      await createMockLiquidationRecord({
-        ...values,
+      await createLiquidationRecord({
+        assetId: values.assetId,
+        liquidationDate: values.liquidationDate,
         assetCondition: values.assetCondition.trim(),
         reason: values.reason.trim(),
+        estimatedRemainingValue: values.estimatedRemainingValue || undefined,
         note: values.note?.trim() || undefined,
-        members:
-          members.length > 0
-            ? members.map((member) => ({
-                userId: member.user.id,
-                roleInCouncil: member.roleInCouncil.trim(),
-                user: member.user,
-              }))
-            : undefined,
       });
       showToast('Đã tạo đề xuất thanh lý.', 'success');
       createForm.reset({
@@ -250,7 +245,13 @@ export function LiquidationRecordsManagementPage() {
 
   async function handleWorkflowAction(recordId: number, action: string) {
     try {
-      await runMockLiquidationWorkflow(recordId, action);
+      const actionMap: Record<string, () => Promise<any>> = {
+        'submit-approval': () => submitApprovalLiquidation(recordId),
+        'approve': () => approveLiquidation(recordId),
+        'reject': () => rejectLiquidation(recordId),
+        'complete': () => completeLiquidation(recordId),
+        'cancel': () => cancelLiquidation(recordId),
+      };
       const actionLabels: Record<string, string> = {
         'submit-approval': 'Đã gửi đề xuất duyệt.',
         'approve': 'Đã duyệt hồ sơ thanh lý.',
@@ -258,6 +259,9 @@ export function LiquidationRecordsManagementPage() {
         'complete': 'Đã hoàn tất thanh lý.',
         'cancel': 'Đã hủy hồ sơ thanh lý.',
       };
+      if (actionMap[action]) {
+        await actionMap[action]();
+      }
       showToast(actionLabels[action] ?? 'Đã cập nhật trạng thái.', 'success');
       setOpenMenuId(null);
       await loadData();

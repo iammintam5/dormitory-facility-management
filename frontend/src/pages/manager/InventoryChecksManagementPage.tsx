@@ -18,7 +18,8 @@ import {
   Spinner
 } from '@phosphor-icons/react';
 import { CouncilMemberSelect, CouncilMemberState } from '../../components/council/CouncilMemberSelect';
-import { createMockInventoryCheck, getMockInventoryCheck, getMockRooms, saveMockInventoryResults, completeMockInventoryCheck } from '../../lib/frontend-mock';
+import { createInventoryCheck, getInventoryCheck, saveInventoryCheckItems, completeInventoryCheck } from '../../services/inventory-checks';
+import { getRooms } from '../../services/locations';
 import { formatDateOnly, formatDateTime } from '../../lib/date';
 import { useToast } from '../../toast/toast-context';
 import { InventoryCheck } from '../../types/inventory-checks';
@@ -480,7 +481,7 @@ function CreateInventoryCheckModal({ isOpen, onClose, basePath }: { isOpen: bool
       setGeneralNote('');
       setMembers([]);
       setErrorMessage('');
-      getMockRooms().then(setRooms).catch(() => showToast('Không thể tải danh sách phòng.', 'error'));
+      getRooms().then(setRooms).catch(() => showToast('Không thể tải danh sách phòng.', 'error'));
     }
   }, [isOpen, showToast]);
 
@@ -490,15 +491,10 @@ function CreateInventoryCheckModal({ isOpen, onClose, basePath }: { isOpen: bool
     setIsSubmitting(true);
     setErrorMessage('');
     try {
-      const record = await createMockInventoryCheck({
+      const record = await createInventoryCheck({
         roomId: Number(roomId),
         checkDate,
         generalNote: generalNote.trim() || undefined,
-        members: members.length > 0 ? members.map((member) => ({
-          userId: member.user.id,
-          roleInCouncil: member.roleInCouncil.trim(),
-          user: member.user,
-        })) : undefined,
       });
       showToast('Tạo phiếu kiểm kê thành công.', 'success');
       onClose();
@@ -584,13 +580,9 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath }: { che
     setIsLoading(true);
     setErrorMessage('');
     try {
-      const response = await getMockInventoryCheck(id);
-      if (!response) {
-        setErrorMessage('Không tìm thấy phiếu kiểm kê.');
-        setInventoryCheck(null);
-        return;
-      }
-      setInventoryCheck(response);
+      try {
+        const response = await getInventoryCheck(id);
+        setInventoryCheck(response);
       setGeneralNote(response.generalNote ?? '');
       setDraftItems(
         Object.fromEntries(
@@ -603,12 +595,12 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath }: { che
             },
           ]),
         ),
-      );
-    } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải phiếu kiểm kê.');
-    } finally {
-      setIsLoading(false);
-    }
+      );      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : 'Không thể tải phiếu kiểm kê.');
+        setInventoryCheck(null);
+      } finally {
+        setIsLoading(false);
+      }
   }
 
   function updateDraft(itemId: number, field: 'actualQuantity' | 'actualCondition' | 'note', value: string | number) {
@@ -634,10 +626,7 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath }: { che
           note: (draft?.note ?? item.note ?? '').trim() || undefined,
         };
       });
-      await saveMockInventoryResults(inventoryCheck.id, {
-        generalNote: generalNote.trim() || undefined,
-        items: rows,
-      });
+      await saveInventoryCheckItems(inventoryCheck.id, rows);
       showToast('Đã lưu kết quả kiểm kê.');
       await loadCheck(inventoryCheck.id);
     } catch (error) {
@@ -653,7 +642,7 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath }: { che
     if (!inventoryCheck) return;
     setIsSubmitting(true);
     try {
-      await completeMockInventoryCheck(inventoryCheck.id, generalNote.trim() || undefined);
+      await completeInventoryCheck(inventoryCheck.id, generalNote.trim() || undefined);
       showToast('Đã hoàn tất phiếu kiểm kê.');
       await loadCheck(inventoryCheck.id);
     } catch (error) {

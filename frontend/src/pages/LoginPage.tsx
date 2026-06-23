@@ -156,9 +156,9 @@ export function LoginPage() {
               </p>
               <div className="space-y-2 text-sm">
                 {[
-                  { role: 'Admin', creds: 'admin / admin' },
-                  { role: 'Quản lý', creds: 'manager / manager' },
-                  { role: 'Sinh viên', creds: 'student / student' },
+                  { role: 'Admin', creds: 'ADMIN001 / 123456' },
+                  { role: 'Quản lý', creds: 'QL001 / 123456' },
+                  { role: 'Sinh viên', creds: 'SV20230001 / 123456' },
                 ].map(({ role, creds }) => (
                   <div key={role} className="flex justify-between items-center bg-background rounded-lg px-3 py-2 border border-border/40">
                     <span className="font-medium text-foreground text-[13px]">{role}</span>

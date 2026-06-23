@@ -1,5 +1,4 @@
 import { apiClient, unwrapApiResponse } from '../lib/api-client';
-import { getMockManagedUsers, getMockRoles, createMockManagedUser, updateMockManagedUser, lockMockUser, unlockMockUser, resetMockUserPassword } from '../lib/frontend-mock';
 
 export type UserRoleOption = {
   id: string;
@@ -44,21 +43,13 @@ export type UsersResponse = {
 };
 
 export async function getUsers(params: Record<string, string | number | boolean | undefined>) {
-  try {
-    const response = await apiClient.get('/users', { params });
-    return unwrapApiResponse<UsersResponse>(response.data);
-  } catch {
-    return getMockManagedUsers(params as any) as unknown as UsersResponse;
-  }
+  const response = await apiClient.get('/users', { params });
+  return unwrapApiResponse<UsersResponse>(response.data);
 }
 
 export async function getRoles() {
-  try {
-    const response = await apiClient.get('/users/roles');
-    return unwrapApiResponse<UserRoleOption[]>(response.data);
-  } catch {
-    return getMockRoles() as unknown as UserRoleOption[];
-  }
+  const response = await apiClient.get('/users/roles');
+  return unwrapApiResponse<UserRoleOption[]>(response.data);
 }
 
 export async function createUser(payload: {
@@ -70,12 +61,8 @@ export async function createUser(payload: {
   phone?: string;
   studentCode?: string;
 }) {
-  try {
-    const response = await apiClient.post('/users', payload);
-    return unwrapApiResponse<ManagedUser>(response.data);
-  } catch {
-    return createMockManagedUser(payload) as unknown as ManagedUser;
-  }
+  const response = await apiClient.post('/users', payload);
+  return unwrapApiResponse<ManagedUser>(response.data);
 }
 
 export async function updateUser(
@@ -90,37 +77,21 @@ export async function updateUser(
     studentCode?: string | null;
   },
 ) {
-  try {
-    const response = await apiClient.patch(`/users/${id}`, payload);
-    return unwrapApiResponse<ManagedUser>(response.data);
-  } catch {
-    return updateMockManagedUser(id, payload) as unknown as ManagedUser;
-  }
+  const response = await apiClient.patch(`/users/${id}`, payload);
+  return unwrapApiResponse<ManagedUser>(response.data);
 }
 
 export async function lockUser(id: string) {
-  try {
-    const response = await apiClient.patch(`/users/${id}/lock`);
-    return unwrapApiResponse<ManagedUser>(response.data);
-  } catch {
-    return lockMockUser(id) as unknown as ManagedUser;
-  }
+  const response = await apiClient.patch(`/users/${id}/lock`);
+  return unwrapApiResponse<ManagedUser>(response.data);
 }
 
 export async function unlockUser(id: string) {
-  try {
-    const response = await apiClient.patch(`/users/${id}/unlock`);
-    return unwrapApiResponse<ManagedUser>(response.data);
-  } catch {
-    return unlockMockUser(id) as unknown as ManagedUser;
-  }
+  const response = await apiClient.patch(`/users/${id}/unlock`);
+  return unwrapApiResponse<ManagedUser>(response.data);
 }
 
 export async function resetUserPassword(id: string, newPassword: string) {
-  try {
-    const response = await apiClient.post(`/users/${id}/reset-password`, { newPassword });
-    return unwrapApiResponse<{ userId: string }>(response.data);
-  } catch {
-    return resetMockUserPassword(id, newPassword);
-  }
+  const response = await apiClient.post(`/users/${id}/reset-password`, { newPassword });
+  return unwrapApiResponse<{ userId: string }>(response.data);
 }

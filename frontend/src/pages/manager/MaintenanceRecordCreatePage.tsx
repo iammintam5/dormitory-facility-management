@@ -9,7 +9,8 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../auth/auth-context';
-import { createMockMaintenanceRecord, getMockAssets, getMockMaintenancePlans } from '../../lib/frontend-mock';
+import { createMaintenanceRecord, getMaintenancePlans } from '../../services/maintenance';
+import { getAssets } from '../../services/assets';
 import { useToast } from '../../toast/toast-context';
 import { Asset } from '../../types/assets';
 import { MaintenancePlan, MaintenanceResultStatus, MaintenanceType } from '../../types/maintenance';
@@ -63,8 +64,8 @@ export function MaintenanceRecordCreatePage() {
   async function loadLookups() {
     setIsLoading(true);
     try {
-      const [assetList, planList] = await Promise.all([getMockAssets(), getMockMaintenancePlans()]);
-      setAssets(assetList);
+      const [assetResponse, planList] = await Promise.all([getAssets({ pageSize: 100 }), getMaintenancePlans()]);
+      setAssets(assetResponse.items.map((a: any) => ({ id: parseInt(a.id), categoryId: 1, assetCode: a.assetCode, assetName: a.assetName, status: a.status, description: a.description, yearInUse: null, createdAt: a.createdAt })));
       setPlans(planList);
     } catch (error) {
       showToast('Không thể tải dữ liệu tạo phiếu bảo trì.', 'error');
@@ -76,7 +77,7 @@ export function MaintenanceRecordCreatePage() {
   const onSubmit = form.handleSubmit(async (values) => {
     setIsSubmitting(true);
     try {
-      const response = await createMockMaintenanceRecord({
+      const response = await createMaintenanceRecord({
         ...values,
         planId: values.planId || undefined,
         nextMaintenanceDate: values.nextMaintenanceDate || undefined,

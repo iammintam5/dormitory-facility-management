@@ -4,7 +4,7 @@ import { useAuth } from '../../auth/auth-context';
 import { InventoryCheckPrintForm } from '../../components/print/forms/InventoryCheckPrintForm';
 import { PrintOverlay } from '../../components/print/PrintOverlay';
 import { usePrint } from '../../hooks/usePrint';
-import { getMockInventoryCheckExport } from '../../lib/frontend-mock';
+import { getInventoryCheckExport } from '../../services/inventory-checks';
 import { InventoryCheckExportResponse } from '../../types/inventory-checks';
 
 export function InventoryCheckPrintPreviewPage({ backTo }: { backTo?: string } = {}) {
@@ -22,7 +22,7 @@ export function InventoryCheckPrintPreviewPage({ backTo }: { backTo?: string } =
   }, [inventoryCheckId]);
 
   async function loadData() {
-    const response = await getMockInventoryCheckExport(inventoryCheckId);
+    const response = await getInventoryCheckExport(inventoryCheckId);
     if (!response) {
       setErrorMessage('Không thể tải dữ liệu in phiếu kiểm kê.');
       return;

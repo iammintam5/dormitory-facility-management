@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { SectionCard } from '../../components/admin/SectionCard';
 import { useAuth } from '../../auth/auth-context';
-import { getMockMaintenanceHistory } from '../../lib/frontend-mock';
+import { getMaintenanceHistory } from '../../services/maintenance';
 import { formatDateOnly, formatDateTime } from '../../lib/date';
 import { MaintenanceRecord } from '../../types/maintenance';
 
@@ -25,7 +25,7 @@ export function MaintenanceAssetHistoryPage() {
     setErrorMessage('');
 
     try {
-      setRecords(await getMockMaintenanceHistory(numericAssetId));
+      setRecords(await getMaintenanceHistory(numericAssetId));
     } catch {
       setErrorMessage('Không thể tải lịch sử bảo trì của tài sản.');
     } finally {

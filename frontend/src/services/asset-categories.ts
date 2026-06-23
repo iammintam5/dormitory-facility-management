@@ -1,5 +1,4 @@
 import { apiClient, unwrapApiResponse } from '../lib/api-client';
-import { getMockAssetCategoryRecords, createMockAssetCategoryRecord, updateMockAssetCategoryRecord, deleteMockAssetCategoryRecord } from '../lib/frontend-mock';
 
 export type AssetCategoryRecord = {
   id: string;
@@ -12,12 +11,8 @@ export type AssetCategoryRecord = {
 };
 
 export async function getAssetCategories() {
-  try {
-    const response = await apiClient.get('/asset-categories');
-    return unwrapApiResponse<AssetCategoryRecord[]>(response.data);
-  } catch {
-    return getMockAssetCategoryRecords() as unknown as AssetCategoryRecord[];
-  }
+  const response = await apiClient.get('/asset-categories');
+  return unwrapApiResponse<AssetCategoryRecord[]>(response.data);
 }
 
 export async function createAssetCategory(payload: {
@@ -26,12 +21,8 @@ export async function createAssetCategory(payload: {
   description?: string | null;
   unit?: string | null;
 }) {
-  try {
-    const response = await apiClient.post('/asset-categories', payload);
-    return unwrapApiResponse<AssetCategoryRecord>(response.data);
-  } catch {
-    return createMockAssetCategoryRecord(payload) as unknown as AssetCategoryRecord;
-  }
+  const response = await apiClient.post('/asset-categories', payload);
+  return unwrapApiResponse<AssetCategoryRecord>(response.data);
 }
 
 export async function updateAssetCategory(
@@ -43,19 +34,11 @@ export async function updateAssetCategory(
     unit?: string | null;
   },
 ) {
-  try {
-    const response = await apiClient.patch(`/asset-categories/${id}`, payload);
-    return unwrapApiResponse<AssetCategoryRecord>(response.data);
-  } catch {
-    return updateMockAssetCategoryRecord(id, payload) as unknown as AssetCategoryRecord;
-  }
+  const response = await apiClient.patch(`/asset-categories/${id}`, payload);
+  return unwrapApiResponse<AssetCategoryRecord>(response.data);
 }
 
 export async function deleteAssetCategory(id: string) {
-  try {
-    const response = await apiClient.delete(`/asset-categories/${id}`);
-    return unwrapApiResponse<{ message: string }>(response.data);
-  } catch {
-    return deleteMockAssetCategoryRecord(id) as unknown as { message: string };
-  }
+  const response = await apiClient.delete(`/asset-categories/${id}`);
+  return unwrapApiResponse<{ message: string }>(response.data);
 }
