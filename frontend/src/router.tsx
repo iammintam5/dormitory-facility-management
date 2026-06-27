@@ -29,6 +29,7 @@ const InventoryChecksManagementPage = React.lazy(() => import('./pages/manager/I
 const EquipmentTransactionsPage = React.lazy(() => import('./pages/manager/EquipmentTransactionsPage').then(m => ({ default: m.EquipmentTransactionsPage })));
 const ImportEquipmentPage = React.lazy(() => import('./pages/manager/ImportEquipmentPage').then(m => ({ default: m.ImportEquipmentPage })));
 const ExportEquipmentPage = React.lazy(() => import('./pages/manager/ExportEquipmentPage').then(m => ({ default: m.ExportEquipmentPage })));
+const AssetAllocationPage = React.lazy(() => import('./pages/manager/AssetAllocationPage').then(m => ({ default: m.AssetAllocationPage })));
 const LiquidationRecordsManagementPage = React.lazy(() => import('./pages/manager/LiquidationRecordsManagementPage').then(m => ({ default: m.LiquidationRecordsManagementPage })));
 const MaintenanceManagementPage = React.lazy(() => import('./pages/manager/MaintenanceManagementPage').then(m => ({ default: m.MaintenanceManagementPage })));
 const MaintenanceRecordCreatePage = React.lazy(() => import('./pages/manager/MaintenanceRecordCreatePage').then(m => ({ default: m.MaintenanceRecordCreatePage })));
@@ -84,6 +85,7 @@ const managerChildren = [
   { path: 'asset-transactions', element: <EquipmentTransactionsPage /> },
   { path: 'asset-transactions/import', element: <ImportEquipmentPage /> },
   { path: 'asset-transactions/export', element: <ExportEquipmentPage /> },
+  { path: 'asset-transactions/allocation', element: <AssetAllocationPage /> },
   { path: 'profile', element: <ProfilePage /> },
   { path: 'change-password', element: <ChangePasswordPage /> },
 ];
