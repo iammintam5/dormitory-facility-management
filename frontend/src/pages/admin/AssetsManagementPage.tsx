@@ -1,9 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useToast } from '../../toast/toast-context';
-import { getAssets, createAsset, createBulkAssets, updateAsset, deleteAsset, AssetRecord, AssetStatus, AssetCondition } from '../../services/assets';
+import { getAssets, updateAsset, deleteAsset, AssetRecord, AssetStatus, AssetCondition } from '../../services/assets';
+import { QRCodeSVG } from 'qrcode.react';
+import { useReactToPrint } from 'react-to-print';
 import { getApiErrorMessage } from '../../lib/api-client';
 import { getBuildings, getRooms, BuildingRecord, RoomRecord } from '../../services/locations';
 import { getAssetCategories, AssetCategoryRecord } from '../../services/asset-categories';
@@ -17,7 +19,10 @@ import {
   ArrowsClockwise,
   PencilSimple,
   Trash,
-  Spinner
+  Spinner,
+  WarningCircle,
+  Eye,
+  QrCode
 } from '@phosphor-icons/react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -34,7 +39,7 @@ const assetSchema = z.object({
   categoryId: z.string().min(1, 'Chọn loại thiết bị.'),
   description: z.string().optional(),
   buildingId: z.string().min(1, 'Chọn khu nhà.'),
-  roomId: z.string().min(1, 'Chọn phòng.'),
+  roomId: z.string().optional(),
   location: z.string().optional(),
   
   purchaseDate: z.string().optional(),
@@ -71,6 +76,16 @@ export function AssetsManagementPage() {
   const [isFetching, setIsFetching] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<AssetRecord | null>(null);
+
+  // QR Modal
+  const [showQrModal, setShowQrModal] = useState(false);
+  const [qrAsset, setQrAsset] = useState<AssetRecord | null>(null);
+  const qrPrintRef = useRef<HTMLDivElement>(null);
+
+  const handlePrintQr = useReactToPrint({
+    contentRef: qrPrintRef,
+    documentTitle: 'Ma_QR_Thiet_Bi',
+  });
   const [deleteTarget, setDeleteTarget] = useState<AssetRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -142,27 +157,11 @@ export function AssetsManagementPage() {
   }, []);
 
 
-  const openAddModal = () => {
-    setSelectedAsset(null);
-    form.reset({
-      assetCode: '',
-      assetName: '',
-      categoryId: '',
-      description: '',
-      buildingId: '',
-      roomId: '',
-      location: '',
-      purchaseDate: '',
-      purchaseCost: '',
-      supplierId: '',
-      quantity: '1',
-      warrantyExpiryDate: '',
-      serialNumber: '',
-      status: 'AVAILABLE',
-      condition: 'GOOD',
-      notes: ''
-    });
-    setIsModalOpen(true);
+  // Add modal has been removed; assets are now imported via ImportEquipmentPage.
+
+  const openQrModal = (asset: AssetRecord) => {
+    setQrAsset(asset);
+    setShowQrModal(true);
   };
 
   const openEditModal = (asset: AssetRecord) => {
@@ -223,19 +222,6 @@ export function AssetsManagementPage() {
       if (selectedAsset) {
         await updateAsset(selectedAsset.id, payload);
         showToast('Cập nhật thiết bị thành công.', 'success');
-      } else {
-        if (quantityNum > 1) {
-          await createBulkAssets({
-            ...payload,
-            prefix: data.assetCode,
-            startNumber: 1,
-            endNumber: quantityNum
-          });
-          showToast(`Đã thêm ${quantityNum} thiết bị thành công.`, 'success');
-        } else {
-          await createAsset(payload);
-          showToast('Thêm thiết bị thành công.', 'success');
-        }
       }
       setIsModalOpen(false);
       loadData();
@@ -257,12 +243,7 @@ export function AssetsManagementPage() {
       <PageHeader 
         title="Thiết bị" 
         description="Quản lý danh sách thiết bị và tài sản trong ký túc xá."
-        actions={
-          <Button onClick={openAddModal} className="gap-2">
-            <Plus size={16} weight="bold" />
-            Thêm thiết bị
-          </Button>
-        }
+        actions={null}
       />
 
       {/* Summary Cards */}
@@ -417,6 +398,7 @@ export function AssetsManagementPage() {
                 <TableHead>Khu nhà</TableHead>
                 <TableHead>Phòng</TableHead>
                 <TableHead>Trạng thái</TableHead>
+                <TableHead className="w-20 text-center">Mã QR</TableHead>
                 <TableHead className="w-20 text-center">Sửa</TableHead>
                 <TableHead className="w-20 text-center">Xóa</TableHead>
               </TableRow>
@@ -424,7 +406,7 @@ export function AssetsManagementPage() {
             <TableBody>
               {assets.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
                     Không có dữ liệu thiết bị
                   </TableCell>
                 </TableRow>
@@ -442,6 +424,11 @@ export function AssetsManagementPage() {
                     <span className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${statusBadgeColor(asset.status)}`}>
                       {asset.statusLabel}
                     </span>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button variant="ghost" size="icon" onClick={() => openQrModal(asset)}>
+                      <QrCode size={16} />
+                    </Button>
                   </TableCell>
                   <TableCell className="text-center">
                     <Button variant="ghost" size="icon" onClick={() => openEditModal(asset)}>
@@ -472,7 +459,7 @@ export function AssetsManagementPage() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        title={selectedAsset ? 'Cập nhật thiết bị' : 'Thêm thiết bị'}
+        title="Cập nhật thiết bị"
         size="lg"
         footer={
           <>
@@ -489,106 +476,60 @@ export function AssetsManagementPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Mã thiết bị <span className="text-destructive">*</span>
+                Mã thiết bị
               </label>
               <Input 
                 {...form.register('assetCode')}
-                placeholder="VD: TB00001 (Hoặc tiền tố)"
-                error={!!form.formState.errors.assetCode}
+                disabled
+                className="bg-muted font-medium"
               />
-              {form.formState.errors.assetCode && (
-                <p className="mt-1 text-xs text-destructive">{form.formState.errors.assetCode.message}</p>
-              )}
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Tên thiết bị <span className="text-destructive">*</span>
+                Tên thiết bị
               </label>
               <Input 
                 {...form.register('assetName')}
-                placeholder="Nhập tên thiết bị"
-                error={!!form.formState.errors.assetName}
+                disabled
+                className="bg-muted font-medium"
               />
-              {form.formState.errors.assetName && (
-                <p className="mt-1 text-xs text-destructive">{form.formState.errors.assetName.message}</p>
-              )}
             </div>
             
             <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Loại thiết bị <span className="text-destructive">*</span>
+                Loại thiết bị
               </label>
-              <Select {...form.register('categoryId')} error={!!form.formState.errors.categoryId}>
+              <Select {...form.register('categoryId')} disabled className="bg-muted font-medium">
                 <option value="">Chọn loại thiết bị</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </Select>
             </div>
-            
-            <div className="md:row-span-2">
+
+            <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Mô tả
+                Vị trí hiện tại
+              </label>
+              <div className="flex h-10 w-full items-center rounded-md border border-input bg-muted px-3 py-2 text-sm font-medium text-primary">
+                {form.watch('buildingId') 
+                  ? `${buildings.find(b => b.id === form.watch('buildingId'))?.name} - Phòng ${rooms.find(r => r.id === form.watch('roomId'))?.roomCode || '...'}` 
+                  : 'Kho trung tâm (Chưa cấp phát)'}
+              </div>
+            </div>
+            
+            <div className="md:col-span-2">
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                Mô tả thêm
               </label>
               <textarea 
                 {...form.register('description')}
-                placeholder="Nhập mô tả..."
-                rows={4}
+                placeholder="Nhập mô tả, ghi chú về thiết bị này..."
+                rows={3}
                 className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
               ></textarea>
             </div>
-
-            <div className="grid grid-cols-2 gap-3 md:col-span-1">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Khu nhà <span className="text-destructive">*</span>
-                </label>
-                <Select {...form.register('buildingId')}>
-                  <option value="">Chọn khu nhà</option>
-                  {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </Select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-foreground">
-                  Phòng <span className="text-destructive">*</span>
-                </label>
-                <Select {...form.register('roomId')}>
-                  <option value="">Chọn phòng</option>
-                  {rooms.filter(r => !form.watch('buildingId') || r.buildingId === form.watch('buildingId')).map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
-                </Select>
-              </div>
-            </div>
           </div>
 
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-6 mb-3">Thông tin mua sắm</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Ngày mua</label>
-              <Input type="date" {...form.register('purchaseDate')} />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Đơn giá (VNĐ)</label>
-              <Input type="number" {...form.register('purchaseCost')} placeholder="Đơn giá" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Số lượng <span className="text-destructive">*</span>
-              </label>
-              <Input 
-                type="number" min="1" 
-                {...form.register('quantity')} 
-                disabled={!!selectedAsset} 
-              />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Bảo hành đến</label>
-              <Input type="date" {...form.register('warrantyExpiryDate')} />
-            </div>
-            <div className="md:col-span-2">
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Số serial/IMEI</label>
-              <Input {...form.register('serialNumber')} placeholder="Nhập số serial" />
-            </div>
-          </div>
-
-          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-6 mb-3">Trạng thái</h3>
+          <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-6 mb-3">Cập nhật Trạng thái</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">Trạng thái sử dụng</label>
@@ -650,6 +591,34 @@ export function AssetsManagementPage() {
           {deleteTarget ? `Thiết bị ${deleteTarget.assetCode} - ${deleteTarget.assetName} sẽ bị xóa khỏi hệ thống. Bạn có chắc chắn?` : ''}
         </p>
       </Modal>
+      <Modal 
+        isOpen={showQrModal} 
+        onClose={() => setShowQrModal(false)} 
+        title="Mã QR Thiết Bị" 
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setShowQrModal(false)}>Đóng</Button>
+            <Button onClick={() => handlePrintQr()}>In mã QR</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col items-center justify-center p-6 bg-white rounded-lg border border-border" ref={qrPrintRef}>
+          {qrAsset && (
+            <>
+              <div className="mb-4 text-center text-black">
+                <h3 className="font-bold text-lg">{qrAsset.assetCode}</h3>
+                <p className="text-sm">{qrAsset.assetName}</p>
+              </div>
+              <QRCodeSVG value={qrAsset.assetCode} size={200} />
+              <div className="mt-4 text-center text-black text-xs">
+                <p>Phòng: {qrAsset.roomName || 'Trong Kho'}</p>
+              </div>
+            </>
+          )}
+        </div>
+      </Modal>
+
     </div>
   );
 }

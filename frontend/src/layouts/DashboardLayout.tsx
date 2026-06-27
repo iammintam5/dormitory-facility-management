@@ -21,6 +21,7 @@ import {
   ClipboardText,
   Trash,
   ArrowsLeftRight,
+  Handshake,
   User,
   LockKey,
   ShieldCheck,
@@ -315,7 +316,8 @@ function getNavGroups(role: UserRole, pendingDamageCount: number = 0): NavGroup[
           { path: 'maintenance', label: 'Bảo trì và sửa chữa', icon: Wrench },
           { path: 'inventory-checks', label: 'Phiếu kiểm kê', icon: ClipboardText },
           { path: 'liquidations', label: 'Thanh lý thiết bị', icon: Trash },
-          { path: 'asset-transactions', label: 'Nhập - xuất thiết bị', icon: ArrowsLeftRight },
+          { path: 'asset-transactions', label: 'Lịch sử nhập/xuất', icon: ArrowsLeftRight },
+          { path: 'asset-transactions/allocation', label: 'Cấp phát - Thu hồi', icon: Handshake },
         ],
       },
       {

@@ -60,6 +60,13 @@ enum LiquidationStatus {
   CANCELLED
 }
 
+enum ReceiptType {
+  IMPORT
+  EXPORT
+  HANDOVER
+  RECLAIM
+}
+
 enum MaintenanceType {
   SCHEDULED
   AD_HOC
@@ -116,6 +123,7 @@ model User {
   performedMaintenanceRecords MaintenanceRecord[]
   createdInventoryChecks     InventoryCheck[]           @relation("CheckedByUser")
   createdLiquidationRecords  LiquidationRecord[]
+  createdAssetReceipts       AssetReceipt[]
   damageReports              DamageReport[]             @relation("Reporter")
   damageReportLogs           DamageReportLog[]
   councilMemberships         CouncilMember[]
@@ -252,6 +260,7 @@ model Asset {
   maintenanceRecords   MaintenanceRecord[]
   inventoryCheckItems  InventoryCheckItem[]
   liquidationItems     LiquidationItem[]
+  receiptItems         AssetReceiptItem[]
   normalizedSearch     NormalizedSearch?
 
   @@map("assets")
@@ -517,4 +526,46 @@ model NormalizedSearch {
   asset   Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
 
   @@map("normalized_searches")
+}
+
+// ===========================
+// ASSET RECEIPTS
+// ===========================
+
+model AssetReceipt {
+  id              Int              @id @default(autoincrement())
+  receiptCode     String           @unique
+  type            ReceiptType
+  receiptDate     DateTime
+  supplierName    String?
+  supplierAddress String?
+  supplierPhone   String?
+  contractNumber  String?
+  documentNumber  String?
+  totalAmount     Decimal?         @db.Decimal(12, 2)
+  note            String?
+  createdAt       DateTime         @default(now())
+
+  createdBy       Int
+  creator         User             @relation(fields: [createdBy], references: [id])
+
+  items           AssetReceiptItem[]
+
+  @@map("asset_receipts")
+}
+
+model AssetReceiptItem {
+  id              Int          @id @default(autoincrement())
+  quantity        Int          @default(1)
+  unitPrice       Decimal?     @db.Decimal(12, 2)
+  warrantyMonths  Int?         @default(0)
+  note            String?
+
+  receiptId       Int
+  receipt         AssetReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  assetId         Int
+  asset           Asset        @relation(fields: [assetId], references: [id])
+
+  @@map("asset_receipt_items")
 }

@@ -171,6 +171,18 @@ export class AssetsService {
       });
     }
 
+    if (data.roomId !== undefined && data.roomId !== existing.roomId) {
+      await this.prisma.assetHistory.create({
+        data: {
+          assetId: id,
+          action: 'ĐIỀU_CHUYỂN',
+          oldRoomId: existing.roomId,
+          newRoomId: data.roomId,
+          note: `Chuyển phòng`,
+        },
+      });
+    }
+
     const asset = await this.prisma.asset.update({
       where: { id },
       data,

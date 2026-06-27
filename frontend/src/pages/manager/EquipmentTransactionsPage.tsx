@@ -13,6 +13,8 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
+import { useState } from 'react';
 
 const transactionData = [
   { id: 1, code: 'NN2024-0009', type: 'Nhập', date: '20/05/2024', items: 80, supplier: 'Cty TNHH Thiết bị Hòa Phát', note: 'Nhập bổ sung Tb các phòng khu A,B', time: '09:30', status: 'Hoàn thành' },
@@ -37,6 +39,7 @@ const statusClass: Record<string, string> = {
 export function EquipmentTransactionsPage() {
   const { user } = useAuth();
   const basePath = user?.role === 'ADMIN' ? '/admin' : '/manager';
+  const [selectedTransaction, setSelectedTransaction] = useState<any>(null);
 
   const summary = {
     total: transactionData.length,
@@ -153,7 +156,7 @@ export function EquipmentTransactionsPage() {
                       {item.note}
                     </TableCell>
                     <TableCell className="text-center">
-                      <Button variant="ghost" size="icon" title="Xem chi tiết">
+                      <Button variant="ghost" size="icon" title="Xem chi tiết" onClick={() => setSelectedTransaction(item)}>
                         <Eye size={16} className="text-muted-foreground" />
                       </Button>
                     </TableCell>
@@ -179,6 +182,59 @@ export function EquipmentTransactionsPage() {
           </div>
         </div>
       </Card>
+
+      {/* Transaction Details Modal */}
+      <Modal isOpen={!!selectedTransaction} onClose={() => setSelectedTransaction(null)} size="lg">
+        <ModalHeader onClose={() => setSelectedTransaction(null)}>
+          <ModalTitle>Chi tiết phiếu {selectedTransaction?.type.toLowerCase()}</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          {selectedTransaction && (
+            <div className="space-y-6 pt-4">
+              <div className="grid grid-cols-2 gap-4 text-sm bg-muted/20 p-4 rounded-lg border border-border/50">
+                <div>
+                  <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">Mã phiếu</p>
+                  <p className="font-bold text-primary text-base">{selectedTransaction.code}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">Trạng thái</p>
+                  <span className={`inline-flex rounded px-2.5 py-0.5 text-[11px] font-bold ${statusClass[selectedTransaction.status] || 'bg-muted text-muted-foreground'}`}>
+                    {selectedTransaction.status}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">Thời gian</p>
+                  <p className="font-semibold text-foreground">{selectedTransaction.time} - {selectedTransaction.date}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">
+                    {selectedTransaction.type === 'Nhập' ? 'Nhà cung cấp' : 'Đơn vị nhận'}
+                  </p>
+                  <p className="font-semibold text-foreground">{selectedTransaction.supplier}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-muted-foreground mb-1 text-xs uppercase tracking-wider">
+                    {selectedTransaction.type === 'Nhập' ? 'Ghi chú nhập hàng' : 'Lý do / Ghi chú xuất'}
+                  </p>
+                  <p className="font-medium text-foreground">{selectedTransaction.note || 'Không có ghi chú'}</p>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-bold text-foreground mb-3 border-b pb-2">Danh sách thiết bị ({selectedTransaction.items})</h4>
+                <div className="bg-muted/30 rounded-md border border-dashed border-border/80 p-8 text-center">
+                  <p className="text-muted-foreground text-sm font-medium">Bảng chi tiết {selectedTransaction.items} thiết bị</p>
+                  <p className="text-xs text-muted-foreground mt-2">(Tính năng xem chi tiết từng tài sản đang được phát triển)</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button onClick={() => setSelectedTransaction(null)}>Đóng</Button>
+        </ModalFooter>
+      </Modal>
+
     </div>
   );
 }
