@@ -8,11 +8,11 @@ const WORKFLOW_MAP: Record<string, { newStatus: string; action: string }> = {
   reject: { newStatus: 'REJECTED', action: 'Từ chối' },
   'start-processing': { newStatus: 'IN_PROGRESS', action: 'Bắt đầu xử lý' },
   complete: { newStatus: 'COMPLETED', action: 'Hoàn thành' },
-  cancel: { newStatus: 'REJECTED', action: 'Hủy phiếu' },
+  cancel: { newStatus: 'CANCELLED', action: 'Hủy phiếu' },
 };
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  SUBMITTED: ['accept', 'reject'],
+  SUBMITTED: ['accept', 'reject', 'cancel'],
   REVIEWING: ['start-processing', 'reject'],
   IN_PROGRESS: ['complete'],
   APPROVED: ['start-processing'],
@@ -139,7 +139,7 @@ export class DamageReportsService {
     };
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, userId?: number, role?: string) {
     const report = await this.prisma.damageReport.findUnique({
       where: { id },
       include: {
@@ -153,6 +153,10 @@ export class DamageReportsService {
       },
     });
     if (!report) throw new NotFoundException('Damage report not found');
+
+    if (role === 'STUDENT' && report.reporterId !== userId) {
+      throw new NotFoundException('Damage report not found');
+    }
 
     return {
       id: report.id,
@@ -180,17 +184,29 @@ export class DamageReportsService {
     if (!body.assetId) {
       throw new BadRequestException('assetId là bắt buộc');
     }
-    if (!body.roomId) {
-      throw new BadRequestException('roomId là bắt buộc');
+
+    const assignment = await this.prisma.roomStudentAssignment.findFirst({
+      where: { studentId: userId, isActive: true },
+    });
+    if (!assignment) {
+      throw new BadRequestException('Sinh viên chưa được phân phòng');
     }
 
-    // Verify asset and room exist
-    const [asset, room] = await Promise.all([
-      this.prisma.asset.findUnique({ where: { id: body.assetId } }),
-      this.prisma.room.findUnique({ where: { id: body.roomId } }),
-    ]);
+    const asset = await this.prisma.asset.findUnique({ where: { id: body.assetId } });
     if (!asset) throw new NotFoundException('Tài sản không tồn tại');
-    if (!room) throw new NotFoundException('Phòng không tồn tại');
+
+    if (asset.roomId !== assignment.roomId) {
+      throw new BadRequestException('Tài sản không thuộc phòng hiện tại của sinh viên');
+    }
+
+    const existingReport = await this.prisma.damageReport.findFirst({
+      where: { assetId: body.assetId, status: { in: ['SUBMITTED', 'REVIEWING', 'IN_PROGRESS'] } }
+    });
+    if (existingReport) {
+      throw new BadRequestException('Tài sản này đang có phiếu báo hỏng chưa hoàn tất');
+    }
+
+    const roomId = assignment.roomId;
 
     const reportCode = generateCode('BH-');
 
@@ -202,8 +218,8 @@ export class DamageReportsService {
         status: 'SUBMITTED',
         reporterId: userId,
         assetId: body.assetId,
-        roomId: body.roomId,
-        location: `${body.roomId ?? ''}`,
+        roomId: roomId,
+        location: `${roomId}`,
         damageReportLogs: {
           create: {
             action: 'Tạo phiếu',
@@ -228,7 +244,7 @@ export class DamageReportsService {
       tableName: 'damage_reports',
       recordId: report.id,
       content: `Tạo phiếu báo hỏng ${reportCode}`,
-      newValue: JSON.stringify({ assetId: body.assetId, roomId: body.roomId, priority: body.priority }),
+      newValue: JSON.stringify({ assetId: body.assetId, roomId: roomId, priority: body.priority }),
     });
 
     return report;
@@ -246,6 +262,9 @@ export class DamageReportsService {
   ) {
     const report = await this.prisma.damageReport.findUnique({ where: { id } });
     if (!report) throw new NotFoundException('Damage report not found');
+    if (report.reporterId !== userId) {
+      throw new NotFoundException('Damage report not found');
+    }
 
     // Only allow update if status is SUBMITTED
     if (report.status !== 'SUBMITTED') {
@@ -268,12 +287,12 @@ export class DamageReportsService {
       changes.push('tài sản');
     }
     if (body.roomId !== undefined && body.roomId !== report.roomId) {
-      updateData.roomId = body.roomId;
-      changes.push('phòng');
+      // Allow if body.roomId matches report.roomId, else ignore it or reject
+      // We will ignore updating roomId for student.
     }
 
     if (Object.keys(updateData).length === 0) {
-      return this.findOne(id);
+      return this.findOne(id, userId, 'STUDENT');
     }
 
     const updated = await this.prisma.damageReport.update({
@@ -321,6 +340,10 @@ export class DamageReportsService {
       include: { asset: true },
     });
     if (!report) throw new NotFoundException('Damage report not found');
+
+    if (action === 'cancel' && report.reporterId !== userId) {
+      throw new NotFoundException('Damage report not found');
+    }
 
     const allowed = VALID_TRANSITIONS[report.status] ?? [];
     if (!allowed.includes(action)) {

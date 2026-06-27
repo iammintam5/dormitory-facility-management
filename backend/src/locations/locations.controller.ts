@@ -46,7 +46,7 @@ export class LocationsController {
     return this.locationsService.batchUpdateRooms(parseInt(id, 10), body);
   }
 
-  @Roles('MANAGER', 'STUDENT')
+  @Roles('MANAGER')
   @Get('rooms')
   async getRooms(@Query('buildingId') buildingId?: string) {
     return this.locationsService.getRooms(buildingId ? parseInt(buildingId, 10) : undefined);

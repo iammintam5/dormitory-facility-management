@@ -26,8 +26,8 @@ export class NotificationsController {
   }
 
   @Post(':id/mark-read')
-  async markRead(@Param('id') id: string) {
-    return this.service.markRead(parseInt(id, 10));
+  async markRead(@Param('id') id: string, @CurrentUser('sub') userId: number) {
+    return this.service.markRead(parseInt(id, 10), userId);
   }
 
   @Post('mark-all-read')
