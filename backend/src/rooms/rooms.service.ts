@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -40,6 +41,18 @@ export class RoomsService {
   async update(id: number, body: { roomCode?: string; capacity?: number; note?: string }) {
     const room = await this.prisma.room.findUnique({ where: { id } });
     if (!room) throw new NotFoundException('Room not found');
+
+    if (body.capacity !== undefined && body.capacity !== null) {
+      if (body.capacity <= 0) {
+        throw new ConflictException('Sức chứa phải là số nguyên dương lớn hơn 0.');
+      }
+      const activeAssignments = await this.prisma.roomStudentAssignment.count({
+        where: { roomId: id, isActive: true },
+      });
+      if (body.capacity < activeAssignments) {
+        throw new ConflictException(`Không thể giảm sức chứa xuống ${body.capacity} vì phòng đang có ${activeAssignments} sinh viên.`);
+      }
+    }
 
     return this.prisma.room.update({
       where: { id },
@@ -99,34 +112,53 @@ export class RoomsService {
   }
 
   async assignStudent(roomId: number, studentId: number) {
-    const room = await this.prisma.room.findUnique({ where: { id: roomId } });
-    if (!room) throw new NotFoundException('Room not found');
-
     const student = await this.prisma.user.findUnique({ where: { id: studentId } });
     if (!student) throw new NotFoundException('Student not found');
 
-    // Check if student already has an active assignment in this room
-    const existing = await this.prisma.roomStudentAssignment.findFirst({
-      where: { studentId, isActive: true },
-    });
-    if (existing) {
-      throw new ConflictException('Sinh viên này đã được xếp vào một phòng khác.');
-    }
+    return this.prisma.$transaction(async (tx) => {
+      const room = await tx.room.findUnique({ where: { id: roomId } });
+      if (!room) throw new NotFoundException('Room not found');
 
-    const assignment = await this.prisma.roomStudentAssignment.create({
-      data: {
-        roomId,
-        studentId,
-        startDate: new Date(),
-        isActive: true,
-      },
-      include: {
-        student: true,
-        room: true,
-      },
-    });
+      // Check capacity
+      if (room.capacity !== null) {
+        const activeCount = await tx.roomStudentAssignment.count({
+          where: { roomId, isActive: true },
+        });
+        if (activeCount >= room.capacity) {
+          throw new ConflictException('Phòng đã đầy.');
+        }
+      }
 
-    return assignment;
+      // Check if student already has an active assignment
+      const existing = await tx.roomStudentAssignment.findFirst({
+        where: { studentId, isActive: true },
+      });
+      if (existing) {
+        throw new ConflictException('Sinh viên này đã được xếp vào một phòng khác.');
+      }
+
+      try {
+        const assignment = await tx.roomStudentAssignment.create({
+          data: {
+            roomId,
+            studentId,
+            startDate: new Date(),
+            isActive: true,
+          },
+          include: {
+            student: true,
+            room: true,
+          },
+        });
+
+        return assignment;
+      } catch (error: any) {
+        if (error.code === 'P2002') {
+          throw new ConflictException('Sinh viên này đã được xếp vào phòng khác.');
+        }
+        throw error;
+      }
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async removeStudent(roomId: number, studentId: number) {
@@ -149,37 +181,38 @@ export class RoomsService {
   }
 
   async transferStudent(studentId: number, newRoomId: number) {
-    // Find current active assignment
-    const currentAssignment = await this.prisma.roomStudentAssignment.findFirst({
-      where: { studentId, isActive: true },
-    });
-    if (!currentAssignment) {
-      throw new NotFoundException('Sinh viên này hiện không ở phòng nào.');
-    }
-
-    if (currentAssignment.roomId === newRoomId) {
-      throw new ConflictException('Sinh viên đã ở phòng này rồi.');
-    }
-
-    // Validate new room exists
-    const newRoom = await this.prisma.room.findUnique({
-      where: { id: newRoomId },
-      include: {
-        floor: { include: { building: true } },
-        roomStudentAssignments: {
-          where: { isActive: true },
-        },
-      },
-    });
-    if (!newRoom) throw new NotFoundException('Phòng đích không tồn tại.');
-
-    // Check capacity
-    if (newRoom.capacity && newRoom.roomStudentAssignments.length >= newRoom.capacity) {
-      throw new ConflictException('Phòng đích đã đầy.');
-    }
-
     // Use transaction: deactivate old + create new
     const result = await this.prisma.$transaction(async (tx) => {
+      // Find current active assignment
+      const currentAssignment = await tx.roomStudentAssignment.findFirst({
+        where: { studentId, isActive: true },
+      });
+      if (!currentAssignment) {
+        throw new NotFoundException('Sinh viên này hiện không ở phòng nào.');
+      }
+
+      if (currentAssignment.roomId === newRoomId) {
+        throw new ConflictException('Sinh viên đã ở phòng này rồi.');
+      }
+
+      // Validate new room exists and capacity
+      const newRoom = await tx.room.findUnique({
+        where: { id: newRoomId },
+        include: {
+          floor: { include: { building: true } },
+        },
+      });
+      if (!newRoom) throw new NotFoundException('Phòng đích không tồn tại.');
+
+      if (newRoom.capacity !== null) {
+        const activeCount = await tx.roomStudentAssignment.count({
+          where: { roomId: newRoomId, isActive: true },
+        });
+        if (activeCount >= newRoom.capacity) {
+          throw new ConflictException('Phòng đích đã đầy.');
+        }
+      }
+
       // Deactivate current assignment
       await tx.roomStudentAssignment.update({
         where: { id: currentAssignment.id },
@@ -207,21 +240,21 @@ export class RoomsService {
         },
       });
 
-      return newAssignment;
-    });
+      return { newAssignment, currentAssignment };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return {
       message: 'Chuyển phòng thành công.',
-      previousRoomId: currentAssignment.roomId,
+      previousRoomId: result.currentAssignment.roomId,
       newRoom: {
-        id: result.room.id,
-        roomCode: result.room.roomCode,
-        buildingName: result.room.floor.building.name,
-        floorNumber: result.room.floor.floorNumber,
+        id: result.newAssignment.room.id,
+        roomCode: result.newAssignment.room.roomCode,
+        buildingName: result.newAssignment.room.floor.building.name,
+        floorNumber: result.newAssignment.room.floor.floorNumber,
       },
       student: {
-        id: result.student.id,
-        fullName: result.student.fullName,
+        id: result.newAssignment.student.id,
+        fullName: result.newAssignment.student.fullName,
       },
     };
   }

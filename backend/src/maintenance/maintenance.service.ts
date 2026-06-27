@@ -1,10 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateCode } from '../common/utils/code-generator';
+import { AssetTransitionService } from '../assets/asset-transition.service';
+import { AssetStatus } from '@prisma/client';
 
 @Injectable()
 export class MaintenanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly assetTransitionService: AssetTransitionService
+  ) {}
 
   private mapPlan(r: any) {
     return {
@@ -102,26 +107,46 @@ export class MaintenanceService {
   ) {
     const code = generateCode('BT-');
 
-    const record = await this.prisma.maintenanceRecord.create({
-      data: {
-        maintenanceCode: code,
-        assetId: body.assetId,
-        performedBy: userId,
-        maintenanceDate: new Date(body.maintenanceDate),
-        maintenanceType: body.maintenanceType as any,
-        content: body.content,
-        resultStatus: body.resultStatus as any,
-        planId: body.planId ?? null,
-        nextMaintenanceDate: body.nextMaintenanceDate ? new Date(body.nextMaintenanceDate) : null,
-        cost: body.cost ?? null,
-        materialNote: body.materialNote ?? null,
-        note: body.note ?? null,
-      },
-      include: {
-        asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
-        plan: true,
-        performer: true,
-      },
+    const record = await this.prisma.$transaction(async (tx) => {
+      const rec = await tx.maintenanceRecord.create({
+        data: {
+          maintenanceCode: code,
+          assetId: body.assetId,
+          performedBy: userId,
+          maintenanceDate: new Date(body.maintenanceDate),
+          maintenanceType: body.maintenanceType as any,
+          content: body.content,
+          resultStatus: body.resultStatus as any,
+          planId: body.planId ?? null,
+          nextMaintenanceDate: body.nextMaintenanceDate ? new Date(body.nextMaintenanceDate) : null,
+          cost: body.cost ?? null,
+          materialNote: body.materialNote ?? null,
+          note: body.note ?? null,
+        },
+        include: {
+          asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
+          plan: true,
+          performer: true,
+        },
+      });
+
+      let nextStatus: AssetStatus | null = null;
+      if (body.resultStatus === 'NEEDS_REPAIR') nextStatus = AssetStatus.UNDER_MAINTENANCE;
+      else if (body.resultStatus === 'UNREPAIRABLE') nextStatus = AssetStatus.DAMAGED;
+      else if (body.resultStatus === 'GOOD' || body.resultStatus === 'COMPLETED' || body.resultStatus === 'REPAIRED') {
+        const asset = await tx.asset.findUnique({ where: { id: body.assetId } });
+        nextStatus = asset?.roomId ? AssetStatus.IN_USE : AssetStatus.AVAILABLE;
+      }
+
+      if (nextStatus) {
+        await this.assetTransitionService.transition(tx, body.assetId, nextStatus, {
+          action: 'BẢO_TRÌ',
+          userId,
+          note: `Bảo trì: ${body.resultStatus}`,
+        });
+      }
+
+      return rec;
     });
 
     return this.mapRecord(record);
@@ -153,16 +178,42 @@ export class MaintenanceService {
     if (body.materialNote !== undefined) updateData.materialNote = body.materialNote;
     if (body.note !== undefined) updateData.note = body.note;
 
-    const updated = await this.prisma.maintenanceRecord.update({
-      where: { id },
-      data: updateData,
-      include: {
-        asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
-        plan: true,
-        performer: true,
-      },
+    const recordUpdate = await this.prisma.$transaction(async (tx) => {
+      const updatedRec = await tx.maintenanceRecord.update({
+        where: { id },
+        data: updateData,
+        include: {
+          asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
+          plan: true,
+          performer: true,
+        },
+      });
+
+      if (body.resultStatus && body.resultStatus !== record.resultStatus) {
+        let nextStatus: AssetStatus | null = null;
+        if (body.resultStatus === 'NEEDS_REPAIR') nextStatus = AssetStatus.UNDER_MAINTENANCE;
+        else if (body.resultStatus === 'UNREPAIRABLE') nextStatus = AssetStatus.DAMAGED;
+        else if (body.resultStatus === 'GOOD' || body.resultStatus === 'COMPLETED' || body.resultStatus === 'REPAIRED') {
+          const asset = await tx.asset.findUnique({ where: { id: record.assetId } });
+          nextStatus = asset?.roomId ? AssetStatus.IN_USE : AssetStatus.AVAILABLE;
+        }
+
+        if (nextStatus) {
+          try {
+            await this.assetTransitionService.transition(tx, record.assetId, nextStatus, {
+              action: 'CẬP_NHẬT_BẢO_TRÌ',
+              userId: 0,
+              note: `Cập nhật bảo trì: ${body.resultStatus}`,
+            });
+          } catch (e) {
+            if (e.name !== 'ConflictException') throw e;
+          }
+        }
+      }
+      return updatedRec;
     });
-    return this.mapRecord(updated);
+
+    return this.mapRecord(recordUpdate);
   }
 
   async getDashboardSummary() {

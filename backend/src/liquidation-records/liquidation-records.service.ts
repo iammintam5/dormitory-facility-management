@@ -1,6 +1,8 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateCode } from '../common/utils/code-generator';
+import { AssetTransitionService } from '../assets/asset-transition.service';
+import { AssetStatus } from '@prisma/client';
 
 const WORKFLOW: Record<string, string> = {
   'submit-approval': 'PENDING_APPROVAL',
@@ -12,7 +14,10 @@ const WORKFLOW: Record<string, string> = {
 
 @Injectable()
 export class LiquidationRecordsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly assetTransitionService: AssetTransitionService,
+  ) {}
 
   async findAll(params: { page: number; pageSize: number; status?: string; keyword?: string }) {
     const { page, pageSize, status, keyword } = params;
@@ -127,18 +132,10 @@ export class LiquidationRecordsService {
 
     const record = await this.prisma.$transaction(async (tx) => {
       // Update asset status to PENDING_LIQUIDATION
-      await tx.asset.update({
-        where: { id: body.assetId },
-        data: { status: 'PENDING_LIQUIDATION' },
-      });
-
-      await tx.assetHistory.create({
-        data: {
-          assetId: body.assetId,
-          action: 'CHỜ_THANH_LÝ',
-          newStatus: 'PENDING_LIQUIDATION',
-          note: 'Đưa vào danh sách thanh lý',
-        },
+      await this.assetTransitionService.transition(tx, body.assetId, AssetStatus.PENDING_LIQUIDATION, {
+        action: 'CHỜ_THANH_LÝ',
+        userId,
+        note: 'Đưa vào danh sách thanh lý',
       });
 
       // Create liquidation record
@@ -189,37 +186,29 @@ export class LiquidationRecordsService {
       const assetIds = updatedRecord.liquidationItems.map((li: any) => li.assetId);
 
       if (action === 'complete') {
-        await tx.asset.updateMany({
-          where: { id: { in: assetIds } },
-          data: { status: 'LIQUIDATED' },
-        });
-
         for (const assetId of assetIds) {
-          await tx.assetHistory.create({
-            data: {
-              assetId,
-              action: 'ĐÃ_THANH_LÝ',
-              newStatus: 'LIQUIDATED',
-              note: `Hoàn tất thanh lý theo hồ sơ #${updatedRecord.liquidationCode}`,
-            },
+          await this.assetTransitionService.transition(tx, assetId, AssetStatus.LIQUIDATED, {
+            action: 'ĐÃ_THANH_LÝ',
+            userId,
+            newRoomId: null, // ensure removed from room
+            note: `Hoàn tất thanh lý theo hồ sơ #${updatedRecord.liquidationCode}`,
           });
         }
       }
 
       if (action === 'reject') {
-        await tx.asset.updateMany({
-          where: { id: { in: assetIds } },
-          data: { status: 'IN_USE' },
-        });
-
         for (const assetId of assetIds) {
-          await tx.assetHistory.create({
-            data: {
-              assetId,
-              action: 'HỦY_THANH_LÝ',
-              newStatus: 'IN_USE',
-              note: `Hủy thanh lý theo hồ sơ #${updatedRecord.liquidationCode}`,
-            },
+          // Find the last status before PENDING_LIQUIDATION to revert
+          const lastHistory = await tx.assetHistory.findFirst({
+            where: { assetId, action: 'CHỜ_THANH_LÝ' },
+            orderBy: { createdAt: 'desc' },
+          });
+          const revertStatus = (lastHistory?.oldStatus ?? AssetStatus.AVAILABLE) as AssetStatus;
+
+          await this.assetTransitionService.transition(tx, assetId, revertStatus, {
+            action: 'HỦY_THANH_LÝ',
+            userId,
+            note: `Hủy thanh lý theo hồ sơ #${updatedRecord.liquidationCode}`,
           });
         }
       }

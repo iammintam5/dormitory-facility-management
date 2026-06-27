@@ -1,11 +1,15 @@
 import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ReceiptType } from '@prisma/client';
+import { ReceiptType, AssetStatus } from '@prisma/client';
 import { generateCode } from '../common/utils/code-generator';
+import { AssetTransitionService } from '../assets/asset-transition.service';
 
 @Injectable()
 export class AssetReceiptsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly assetTransitionService: AssetTransitionService
+  ) {}
 
   async createImportReceipt(payload: any, userId: number) {
     const {
@@ -143,31 +147,22 @@ export class AssetReceiptsService {
         },
       });
 
-      for (const assetId of assetIds) {
-        await prisma.asset.update({
-          where: { id: parseInt(assetId, 10) },
-          data: {
-            roomId: parseInt(targetRoomId, 10),
-            status: 'IN_USE',
-          },
+      const uniqueAssetIds = [...new Set(assetIds.map((id: any) => parseInt(id, 10)))] as number[];
+
+      for (const assetId of uniqueAssetIds) {
+        await this.assetTransitionService.transition(prisma, assetId, AssetStatus.IN_USE, {
+          action: 'CẤP_PHÁT',
+          userId,
+          newRoomId: parseInt(targetRoomId, 10),
+          note: `Cấp phát theo phiếu ${receiptCode}`,
         });
 
         await prisma.assetReceiptItem.create({
           data: {
             receiptId: receipt.id,
-            assetId: parseInt(assetId, 10),
+            assetId,
             quantity: 1,
             note: 'Cấp phát',
-          },
-        });
-
-        await prisma.assetHistory.create({
-          data: {
-            assetId: parseInt(assetId, 10),
-            action: 'CẤP_PHÁT',
-            newStatus: 'IN_USE',
-            newRoomId: parseInt(targetRoomId, 10),
-            note: `Cấp phát theo phiếu ${receiptCode}`,
           },
         });
       }
@@ -190,32 +185,34 @@ export class AssetReceiptsService {
         },
       });
 
-      for (const assetId of assetIds) {
-        await prisma.asset.update({
-          where: { id: parseInt(assetId, 10) },
-          data: {
-            roomId: null,
-            status: 'AVAILABLE',
-          },
+      const uniqueAssetIds = [...new Set(assetIds.map((id: any) => parseInt(id, 10)))] as number[];
+
+      for (const assetId of uniqueAssetIds) {
+        // Find asset to ensure it belongs to fromRoomId
+        const asset = await prisma.asset.findUnique({ where: { id: assetId } });
+        if (!asset || asset.roomId !== parseInt(fromRoomId, 10)) {
+          throw new BadRequestException(`Tài sản ID ${assetId} không thuộc phòng ID ${fromRoomId}`);
+        }
+
+        // Keep current status if it's DAMAGED or UNDER_MAINTENANCE.
+        // If IN_USE, revert to AVAILABLE.
+        const nextStatus = (asset.status === AssetStatus.DAMAGED || asset.status === AssetStatus.UNDER_MAINTENANCE) 
+          ? asset.status 
+          : AssetStatus.AVAILABLE;
+
+        await this.assetTransitionService.transition(prisma, assetId, nextStatus, {
+          action: 'THU_HỒI',
+          userId,
+          newRoomId: null, // Return to stock
+          note: `Thu hồi theo phiếu ${receiptCode}`,
         });
 
         await prisma.assetReceiptItem.create({
           data: {
             receiptId: receipt.id,
-            assetId: parseInt(assetId, 10),
+            assetId,
             quantity: 1,
             note: 'Thu hồi',
-          },
-        });
-
-        await prisma.assetHistory.create({
-          data: {
-            assetId: parseInt(assetId, 10),
-            action: 'THU_HỒI',
-            newStatus: 'AVAILABLE',
-            oldRoomId: parseInt(fromRoomId, 10),
-            newRoomId: null,
-            note: `Thu hồi theo phiếu ${receiptCode}`,
           },
         });
       }
@@ -254,21 +251,17 @@ export class AssetReceiptsService {
         });
 
         // 2. Process Items
-        for (const item of items) {
+        const uniqueItems = Array.from(new Map(items.map((item: any) => [parseInt(item.id, 10), item])).values()) as any[];
+
+        for (const item of uniqueItems) {
           const assetId = parseInt(item.id, 10);
           
-          // Get old asset info
-          const oldAsset = await prisma.asset.findUnique({ where: { id: assetId } });
-          const oldRoomId = oldAsset?.roomId;
-
-          // Update Asset
-          await prisma.asset.update({
-            where: { id: assetId },
-            data: {
-              status: 'LIQUIDATED',
-              roomId: null,
-              description: item.note || reason,
-            }
+          // Use Transition Service. It expects AVAILABLE or PENDING_LIQUIDATION to transition to LIQUIDATED
+          await this.assetTransitionService.transition(prisma, assetId, AssetStatus.LIQUIDATED, {
+            action: 'XUẤT_KHO',
+            userId,
+            newRoomId: null,
+            note: `Xuất thiết bị theo phiếu ${receiptCode}. Lý do: ${reason}`,
           });
 
           // Create Receipt Item
@@ -279,19 +272,6 @@ export class AssetReceiptsService {
               quantity: item.qty || 1,
               note: item.note || reason,
             },
-          });
-
-          // Create Asset History
-          await prisma.assetHistory.create({
-            data: {
-              assetId: assetId,
-              action: 'XUẤT_KHO',
-              oldStatus: oldAsset?.status,
-              newStatus: 'LIQUIDATED',
-              oldRoomId: oldRoomId,
-              newRoomId: null,
-              note: `Xuất thiết bị theo phiếu ${receiptCode}. Lý do: ${reason}`,
-            }
           });
         }
         return receipt;
