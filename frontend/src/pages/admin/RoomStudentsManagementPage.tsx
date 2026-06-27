@@ -299,7 +299,11 @@ export function RoomStudentsManagementPage() {
       await loadStudents(); // Refresh lại dữ liệu
     } catch (error: any) {
       const message = error?.response?.data?.message || error.message || 'Lưu thông tin thất bại.';
-      showToast(message, 'error');
+      if (message.toLowerCase().includes('đầy')) {
+        form.setError('roomCode', { type: 'manual', message: message });
+      } else {
+        showToast(message, 'error');
+      }
     } finally {
       setIsLoading(false);
     }

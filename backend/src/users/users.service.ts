@@ -29,6 +29,7 @@ export class UsersService {
         { fullName: { contains: keyword, mode: 'insensitive' } },
         { userCode: { contains: keyword, mode: 'insensitive' } },
         { email: { contains: keyword, mode: 'insensitive' } },
+        { studentCode: { contains: keyword, mode: 'insensitive' } },
       ];
     }
     if (roleCode) {

@@ -12,7 +12,7 @@ import { CreateUserDto, UpdateUserDto, ResetPasswordDto } from './dto/create-use
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Roles('ADMIN')
+  @Roles('ADMIN', 'MANAGER')
   @Get()
   async findAll(
     @Query('page') page?: string,
