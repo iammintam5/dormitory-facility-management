@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateCode } from '../common/utils/code-generator';
 
@@ -135,9 +135,17 @@ export class InventoryChecksService {
     const record = await this.prisma.inventoryCheck.findUnique({ where: { id } });
     if (!record) throw new NotFoundException('Inventory check not found');
 
+    if (record.status !== 'DRAFT') {
+      throw new BadRequestException('Chỉ có thể cập nhật khi phiên kiểm kê ở trạng thái DRAFT');
+    }
+
     for (const item of items) {
-      await this.prisma.inventoryCheckItem.update({
-        where: { id: item.itemId },
+      if (item.actualQuantity < 0) {
+        throw new BadRequestException('Số lượng thực tế không được âm');
+      }
+
+      const updateResult = await this.prisma.inventoryCheckItem.updateMany({
+        where: { id: item.itemId, inventoryCheckId: id },
         data: {
           actualQuantity: item.actualQuantity,
           difference: item.actualQuantity - 1,
@@ -145,6 +153,10 @@ export class InventoryChecksService {
           note: item.note ?? null,
         },
       });
+
+      if (updateResult.count === 0) {
+        throw new BadRequestException(`Item ID ${item.itemId} không thuộc phiên kiểm kê này hoặc không tồn tại`);
+      }
     }
 
     return this.findOne(id);
@@ -154,20 +166,24 @@ export class InventoryChecksService {
     const record = await this.prisma.inventoryCheck.findUnique({ where: { id } });
     if (!record) throw new NotFoundException('Inventory check not found');
 
-    const completed = await this.prisma.inventoryCheck.update({
-      where: { id },
+    if (record.status !== 'DRAFT') {
+      throw new BadRequestException('Phiên kiểm kê đã hoàn tất hoặc không ở trạng thái DRAFT');
+    }
+
+    const updateResult = await this.prisma.inventoryCheck.updateMany({
+      where: { id, status: 'DRAFT' },
       data: {
         status: 'COMPLETED',
         completedAt: new Date(),
         generalNote: generalNote ?? record.generalNote,
       },
-      include: {
-        room: { include: { floor: { include: { building: true } } } },
-        checker: true,
-        inventoryCheckItems: { include: { asset: { include: { category: true } } } },
-      },
     });
-    return this.mapRecord(completed);
+
+    if (updateResult.count === 0) {
+      throw new ConflictException('Xung đột trạng thái: Phiên kiểm kê đã bị thay đổi');
+    }
+
+    return this.findOne(id);
   }
 
   async exportData(id: number) {

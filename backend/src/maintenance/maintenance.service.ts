@@ -131,9 +131,9 @@ export class MaintenanceService {
       });
 
       let nextStatus: AssetStatus | null = null;
-      if (body.resultStatus === 'NEEDS_REPAIR') nextStatus = AssetStatus.UNDER_MAINTENANCE;
-      else if (body.resultStatus === 'UNREPAIRABLE') nextStatus = AssetStatus.DAMAGED;
-      else if (body.resultStatus === 'GOOD' || body.resultStatus === 'COMPLETED' || body.resultStatus === 'REPAIRED') {
+      if (body.resultStatus === 'NEED_REPAIR') nextStatus = AssetStatus.UNDER_MAINTENANCE;
+      else if (body.resultStatus === 'RECOMMEND_LIQUIDATION') nextStatus = AssetStatus.DAMAGED;
+      else if (body.resultStatus === 'GOOD' || body.resultStatus === 'NEED_MONITORING') {
         const asset = await tx.asset.findUnique({ where: { id: body.assetId } });
         nextStatus = asset?.roomId ? AssetStatus.IN_USE : AssetStatus.AVAILABLE;
       }
@@ -191,23 +191,19 @@ export class MaintenanceService {
 
       if (body.resultStatus && body.resultStatus !== record.resultStatus) {
         let nextStatus: AssetStatus | null = null;
-        if (body.resultStatus === 'NEEDS_REPAIR') nextStatus = AssetStatus.UNDER_MAINTENANCE;
-        else if (body.resultStatus === 'UNREPAIRABLE') nextStatus = AssetStatus.DAMAGED;
-        else if (body.resultStatus === 'GOOD' || body.resultStatus === 'COMPLETED' || body.resultStatus === 'REPAIRED') {
+        if (body.resultStatus === 'NEED_REPAIR') nextStatus = AssetStatus.UNDER_MAINTENANCE;
+        else if (body.resultStatus === 'RECOMMEND_LIQUIDATION') nextStatus = AssetStatus.DAMAGED;
+        else if (body.resultStatus === 'GOOD' || body.resultStatus === 'NEED_MONITORING') {
           const asset = await tx.asset.findUnique({ where: { id: record.assetId } });
           nextStatus = asset?.roomId ? AssetStatus.IN_USE : AssetStatus.AVAILABLE;
         }
 
         if (nextStatus) {
-          try {
-            await this.assetTransitionService.transition(tx, record.assetId, nextStatus, {
-              action: 'CẬP_NHẬT_BẢO_TRÌ',
-              userId: 0,
-              note: `Cập nhật bảo trì: ${body.resultStatus}`,
-            });
-          } catch (e) {
-            if (e.name !== 'ConflictException') throw e;
-          }
+          await this.assetTransitionService.transition(tx, record.assetId, nextStatus, {
+            action: 'CẬP_NHẬT_BẢO_TRÌ',
+            userId: 0,
+            note: `Cập nhật bảo trì: ${body.resultStatus}`,
+          });
         }
       }
       return updatedRec;

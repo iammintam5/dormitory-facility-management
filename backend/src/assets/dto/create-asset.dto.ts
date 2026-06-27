@@ -21,14 +21,7 @@ export class CreateAssetDto {
   @Type(() => Number)
   categoryId!: number;
 
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  roomId?: number | null;
 
-  @IsOptional()
-  @IsEnum(AssetStatusEnum)
-  status?: AssetStatusEnum;
 
   @IsOptional()
   @IsString()
@@ -53,9 +46,7 @@ export class UpdateAssetDto {
   @IsString()
   assetName?: string;
 
-  @IsOptional()
-  @IsEnum(AssetStatusEnum)
-  status?: AssetStatusEnum;
+
 
   @IsOptional()
   @IsString()
@@ -66,8 +57,5 @@ export class UpdateAssetDto {
   @Type(() => Number)
   categoryId?: number;
 
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  roomId?: number | null;
+
 }

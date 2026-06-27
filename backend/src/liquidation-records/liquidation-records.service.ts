@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateCode } from '../common/utils/code-generator';
 import { AssetTransitionService } from '../assets/asset-transition.service';
@@ -171,6 +171,19 @@ export class LiquidationRecordsService {
 
     const newStatus = WORKFLOW[action];
     if (!newStatus) throw new NotFoundException(`Invalid action: ${action}`);
+
+    const VALID_TRANSITIONS: Record<string, string[]> = {
+      'DRAFT': ['PENDING_APPROVAL', 'CANCELLED'],
+      'PENDING_APPROVAL': ['APPROVED', 'REJECTED', 'CANCELLED'],
+      'APPROVED': ['COMPLETED', 'CANCELLED'],
+      'REJECTED': [],
+      'COMPLETED': [],
+      'CANCELLED': []
+    };
+
+    if (!VALID_TRANSITIONS[record.status]?.includes(newStatus)) {
+      throw new ConflictException(`Không thể chuyển trạng thái thanh lý từ ${record.status} sang ${newStatus}`);
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const updatedRecord = await tx.liquidationRecord.update({

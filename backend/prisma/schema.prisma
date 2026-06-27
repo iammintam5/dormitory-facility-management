@@ -6,8 +6,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
@@ -91,8 +91,8 @@ enum NotificationStatus {
 // ===========================
 
 model Role {
-  id          Int      @id @default(autoincrement())
-  code        String   @unique
+  id          Int     @id @default(autoincrement())
+  code        String  @unique
   name        String
   description String?
 
@@ -105,7 +105,7 @@ model User {
   id          Int        @id @default(autoincrement())
   fullName    String
   userCode    String     @unique
-  password    String     // bcrypt hash
+  password    String // bcrypt hash
   email       String?
   phone       String?
   studentCode String?
@@ -114,41 +114,41 @@ model User {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  roleId  Int
-  role    Role   @relation(fields: [roleId], references: [id])
+  roleId Int
+  role   Role @relation(fields: [roleId], references: [id])
 
-  profile                    Profile?
-  roomStudentAssignments     RoomStudentAssignment[]
-  ownedAssets                Asset[]                    @relation("AssetCheckedByUser")
-  createdMaintenancePlans    MaintenancePlan[]
+  profile                     Profile?
+  roomStudentAssignments      RoomStudentAssignment[]
+  ownedAssets                 Asset[]                 @relation("AssetCheckedByUser")
+  createdMaintenancePlans     MaintenancePlan[]
   performedMaintenanceRecords MaintenanceRecord[]
-  createdInventoryChecks     InventoryCheck[]           @relation("CheckedByUser")
-  createdLiquidationRecords  LiquidationRecord[]
-  createdAssetReceipts       AssetReceipt[]
-  damageReports              DamageReport[]             @relation("Reporter")
-  damageReportLogs           DamageReportLog[]
-  councilMemberships         CouncilMember[]
-  notifications              Notification[]
-  auditLogs                  AuditLog[]
+  createdInventoryChecks      InventoryCheck[]        @relation("CheckedByUser")
+  createdLiquidationRecords   LiquidationRecord[]
+  createdAssetReceipts        AssetReceipt[]
+  damageReports               DamageReport[]          @relation("Reporter")
+  damageReportLogs            DamageReportLog[]
+  councilMemberships          CouncilMember[]
+  notifications               Notification[]
+  auditLogs                   AuditLog[]
 
   @@map("users")
 }
 
 model Profile {
-  id            Int     @id @default(autoincrement())
-  avatarUrl     String?
-  gender        String?
-  dateOfBirth   String? // ISO date string
-  address       String?
-  faculty       String?
-  className     String?
-  course        String?
-  emergencyName String?
+  id             Int     @id @default(autoincrement())
+  avatarUrl      String?
+  gender         String?
+  dateOfBirth    String? // ISO date string
+  address        String?
+  faculty        String?
+  className      String?
+  course         String?
+  emergencyName  String?
   emergencyPhone String?
-  notes         String?
+  notes          String?
 
-  userId Int   @unique
-  user   User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("profiles")
 }
@@ -170,12 +170,12 @@ model DormBuilding {
 }
 
 model Floor {
-  id          Int    @id @default(autoincrement())
+  id          Int     @id @default(autoincrement())
   floorNumber Int
   name        String?
 
   buildingId Int
-  building   DormBuilding @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  building   DormBuilding @relation(fields: [buildingId], references: [id], onDelete: Restrict)
 
   rooms Room[]
 
@@ -194,7 +194,7 @@ model Room {
   updatedAt DateTime @updatedAt
 
   floorId Int
-  floor   Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
+  floor   Floor @relation(fields: [floorId], references: [id], onDelete: Restrict)
 
   roomStudentAssignments RoomStudentAssignment[]
   assets                 Asset[]
@@ -205,15 +205,15 @@ model Room {
 }
 
 model RoomStudentAssignment {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   startDate DateTime
   endDate   DateTime?
-  isActive  Boolean  @default(true)
+  isActive  Boolean   @default(true)
 
   roomId    Int
-  room      Room  @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  room      Room @relation(fields: [roomId], references: [id], onDelete: Restrict)
   studentId Int
-  student   User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student   User @relation(fields: [studentId], references: [id], onDelete: Restrict)
 
   @@map("room_student_assignments")
 }
@@ -223,13 +223,13 @@ model RoomStudentAssignment {
 // ===========================
 
 model AssetCategory {
-  id                    Int      @id @default(autoincrement())
-  code                  String   @unique
-  name                  String
-  description           String?
+  id                     Int      @id @default(autoincrement())
+  code                   String   @unique
+  name                   String
+  description            String?
   maintenanceCycleMonths Int?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   assets Asset[]
 
@@ -253,32 +253,32 @@ model Asset {
   room   Room? @relation(fields: [roomId], references: [id])
 
   checkedByUserId Int?
-  checkedByUser   User?  @relation("AssetCheckedByUser", fields: [checkedByUserId], references: [id])
+  checkedByUser   User? @relation("AssetCheckedByUser", fields: [checkedByUserId], references: [id])
 
-  assetHistories       AssetHistory[]
-  damageReports        DamageReport[]
-  maintenancePlans     MaintenancePlan[]
-  maintenanceRecords   MaintenanceRecord[]
-  inventoryCheckItems  InventoryCheckItem[]
-  liquidationItems     LiquidationItem[]
-  receiptItems         AssetReceiptItem[]
-  normalizedSearch     NormalizedSearch?
+  assetHistories      AssetHistory[]
+  damageReports       DamageReport[]
+  maintenancePlans    MaintenancePlan[]
+  maintenanceRecords  MaintenanceRecord[]
+  inventoryCheckItems InventoryCheckItem[]
+  liquidationItems    LiquidationItem[]
+  receiptItems        AssetReceiptItem[]
+  normalizedSearch    NormalizedSearch?
 
   @@map("assets")
 }
 
 model AssetHistory {
-  id        Int      @id @default(autoincrement())
+  id        Int          @id @default(autoincrement())
   action    String
   oldStatus AssetStatus?
   newStatus AssetStatus?
   oldRoomId Int?
   newRoomId Int?
   note      String?
-  createdAt DateTime @default(now())
+  createdAt DateTime     @default(now())
 
   assetId Int
-  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
   @@map("asset_histories")
 }
@@ -288,17 +288,17 @@ model AssetHistory {
 // ===========================
 
 model DamageReport {
-  id          Int                 @id @default(autoincrement())
-  reportCode  String              @unique
+  id          Int                  @id @default(autoincrement())
+  reportCode  String               @unique
   description String
   location    String?
   priority    DamageReportPriority @default(MEDIUM)
-  status      DamageReportStatus  @default(SUBMITTED)
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  status      DamageReportStatus   @default(SUBMITTED)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
 
   reporterId Int
-  reporter   User  @relation("Reporter", fields: [reporterId], references: [id])
+  reporter   User @relation("Reporter", fields: [reporterId], references: [id])
 
   assetId Int
   asset   Asset @relation(fields: [assetId], references: [id])
@@ -312,15 +312,15 @@ model DamageReport {
 }
 
 model DamageReportLog {
-  id        Int         @id @default(autoincrement())
+  id        Int                 @id @default(autoincrement())
   action    String
   oldStatus DamageReportStatus?
   newStatus DamageReportStatus?
   note      String?
-  createdAt DateTime    @default(now())
+  createdAt DateTime            @default(now())
 
   damageReportId Int
-  damageReport   DamageReport @relation(fields: [damageReportId], references: [id], onDelete: Cascade)
+  damageReport   DamageReport @relation(fields: [damageReportId], references: [id], onDelete: Restrict)
 
   createdByUserId Int
   createdByUser   User @relation(fields: [createdByUserId], references: [id])
@@ -342,9 +342,9 @@ model MaintenancePlan {
   updatedAt   DateTime @updatedAt
 
   assetId   Int
-  asset     Asset  @relation(fields: [assetId], references: [id])
+  asset     Asset @relation(fields: [assetId], references: [id])
   createdBy Int
-  creator   User   @relation(fields: [createdBy], references: [id])
+  creator   User  @relation(fields: [createdBy], references: [id])
 
   maintenanceRecords MaintenanceRecord[]
 
@@ -352,26 +352,26 @@ model MaintenancePlan {
 }
 
 model MaintenanceRecord {
-  id                  Int                    @id @default(autoincrement())
-  maintenanceCode     String                 @unique
+  id                  Int                     @id @default(autoincrement())
+  maintenanceCode     String                  @unique
   maintenanceDate     DateTime
   maintenanceType     MaintenanceType
   content             String
   resultStatus        MaintenanceResultStatus
   nextMaintenanceDate DateTime?
-  cost                Decimal?               @db.Decimal(12, 2)
+  cost                Decimal?                @db.Decimal(12, 2)
   materialNote        String?
   note                String?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
 
   planId Int?
   plan   MaintenancePlan? @relation(fields: [planId], references: [id])
 
-  assetId      Int
-  asset        Asset @relation(fields: [assetId], references: [id])
-  performedBy  Int
-  performer    User  @relation(fields: [performedBy], references: [id])
+  assetId     Int
+  asset       Asset @relation(fields: [assetId], references: [id])
+  performedBy Int
+  performer   User  @relation(fields: [performedBy], references: [id])
 
   @@map("maintenance_records")
 }
@@ -402,15 +402,15 @@ model InventoryCheck {
 }
 
 model InventoryCheckItem {
-  id               Int    @id @default(autoincrement())
-  systemQuantity   Int    @default(1)
-  actualQuantity   Int    @default(1)
-  difference       Int    @default(0)
-  actualCondition  String?
-  note             String?
+  id              Int     @id @default(autoincrement())
+  systemQuantity  Int     @default(1)
+  actualQuantity  Int     @default(1)
+  difference      Int     @default(0)
+  actualCondition String?
+  note            String?
 
   inventoryCheckId Int
-  inventoryCheck   InventoryCheck @relation(fields: [inventoryCheckId], references: [id], onDelete: Cascade)
+  inventoryCheck   InventoryCheck @relation(fields: [inventoryCheckId], references: [id], onDelete: Restrict)
 
   assetId Int
   asset   Asset @relation(fields: [assetId], references: [id])
@@ -423,16 +423,16 @@ model InventoryCheckItem {
 // ===========================
 
 model LiquidationRecord {
-  id              Int              @id @default(autoincrement())
-  liquidationCode String           @unique
+  id              Int               @id @default(autoincrement())
+  liquidationCode String            @unique
   liquidationDate DateTime
   status          LiquidationStatus @default(DRAFT)
   note            String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
 
   createdBy Int
-  creator   User  @relation(fields: [createdBy], references: [id])
+  creator   User @relation(fields: [createdBy], references: [id])
 
   liquidationItems LiquidationItem[]
   councilMembers   CouncilMember[]
@@ -441,13 +441,13 @@ model LiquidationRecord {
 }
 
 model LiquidationItem {
-  id                     Int    @id @default(autoincrement())
-  assetCondition         String
-  reason                 String
+  id                      Int      @id @default(autoincrement())
+  assetCondition          String
+  reason                  String
   estimatedRemainingValue Decimal? @db.Decimal(12, 2)
 
   liquidationRecordId Int
-  liquidationRecord   LiquidationRecord @relation(fields: [liquidationRecordId], references: [id], onDelete: Cascade)
+  liquidationRecord   LiquidationRecord @relation(fields: [liquidationRecordId], references: [id], onDelete: Restrict)
 
   assetId Int
   asset   Asset @relation(fields: [assetId], references: [id])
@@ -466,10 +466,10 @@ model CouncilMember {
   userId Int
   user   User @relation(fields: [userId], references: [id])
 
-  inventoryCheckId   Int?
-  inventoryCheck     InventoryCheck?   @relation(fields: [inventoryCheckId], references: [id], onDelete: Cascade)
+  inventoryCheckId    Int?
+  inventoryCheck      InventoryCheck?    @relation(fields: [inventoryCheckId], references: [id], onDelete: Cascade)
   liquidationRecordId Int?
-  liquidationRecord  LiquidationRecord? @relation(fields: [liquidationRecordId], references: [id], onDelete: Cascade)
+  liquidationRecord   LiquidationRecord? @relation(fields: [liquidationRecordId], references: [id], onDelete: Cascade)
 
   @@map("council_members")
 }
@@ -534,8 +534,8 @@ model NormalizedSearch {
 // ===========================
 
 model AssetReceipt {
-  id              Int              @id @default(autoincrement())
-  receiptCode     String           @unique
+  id              Int         @id @default(autoincrement())
+  receiptCode     String      @unique
   type            ReceiptType
   receiptDate     DateTime
   supplierName    String?
@@ -543,30 +543,30 @@ model AssetReceipt {
   supplierPhone   String?
   contractNumber  String?
   documentNumber  String?
-  totalAmount     Decimal?         @db.Decimal(12, 2)
+  totalAmount     Decimal?    @db.Decimal(12, 2)
   note            String?
-  createdAt       DateTime         @default(now())
+  createdAt       DateTime    @default(now())
 
-  createdBy       Int
-  creator         User             @relation(fields: [createdBy], references: [id])
+  createdBy Int
+  creator   User @relation(fields: [createdBy], references: [id])
 
-  items           AssetReceiptItem[]
+  items AssetReceiptItem[]
 
   @@map("asset_receipts")
 }
 
 model AssetReceiptItem {
-  id              Int          @id @default(autoincrement())
-  quantity        Int          @default(1)
-  unitPrice       Decimal?     @db.Decimal(12, 2)
-  warrantyMonths  Int?         @default(0)
-  note            String?
+  id             Int      @id @default(autoincrement())
+  quantity       Int      @default(1)
+  unitPrice      Decimal? @db.Decimal(12, 2)
+  warrantyMonths Int?     @default(0)
+  note           String?
 
-  receiptId       Int
-  receipt         AssetReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  receiptId Int
+  receipt   AssetReceipt @relation(fields: [receiptId], references: [id], onDelete: Restrict)
 
-  assetId         Int
-  asset           Asset        @relation(fields: [assetId], references: [id])
+  assetId Int
+  asset   Asset @relation(fields: [assetId], references: [id])
 
   @@map("asset_receipt_items")
 }
