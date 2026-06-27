@@ -9,6 +9,7 @@ import {
   deleteBuilding,
   getBuildings,
   updateBuilding,
+  batchUpdateRooms,
   type BuildingRecord,
 } from '../../services/locations';
 import { useToast } from '../../toast/toast-context';
@@ -21,7 +22,8 @@ import {
   Plus,
   PencilSimple,
   Trash,
-  Spinner
+  Spinner,
+  Eye
 } from '@phosphor-icons/react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { SummaryCard } from '../../components/ui/SummaryCard';
@@ -36,6 +38,11 @@ const locationSchema = z.object({
   name: z.string().min(1, 'Nhập tên khu nhà.'),
   floors: z.coerce.number().min(1, 'Nhập số tầng.'),
   rooms: z.coerce.number().min(0, 'Nhập số phòng.'),
+  defaultCapacity: z.coerce.number().min(1, 'Sức chứa tối thiểu 1.').default(4),
+  defaultRoomType: z.string().optional(),
+  defaultAreaM2: z.coerce.number().min(0).optional(),
+  defaultCondition: z.string().default('Tốt'),
+  defaultNote: z.string().optional(),
   status: z.string().default('Đang hoạt động'),
   description: z.string().optional(),
 });
@@ -54,12 +61,25 @@ type BuildingView = {
 export function LocationsManagementPage() {
   const { showToast } = useToast();
   const [buildings, setBuildings] = useState<BuildingView[]>([]);
+  const [rawBuildings, setRawBuildings] = useState<BuildingRecord[]>([]);
   const [keyword, setKeyword] = useState('');
   const [statusFilter, setStatusFilter] = useState('Tất cả');
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedBuilding, setSelectedBuilding] = useState<BuildingView | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BuildingView | null>(null);
+
+  // Room management state
+  const [isRoomModalOpen, setIsRoomModalOpen] = useState(false);
+  const [roomBuilding, setRoomBuilding] = useState<BuildingView | null>(null);
+  const [buildingRooms, setBuildingRooms] = useState<BuildingRecord['rooms']>([]);
+  const [selectedRoomIds, setSelectedRoomIds] = useState<Set<string>>(new Set());
+  const [batchCapacity, setBatchCapacity] = useState(4);
+  const [batchRoomType, setBatchRoomType] = useState('');
+  const [batchAreaM2, setBatchAreaM2] = useState('');
+  const [batchCondition, setBatchCondition] = useState('');
+  const [batchNote, setBatchNote] = useState('');
+  const [isBatchUpdating, setIsBatchUpdating] = useState(false);
 
   const form = useForm<LocationFormValues>({
     resolver: zodResolver(locationSchema),
@@ -68,6 +88,11 @@ export function LocationsManagementPage() {
       name: '',
       floors: 1,
       rooms: 0,
+      defaultCapacity: 4,
+      defaultRoomType: '',
+      defaultAreaM2: undefined,
+      defaultCondition: 'Tốt',
+      defaultNote: '',
       status: 'Đang hoạt động',
       description: '',
     },
@@ -81,6 +106,7 @@ export function LocationsManagementPage() {
     setIsLoading(true);
     try {
       const response = await getBuildings();
+      setRawBuildings(response);
       setBuildings(response.map(mapBuilding));
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không thể tải danh sách khu nhà.'), 'error');
@@ -96,6 +122,11 @@ export function LocationsManagementPage() {
       name: '',
       floors: 1,
       rooms: 0,
+      defaultCapacity: 4,
+      defaultRoomType: '',
+      defaultAreaM2: undefined,
+      defaultCondition: 'Tốt',
+      defaultNote: '',
       status: 'Đang hoạt động',
       description: '',
     });
@@ -131,6 +162,13 @@ export function LocationsManagementPage() {
           name: data.name,
           status: data.status === 'Đang hoạt động' ? 'ACTIVE' : 'INACTIVE',
           description: data.description || null,
+          floors: data.floors,
+          rooms: data.rooms,
+          defaultCapacity: data.defaultCapacity,
+          defaultRoomType: data.defaultRoomType || null,
+          defaultAreaM2: data.defaultAreaM2 || null,
+          defaultCondition: data.defaultCondition || null,
+          defaultNote: data.defaultNote || null,
         });
         showToast('Thêm khu nhà thành công.', 'success');
       }
@@ -138,6 +176,57 @@ export function LocationsManagementPage() {
       await loadBuildings();
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Lưu khu nhà thất bại.'), 'error');
+    }
+  }
+
+  function openRoomModal(building: BuildingView, rooms: BuildingRecord['rooms']) {
+    setRoomBuilding(building);
+    setBuildingRooms(rooms);
+    setSelectedRoomIds(new Set());
+    setBatchCapacity(4);
+    setBatchRoomType('');
+    setBatchAreaM2('');
+    setBatchCondition('');
+    setBatchNote('');
+    setIsRoomModalOpen(true);
+  }
+
+  function toggleSelectRoom(roomId: string) {
+    setSelectedRoomIds(prev => {
+      const next = new Set(prev);
+      if (next.has(roomId)) next.delete(roomId);
+      else next.add(roomId);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedRoomIds.size === buildingRooms.length) {
+      setSelectedRoomIds(new Set());
+    } else {
+      setSelectedRoomIds(new Set(buildingRooms.map(r => r.id)));
+    }
+  }
+
+  async function handleBatchUpdate() {
+    if (!roomBuilding || selectedRoomIds.size === 0) return;
+    setIsBatchUpdating(true);
+    try {
+      await batchUpdateRooms(roomBuilding.id, {
+        roomIds: Array.from(selectedRoomIds).map(Number),
+        capacity: batchCapacity,
+        roomType: batchRoomType || undefined,
+        areaM2: batchAreaM2 ? Number(batchAreaM2) : undefined,
+        condition: batchCondition || undefined,
+        note: batchNote || undefined,
+      });
+      showToast(`Đã cập nhật ${selectedRoomIds.size} phòng.`, 'success');
+      setIsRoomModalOpen(false);
+      await loadBuildings();
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Cập nhật phòng thất bại.'), 'error');
+    } finally {
+      setIsBatchUpdating(false);
     }
   }
 
@@ -282,6 +371,12 @@ export function LocationsManagementPage() {
                   </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
+                      <Button variant="ghost" size="icon" onClick={() => {
+                        const raw = rawBuildings.find(r => r.id === building.id);
+                        openRoomModal(building, raw?.rooms ?? []);
+                      }} title="Xem phòng">
+                        <Eye size={16} className="text-muted-foreground" />
+                      </Button>
                       <Button variant="ghost" size="icon" onClick={() => openEditModal(building)}>
                         <PencilSimple size={16} className="text-muted-foreground" />
                       </Button>
@@ -353,12 +448,53 @@ export function LocationsManagementPage() {
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">
-                Số phòng <span className="text-destructive">*</span>
+                Số phòng mỗi tầng <span className="text-destructive">*</span>
               </label>
               <Input 
                 type="number" 
                 {...form.register('rooms')} 
                 error={!!form.formState.errors.rooms}
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">
+                Sức chứa mỗi phòng <span className="text-destructive">*</span>
+              </label>
+              <Input 
+                type="number" 
+                {...form.register('defaultCapacity')} 
+                placeholder="4"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Loại phòng</label>
+              <Select {...form.register('defaultRoomType')}>
+                <option value="">Mặc định</option>
+                <option value="Phòng thường">Phòng thường</option>
+                <option value="Phòng dịch vụ">Phòng dịch vụ</option>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Diện tích (m²)</label>
+              <Input 
+                type="number" 
+                step="0.5"
+                {...form.register('defaultAreaM2', { valueAsNumber: true })} 
+                placeholder="VD: 25"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Tình trạng</label>
+              <Select {...form.register('defaultCondition')}>
+                <option value="Tốt">Tốt</option>
+                <option value="Đang sửa">Đang sửa</option>
+              </Select>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Ghi chú phòng</label>
+              <Input 
+                {...form.register('defaultNote')} 
+                placeholder="VD: Phòng 4 người"
               />
             </div>
           </div>
@@ -382,6 +518,146 @@ export function LocationsManagementPage() {
         </form>
       </Modal>
 
+      {/* Room Management Modal */}
+      {roomBuilding && (
+        <Modal
+          isOpen={isRoomModalOpen}
+          onClose={() => setIsRoomModalOpen(false)}
+          title={`Quản lý phòng - ${roomBuilding.name} (${roomBuilding.code})`}
+          size="lg"
+          footer={
+            <>
+              <Button variant="outline" onClick={() => setIsRoomModalOpen(false)}>Đóng</Button>
+              <Button 
+                onClick={() => void handleBatchUpdate()} 
+                disabled={selectedRoomIds.size === 0 || isBatchUpdating}
+              >
+                {isBatchUpdating ? 'Đang cập nhật...' : `Cập nhật ${selectedRoomIds.size} phòng`}
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-5 py-4">
+            {/* Batch edit form */}
+            <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-200/50">
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">
+                  Sức chứa mới
+                </label>
+                <input
+                  type="number"
+                  value={batchCapacity}
+                  onChange={(e) => setBatchCapacity(Number(e.target.value))}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  min={1}
+                  placeholder="4"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Loại phòng mới</label>
+                <select
+                  value={batchRoomType}
+                  onChange={(e) => setBatchRoomType(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                >
+                  <option value="">Giữ nguyên</option>
+                  <option value="Phòng thường">Phòng thường</option>
+                  <option value="Phòng dịch vụ">Phòng dịch vụ</option>
+                </select>
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Diện tích mới (m²)</label>
+                <input
+                  type="number"
+                  step="0.5"
+                  value={batchAreaM2}
+                  onChange={(e) => setBatchAreaM2(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  placeholder="VD: 25"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Tình trạng mới</label>
+                <select
+                  value={batchCondition}
+                  onChange={(e) => setBatchCondition(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                >
+                  <option value="">Giữ nguyên</option>
+                  <option value="Tốt">Tốt</option>
+                  <option value="Đang sửa">Đang sửa</option>
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">Ghi chú mới</label>
+                <input
+                  value={batchNote}
+                  onChange={(e) => setBatchNote(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  placeholder="VD: Phòng 4 người"
+                />
+              </div>
+              <p className="col-span-2 text-xs text-muted-foreground">
+                Điền giá trị mới (để trống = giữ nguyên), sau đó chọn phòng và nhấn "Cập nhật" để áp dụng.
+              </p>
+            </div>
+
+            {/* Room list header */}
+            <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={buildingRooms.length > 0 && selectedRoomIds.size === buildingRooms.length}
+                  onChange={toggleSelectAll}
+                  className="rounded border-slate-300"
+                />
+                <span className="font-medium text-foreground">Chọn tất cả</span>
+              </label>
+              <span className="text-xs text-muted-foreground">
+                ({selectedRoomIds.size}/{buildingRooms.length} phòng)
+              </span>
+            </div>
+
+            {/* Room list */}
+            <div className="max-h-64 space-y-1 overflow-y-auto">
+              {buildingRooms.length === 0 ? (
+                <p className="py-8 text-center text-sm text-muted-foreground">
+                  Khu nhà này chưa có phòng nào.
+                </p>
+              ) : (
+                groupByFloor(buildingRooms).map(([floor, rooms]) => (
+                  <div key={floor}>
+                    <p className="mb-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Tầng {floor}
+                    </p>
+                    <div className="mb-2 grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                      {rooms.map((room) => (
+                        <label
+                          key={room.id}
+                          className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                            selectedRoomIds.has(room.id)
+                              ? 'border-slate-900 bg-slate-900/5 ring-1 ring-slate-900'
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={selectedRoomIds.has(room.id)}
+                            onChange={() => toggleSelectRoom(room.id)}
+                            className="rounded border-slate-300"
+                          />
+                          <span className="font-medium">{room.code}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </Modal>
+      )}
+
       <Modal
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
@@ -402,6 +678,17 @@ export function LocationsManagementPage() {
       </Modal>
     </div>
   );
+}
+
+function groupByFloor(rooms: BuildingRecord['rooms']): [number, typeof rooms][] {
+  const map = new Map<number, typeof rooms>();
+  for (const room of rooms) {
+    if (!map.has(room.floorNumber)) {
+      map.set(room.floorNumber, []);
+    }
+    map.get(room.floorNumber)!.push(room);
+  }
+  return Array.from(map.entries()).sort(([a], [b]) => a - b);
 }
 
 function mapBuilding(building: BuildingRecord): BuildingView {

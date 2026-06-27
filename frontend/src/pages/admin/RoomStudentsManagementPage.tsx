@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useToast } from '../../toast/toast-context';
@@ -10,7 +10,6 @@ import {
   UserMinus,
   Door,
   Plus,
-  Funnel,
   ArrowsClockwise,
   Eye,
   PencilSimple,
@@ -29,6 +28,8 @@ import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { getAllRoomsWithAssignments, assignStudentToRoom, transferStudentToRoom } from '../../services/locations';
+import { getUsers } from '../../services/users';
 
 const studentRoomSchema = z.object({
   studentId: z.string().min(1, 'Nhập mã sinh viên.'),
@@ -38,7 +39,6 @@ const studentRoomSchema = z.object({
   phone: z.string().optional(),
   buildingCode: z.string().min(1, 'Chọn khu nhà.'),
   roomCode: z.string().min(1, 'Chọn phòng.'),
-  bed: z.string().min(1, 'Chọn giường.'),
   moveInDate: z.string().min(1, 'Chọn ngày vào ở.'),
   notes: z.string().optional(),
 });
@@ -47,38 +47,131 @@ type StudentRoomFormValues = z.infer<typeof studentRoomSchema>;
 
 type RoomStudent = {
   id: number;
+  userId: number;
   studentId: string;
   fullName: string;
   faculty: string;
   course: string;
   buildingCode: string;
   roomCode: string;
-  bed: string;
   moveInDate: string;
   status: 'Đang ở' | 'Đã chuyển';
   phone: string;
 };
 
-const mockStudents: RoomStudent[] = [
-  { id: 1, studentId: 'SV00123', fullName: 'Nguyễn Văn An', faculty: 'CNTT', course: 'K21', buildingCode: 'Khu A', roomCode: 'A101', bed: '01', moveInDate: '01/09/2024', status: 'Đang ở', phone: '0987 654 321' },
-  { id: 2, studentId: 'SV00124', fullName: 'Trần Thị Bình', faculty: 'KTĐT', course: 'K21', buildingCode: 'Khu A', roomCode: 'A101', bed: '02', moveInDate: '01/09/2024', status: 'Đang ở', phone: '0965 432 123' },
-  { id: 3, studentId: 'SV00125', fullName: 'Lê Hoàng Cường', faculty: 'Điện - Điện tử', course: 'K20', buildingCode: 'Khu A', roomCode: 'A101', bed: '03', moveInDate: '01/09/2024', status: 'Đang ở', phone: '0977 123 456' },
-  { id: 4, studentId: 'SV00126', fullName: 'Phạm Minh Dũng', faculty: 'CNTT', course: 'K21', buildingCode: 'Khu A', roomCode: 'A101', bed: '04', moveInDate: '01/09/2024', status: 'Đang ở', phone: '0912 345 678' },
-  { id: 5, studentId: 'SV00127', fullName: 'Võ Thị Hà', faculty: 'Kế toán', course: 'K22', buildingCode: 'Khu A', roomCode: 'A102', bed: '01', moveInDate: '02/09/2024', status: 'Đang ở', phone: '0909 876 543' },
-  { id: 6, studentId: 'SV00128', fullName: 'Đặng Quốc Huy', faculty: 'Cơ khí', course: 'K20', buildingCode: 'Khu B', roomCode: 'B201', bed: '01', moveInDate: '01/09/2024', status: 'Đang ở', phone: '0988 765 432' },
-  { id: 7, studentId: 'SV00129', fullName: 'Ngô Thanh Long', faculty: 'Xây dựng', course: 'K21', buildingCode: 'Khu B', roomCode: 'B201', bed: '02', moveInDate: '01/09/2024', status: 'Đã chuyển', phone: '0933 222 111' },
-  { id: 8, studentId: 'SV00130', fullName: 'Bùi Khánh Linh', faculty: 'Kinh tế', course: 'K22', buildingCode: 'Khu C', roomCode: 'C301', bed: '01', moveInDate: '03/09/2024', status: 'Đang ở', phone: '0944 333 222' },
-];
+// Raw room data from API for lookups
+type RoomWithAssignments = Awaited<ReturnType<typeof getAllRoomsWithAssignments>>[number];
 
 export function RoomStudentsManagementPage() {
   const { showToast } = useToast();
   
-  const [students, setStudents] = useState<RoomStudent[]>(mockStudents);
-  const [isLoading, setIsLoading] = useState(false);
+  const [students, setStudents] = useState<RoomStudent[]>([]);
+  const [allRooms, setAllRooms] = useState<RoomWithAssignments[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadStudents();
+  }, []);
+
+  async function loadStudents() {
+    setIsLoading(true);
+    try {
+      const rooms = await getAllRoomsWithAssignments();
+      setAllRooms(rooms);
+      const allStudents: RoomStudent[] = [];
+      let idCounter = 1;
+      for (const room of rooms) {
+        const buildingName = room.floor?.building?.name ?? '';
+        for (const assignment of room.roomStudentAssignments) {
+          allStudents.push({
+            id: idCounter++,
+            userId: assignment.student.id,
+            studentId: assignment.student.studentCode || assignment.student.userCode,
+            fullName: assignment.student.fullName,
+            faculty: assignment.student.profile?.faculty || '',
+            course: assignment.student.profile?.course || '',
+            buildingCode: buildingName,
+            roomCode: room.roomCode,
+            moveInDate: assignment.startDate ? new Date(assignment.startDate).toLocaleDateString('vi-VN') : '',
+            status: assignment.isActive ? 'Đang ở' : 'Đã chuyển',
+            phone: assignment.student.phone ?? '',
+          });
+        }
+      }
+      setStudents(allStudents);
+    } catch {
+      showToast('Không thể tải danh sách sinh viên.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }
   
+  // === Filter state ===
+  const [filterValues, setFilterValues] = useState({
+    search: '',
+    buildingCode: '',
+    roomCode: '',
+    status: '',
+    faculty: '',
+    course: '',
+  });
+
+  // === Pagination state ===
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
+
+  // === Derived: filtered + paginated data ===
+  const filteredStudents = students.filter(s => {
+    if (filterValues.search) {
+      const q = filterValues.search.toLowerCase();
+      if (!s.studentId.toLowerCase().includes(q) && !s.fullName.toLowerCase().includes(q)) return false;
+    }
+    if (filterValues.buildingCode && s.buildingCode !== filterValues.buildingCode) return false;
+    if (filterValues.roomCode && s.roomCode !== filterValues.roomCode) return false;
+    if (filterValues.status && s.status !== filterValues.status) return false;
+    if (filterValues.faculty && s.faculty !== filterValues.faculty) return false;
+    if (filterValues.course && s.course !== filterValues.course) return false;
+    return true;
+  });
+
+  const totalPages = Math.max(1, Math.ceil(filteredStudents.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedStudents = filteredStudents.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  // === Dynamic filter options from data ===
+  const filterOptions = {
+    buildings: [...new Set(students.map(s => s.buildingCode).filter(Boolean))].sort(),
+    rooms: [...new Set(
+      students
+        .filter(s => !filterValues.buildingCode || s.buildingCode === filterValues.buildingCode)
+        .map(s => s.roomCode)
+    )].sort(),
+    statuses: [...new Set(students.map(s => s.status))],
+    faculties: [...new Set(students.map(s => s.faculty).filter(Boolean))].sort(),
+    courses: [...new Set(students.map(s => s.course).filter(Boolean))].sort(),
+  };
+
+  // Reset trang khi filter thay đổi
+  const filterJson = JSON.stringify(filterValues);
+  useEffect(() => { setCurrentPage(1); }, [filterJson]);
+
+  const clearFilters = () => {
+    setFilterValues({ search: '', buildingCode: '', roomCode: '', status: '', faculty: '', course: '' });
+    setCurrentPage(1);
+  };
+
+  const updateFilter = (key: string, value: string) => {
+    setFilterValues(prev => {
+      const next = { ...prev, [key]: value };
+      if (key === 'buildingCode') next.roomCode = '';
+      return next;
+    });
+  };
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'new' | 'transfer'>('new');
   const [selectedStudent, setSelectedStudent] = useState<RoomStudent | null>(null);
+  const [detailStudent, setDetailStudent] = useState<RoomStudent | null>(null);
 
   const form = useForm<StudentRoomFormValues>({
     resolver: zodResolver(studentRoomSchema),
@@ -90,11 +183,18 @@ export function RoomStudentsManagementPage() {
       phone: '',
       buildingCode: '',
       roomCode: '',
-      bed: '',
       moveInDate: '',
       notes: ''
     },
   });
+
+  // Tự động xóa error roomCode khi người dùng chọn phòng khác
+  const watchedRoomCode = form.watch('roomCode');
+  useEffect(() => {
+    if (form.formState.errors.roomCode) {
+      form.clearErrors('roomCode');
+    }
+  }, [watchedRoomCode]);
 
   const openAddModal = () => {
     setSelectedStudent(null);
@@ -107,7 +207,6 @@ export function RoomStudentsManagementPage() {
       phone: '',
       buildingCode: '',
       roomCode: '',
-      bed: '',
       moveInDate: '',
       notes: ''
     });
@@ -125,11 +224,14 @@ export function RoomStudentsManagementPage() {
       phone: student.phone,
       buildingCode: student.buildingCode,
       roomCode: student.roomCode,
-      bed: student.bed,
       moveInDate: student.moveInDate,
       notes: ''
     });
     setIsModalOpen(true);
+  };
+
+  const openDetailModal = (student: RoomStudent) => {
+    setDetailStudent(student);
   };
 
   const openTransferModal = (student: RoomStudent) => {
@@ -143,7 +245,6 @@ export function RoomStudentsManagementPage() {
       phone: student.phone,
       buildingCode: '',
       roomCode: '',
-      bed: '',
       moveInDate: '',
       notes: `Chuyển từ phòng ${student.roomCode}`
     });
@@ -153,28 +254,64 @@ export function RoomStudentsManagementPage() {
   const onSubmit = async (data: StudentRoomFormValues) => {
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      if (activeTab === 'transfer') {
-        showToast(`Đã chuyển phòng cho sinh viên ${data.fullName}`, 'success');
+      // Helper tìm phòng theo mã + khu nhà
+      function findTargetRoom(formData: StudentRoomFormValues) {
+        return allRooms.find(r => 
+          r.roomCode === formData.roomCode && 
+          r.floor?.building?.name === formData.buildingCode
+        );
+      }
+
+      if (activeTab === 'transfer' && selectedStudent) {
+        // Validation: không cho chọn phòng trùng với phòng hiện tại
+        if (data.roomCode === selectedStudent.roomCode) {
+          form.setError('roomCode', { message: 'Phòng chuyển đến không được trùng với phòng hiện tại.' });
+          return;
+        }
+        // Chuyển phòng: tìm phòng đích từ rooms data
+        const targetRoom = findTargetRoom(data);
+        if (!targetRoom) throw new Error('Không tìm thấy phòng đích.');
+        await transferStudentToRoom(targetRoom.id, selectedStudent.userId);
+        showToast(`Đã chuyển ${selectedStudent.fullName} sang phòng ${targetRoom.roomCode}`, 'success');
+      } else if (activeTab === 'new' && selectedStudent) {
+        // Cập nhật thông tin
+        if (data.roomCode === selectedStudent.roomCode) {
+          // Giữ nguyên phòng → không cần gọi API, chỉ đóng modal
+          showToast(`Đã cập nhật thông tin cho ${selectedStudent.fullName}`, 'success');
+        } else {
+          // Đổi sang phòng khác → gọi transfer
+          const targetRoom = findTargetRoom(data);
+          if (!targetRoom) throw new Error('Không tìm thấy phòng đích.');
+          await transferStudentToRoom(targetRoom.id, selectedStudent.userId);
+          showToast(`Đã chuyển ${selectedStudent.fullName} sang phòng ${targetRoom.roomCode}`, 'success');
+        }
       } else {
-        showToast(selectedStudent ? 'Cập nhật thông tin thành công.' : 'Thêm sinh viên thành công.', 'success');
+        // Thêm sinh viên mới: tìm user theo studentCode rồi gán phòng
+        const usersRes = await getUsers({ studentCode: data.studentId, status: 'ACTIVE' });
+        const user = usersRes.items[0];
+        if (!user) throw new Error(`Không tìm thấy sinh viên với mã "${data.studentId}".`);
+        const targetRoom = findTargetRoom(data);
+        if (!targetRoom) throw new Error('Không tìm thấy phòng.');
+        await assignStudentToRoom(targetRoom.id, Number(user.id));
+        showToast(`Đã thêm ${data.fullName} vào phòng ${targetRoom.roomCode}`, 'success');
       }
       setIsModalOpen(false);
-    } catch (error) {
-      showToast('Lưu thông tin thất bại.', 'error');
+      await loadStudents(); // Refresh lại dữ liệu
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error.message || 'Lưu thông tin thất bại.';
+      showToast(message, 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const totalStudents = 512;
-  const activeStudents = 487;
-  const transferredStudents = 25;
-  const totalRoomsWithStudents = 112;
+  const totalStudents = students.length;
+  const activeStudents = students.filter(s => s.status === 'Đang ở').length;
+  const transferredStudents = students.filter(s => s.status === 'Đã chuyển').length;
+  const totalRoomsWithStudents = new Set(students.map(s => `${s.buildingCode}-${s.roomCode}`)).size;
 
-  const activePercent = ((activeStudents / totalStudents) * 100).toFixed(1);
-  const transferPercent = ((transferredStudents / totalStudents) * 100).toFixed(1);
+  const activePercent = totalStudents > 0 ? ((activeStudents / totalStudents) * 100).toFixed(1) : '0';
+  const transferPercent = totalStudents > 0 ? ((transferredStudents / totalStudents) * 100).toFixed(1) : '0';
 
   return (
     <div className="space-y-6 mx-auto max-w-7xl pb-10">
@@ -226,63 +363,71 @@ export function RoomStudentsManagementPage() {
             <div className="lg:col-span-1">
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
               <div className="relative">
-                <Input placeholder="Mã SV, họ tên..." className="pl-9" />
+                <Input
+                  placeholder="Mã SV, họ tên..."
+                  className="pl-9"
+                  value={filterValues.search}
+                  onChange={e => setFilterValues(prev => ({ ...prev, search: e.target.value }))}
+                />
                 <MagnifyingGlass size={16} className="absolute left-3 top-2.5 text-muted-foreground" />
               </div>
             </div>
             
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Khu nhà</label>
-              <Select>
-                <option>Tất cả</option>
-                <option>Khu A</option>
-                <option>Khu B</option>
+              <Select value={filterValues.buildingCode} onChange={e => updateFilter('buildingCode', e.target.value)}>
+                <option value="">Tất cả</option>
+                {filterOptions.buildings.map(b => (
+                  <option key={b} value={b}>{b}</option>
+                ))}
               </Select>
             </div>
             
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Phòng</label>
-              <Select>
-                <option>Tất cả</option>
+              <Select value={filterValues.roomCode} onChange={e => setFilterValues(prev => ({ ...prev, roomCode: e.target.value }))}>
+                <option value="">Tất cả</option>
+                {filterOptions.rooms.map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
               </Select>
             </div>
             
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Trạng thái</label>
-              <Select>
-                <option>Tất cả</option>
-                <option>Đang ở</option>
-                <option>Đã chuyển</option>
+              <Select value={filterValues.status} onChange={e => setFilterValues(prev => ({ ...prev, status: e.target.value }))}>
+                <option value="">Tất cả</option>
+                {filterOptions.statuses.map(s => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
               </Select>
             </div>
             
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Khoa</label>
-              <Select>
-                <option>Tất cả</option>
-                <option>CNTT</option>
-                <option>Kinh tế</option>
+              <Select value={filterValues.faculty} onChange={e => setFilterValues(prev => ({ ...prev, faculty: e.target.value }))}>
+                <option value="">Tất cả</option>
+                {filterOptions.faculties.map(f => (
+                  <option key={f} value={f}>{f}</option>
+                ))}
               </Select>
             </div>
             
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Khóa</label>
-              <Select>
-                <option>Tất cả</option>
-                <option>K21</option>
-                <option>K22</option>
+              <Select value={filterValues.course} onChange={e => setFilterValues(prev => ({ ...prev, course: e.target.value }))}>
+                <option value="">Tất cả</option>
+                {filterOptions.courses.map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
               </Select>
             </div>
           </div>
           
-          <div className="flex w-full items-center justify-end gap-2 pt-2">
-            <Button className="gap-2">
-              <Funnel size={16} weight="bold" />
-              Lọc
-            </Button>
-            <Button variant="outline" className="gap-2">
-              <ArrowsClockwise size={16} weight="bold" />
-              Làm mới
+          <div className="flex w-full items-center justify-end pt-2">
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5 text-muted-foreground hover:text-foreground">
+              <ArrowsClockwise size={14} weight="bold" />
+              Làm mới bộ lọc
             </Button>
           </div>
         </CardContent>
@@ -300,7 +445,6 @@ export function RoomStudentsManagementPage() {
                 <TableHead className="text-center">Khóa</TableHead>
                 <TableHead className="text-center">Khu nhà</TableHead>
                 <TableHead className="text-center">Phòng</TableHead>
-                <TableHead className="text-center">Giường</TableHead>
                 <TableHead className="text-center">Ngày vào ở</TableHead>
                 <TableHead className="text-center">Trạng thái</TableHead>
                 <TableHead className="text-center">SĐT</TableHead>
@@ -308,35 +452,34 @@ export function RoomStudentsManagementPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {students.length === 0 ? (
+              {filteredStudents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="h-24 text-center text-muted-foreground">
-                    Không có dữ liệu sinh viên
+                  <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
+                    {students.length === 0 ? 'Không có dữ liệu sinh viên' : 'Không tìm thấy kết quả phù hợp'}
                   </TableCell>
                 </TableRow>
               ) : (
-                students.map((student, idx) => (
+                paginatedStudents.map((student, idx) => (
                   <TableRow key={student.id}>
-                    <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
-                    <TableCell className="font-bold text-foreground">{student.studentId}</TableCell>
-                    <TableCell className="font-medium text-foreground">{student.fullName}</TableCell>
-                    <TableCell className="text-center text-muted-foreground">{student.faculty}</TableCell>
+                    <TableCell className="text-center font-medium text-muted-foreground">{(safePage - 1) * pageSize + idx + 1}</TableCell>
+                    <TableCell className="font-bold text-foreground whitespace-nowrap"><span title={student.studentId}>{student.studentId}</span></TableCell>
+                    <TableCell className="font-medium text-foreground whitespace-nowrap"><span title={student.fullName}>{student.fullName}</span></TableCell>
+                    <TableCell className="text-center text-muted-foreground whitespace-nowrap"><span title={student.faculty}>{student.faculty}</span></TableCell>
                     <TableCell className="text-center text-muted-foreground">{student.course}</TableCell>
-                    <TableCell className="text-center font-medium text-foreground">{student.buildingCode}</TableCell>
+                    <TableCell className="text-center font-medium text-foreground whitespace-nowrap"><span title={student.buildingCode}>{student.buildingCode}</span></TableCell>
                     <TableCell className="text-center font-medium text-foreground">{student.roomCode}</TableCell>
-                    <TableCell className="text-center tabular-nums">{student.bed}</TableCell>
-                    <TableCell className="text-center text-muted-foreground tabular-nums">{student.moveInDate}</TableCell>
-                    <TableCell className="text-center">
+                    <TableCell className="text-center text-muted-foreground tabular-nums whitespace-nowrap">{student.moveInDate}</TableCell>
+                    <TableCell className="text-center whitespace-nowrap">
                       <span className={`inline-flex min-w-[90px] items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${
                         student.status === 'Đang ở' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                       }`}>
                         {student.status}
                       </span>
                     </TableCell>
-                    <TableCell className="text-center text-muted-foreground tabular-nums">{student.phone}</TableCell>
+                    <TableCell className="text-center text-muted-foreground tabular-nums whitespace-nowrap">{student.phone}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="icon" title="Xem chi tiết">
+                        <Button variant="ghost" size="icon" onClick={() => openDetailModal(student)} title="Xem chi tiết">
                           <Eye size={16} className="text-muted-foreground" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => openEditModal(student)} title="Sửa">
@@ -356,13 +499,20 @@ export function RoomStudentsManagementPage() {
         
         <div className="flex items-center justify-between border-t border-border/50 bg-muted/30 px-6 py-4">
           <div className="text-sm text-muted-foreground">
-            Hiển thị 1 đến {students.length} của {totalStudents} kết quả
+            {filteredStudents.length > 0 ? (
+              <>Hiển thị {(safePage - 1) * pageSize + 1} đến {Math.min(safePage * pageSize, filteredStudents.length)} của {filteredStudents.length} kết quả</>
+            ) : (
+              <>0 kết quả</>
+            )}
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled className="gap-1">
+            <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="gap-1">
               <CaretLeft size={16} /> Trước
             </Button>
-            <Button variant="outline" size="sm" className="gap-1">
+            <span className="text-xs text-muted-foreground px-2 tabular-nums">
+              Trang {safePage}/{totalPages}
+            </span>
+            <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="gap-1">
               Sau <CaretRight size={16} />
             </Button>
           </div>
@@ -373,7 +523,7 @@ export function RoomStudentsManagementPage() {
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
         title={selectedStudent ? (activeTab === 'transfer' ? 'Chuyển phòng' : 'Cập nhật thông tin') : 'Thêm sinh viên / Chuyển phòng'}
-        size="lg"
+        size="3xl"
         footer={
           <>
             <Button variant="outline" onClick={() => setIsModalOpen(false)}>Hủy</Button>
@@ -470,7 +620,7 @@ export function RoomStudentsManagementPage() {
                     Thông tin phòng ở
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="grid grid-cols-3 gap-3 md:col-span-2">
+                    <div className="grid grid-cols-2 gap-3 md:col-span-2">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-foreground">
                           Khu nhà <span className="text-destructive">*</span>
@@ -497,21 +647,7 @@ export function RoomStudentsManagementPage() {
                           <p className="mt-1 text-xs text-destructive">{form.formState.errors.roomCode.message}</p>
                         )}
                       </div>
-                      <div>
-                        <label className="mb-1.5 block text-sm font-medium text-foreground">
-                          Giường <span className="text-destructive">*</span>
-                        </label>
-                        <Select {...form.register('bed')} error={!!form.formState.errors.bed}>
-                          <option value="">Chọn giường</option>
-                          <option value="01">01</option>
-                          <option value="02">02</option>
-                          <option value="03">03</option>
-                          <option value="04">04</option>
-                        </Select>
-                        {form.formState.errors.bed && (
-                          <p className="mt-1 text-xs text-destructive">{form.formState.errors.bed.message}</p>
-                        )}
-                      </div>
+
                     </div>
 
                     <div>
@@ -559,26 +695,26 @@ export function RoomStudentsManagementPage() {
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary border border-primary/20">
                       <Users size={28} weight="duotone" />
                     </div>
-                    <div className="flex-1 grid grid-cols-2 md:grid-cols-5 gap-4">
-                      <div>
+                    <div className="flex-1 grid grid-cols-2 md:grid-cols-8 gap-4">
+                      <div className="col-span-2 md:col-span-2">
                         <p className="text-xs text-muted-foreground mb-1">Mã sinh viên</p>
-                        <p className="text-sm font-bold text-foreground">{form.getValues('studentId') || 'SV00123'}</p>
+                        <p className="text-sm font-bold text-foreground" title={selectedStudent?.studentId || ''}>{selectedStudent?.studentId || form.getValues('studentId')}</p>
                       </div>
-                      <div className="col-span-2 md:col-span-1">
+                      <div className="col-span-2 md:col-span-2">
                         <p className="text-xs text-muted-foreground mb-1">Họ và tên</p>
-                        <p className="text-sm font-bold text-foreground">{form.getValues('fullName') || 'Nguyễn Văn A'}</p>
+                        <p className="text-sm font-bold text-foreground" title={selectedStudent?.fullName || ''}>{selectedStudent?.fullName || form.getValues('fullName')}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Khoa</p>
-                        <p className="text-sm font-bold text-foreground">{form.getValues('faculty') || 'CNTT'}</p>
+                        <p className="text-sm font-bold text-foreground" title={selectedStudent?.faculty || ''}>{selectedStudent?.faculty || form.getValues('faculty')}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Khóa</p>
-                        <p className="text-sm font-bold text-foreground">{form.getValues('course') || 'K21'}</p>
+                        <p className="text-sm font-bold text-foreground" title={selectedStudent?.course || ''}>{selectedStudent?.course || form.getValues('course')}</p>
                       </div>
-                      <div>
+                      <div className="col-span-2 md:col-span-2">
                         <p className="text-xs text-muted-foreground mb-1">SĐT</p>
-                        <p className="text-sm font-bold text-foreground">{form.getValues('phone') || '0987 654 321'}</p>
+                        <p className="text-sm font-bold text-foreground" title={selectedStudent?.phone || ''}>{selectedStudent?.phone || form.getValues('phone')}</p>
                       </div>
                     </div>
                   </div>
@@ -586,27 +722,24 @@ export function RoomStudentsManagementPage() {
 
                 <div className="rounded-lg border border-border/50 bg-muted/20 p-4">
                   <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-4 border-b border-border/50 pb-2">2. Thông tin phòng hiện tại</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 px-2">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 px-2">
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Khu nhà</p>
-                      <p className="text-sm font-bold text-foreground">Khu A</p>
+                      <p className="text-sm font-bold text-foreground" title={selectedStudent?.buildingCode || ''}>{selectedStudent?.buildingCode || ''}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Phòng</p>
-                      <p className="text-sm font-bold text-foreground">A101</p>
+                      <p className="text-sm font-bold text-foreground" title={selectedStudent?.roomCode || ''}>{selectedStudent?.roomCode || ''}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Giường</p>
-                      <p className="text-sm font-bold text-foreground">01</p>
-                    </div>
+
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Ngày vào ở</p>
-                      <p className="text-sm font-bold text-foreground">01/09/2024</p>
+                      <p className="text-sm font-bold text-foreground" title={selectedStudent?.moveInDate || ''}>{selectedStudent?.moveInDate || ''}</p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground mb-1">Trạng thái</p>
-                      <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-700">
-                        Đang ở
+                      <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded text-[11px] font-bold ${selectedStudent?.status === 'Đang ở' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`} title={selectedStudent?.status || ''}>
+                        {selectedStudent?.status || ''}
                       </span>
                     </div>
                   </div>
@@ -615,37 +748,44 @@ export function RoomStudentsManagementPage() {
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 relative">
                   <h3 className="text-xs font-bold text-primary uppercase tracking-wider mb-4 border-b border-primary/10 pb-2">3. Chọn phòng mới</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="grid grid-cols-3 gap-3 md:col-span-2">
+                    <div className="grid grid-cols-2 gap-3 md:col-span-2">
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-foreground">
                           Khu nhà <span className="text-destructive">*</span>
                         </label>
-                        <Select {...form.register('buildingCode')}>
+                        <Select {...form.register('buildingCode')} error={!!form.formState.errors.buildingCode}>
                           <option value="">Chọn khu nhà</option>
-                          <option value="Khu A">Khu A</option>
-                          <option value="Khu B">Khu B</option>
+                          {[...new Set(allRooms.map(r => r.floor?.building?.name).filter(Boolean))].map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
                         </Select>
+                        {form.formState.errors.buildingCode && (
+                          <p className="mt-1 text-xs text-destructive">{form.formState.errors.buildingCode.message}</p>
+                        )}
                       </div>
                       <div>
                         <label className="mb-1.5 block text-xs font-semibold text-foreground">
                           Phòng <span className="text-destructive">*</span>
                         </label>
-                        <Select {...form.register('roomCode')}>
+                        <Select {...form.register('roomCode')} error={!!form.formState.errors.roomCode}>
                           <option value="">Chọn phòng</option>
-                          <option value="A102">A102</option>
-                          <option value="B201">B201</option>
+                          {allRooms
+                            .filter(r =>
+                              r.roomCode !== selectedStudent?.roomCode &&
+                              r.floor?.building?.name === form.watch('buildingCode')
+                            )
+                            .map(r => (
+                              <option key={r.id} value={r.roomCode}>
+                                {r.roomCode} ({r.capacity - r.roomStudentAssignments.length}/{r.capacity} trống)
+                              </option>
+                            ))
+                          }
                         </Select>
+                        {form.formState.errors.roomCode && (
+                          <p className="mt-1 text-xs text-destructive">{form.formState.errors.roomCode.message}</p>
+                        )}
                       </div>
-                      <div>
-                        <label className="mb-1.5 block text-xs font-semibold text-foreground">
-                          Giường <span className="text-destructive">*</span>
-                        </label>
-                        <Select {...form.register('bed')}>
-                          <option value="">Chọn giường</option>
-                          <option value="01">01</option>
-                          <option value="02">02</option>
-                        </Select>
-                      </div>
+
                     </div>
                     
                     <div>
@@ -674,6 +814,77 @@ export function RoomStudentsManagementPage() {
             )}
           </form>
         </div>
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal 
+        isOpen={!!detailStudent} 
+        onClose={() => setDetailStudent(null)} 
+        title="Chi tiết sinh viên"
+        size="md"
+        footer={
+          <Button variant="outline" onClick={() => setDetailStudent(null)}>Đóng</Button>
+        }
+      >
+        {detailStudent && (
+          <div className="space-y-5">
+            <div className="rounded-lg border border-border/50 bg-muted/20 p-4">
+              <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-4 border-b border-border/50 pb-2">
+                <Users size={14} className="inline mr-1.5 -mt-0.5" weight="duotone" />
+                Thông tin sinh viên
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Mã sinh viên</p>
+                  <p className="text-sm font-semibold text-foreground">{detailStudent.studentId}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Họ và tên</p>
+                  <p className="text-sm font-semibold text-foreground">{detailStudent.fullName}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Khoa</p>
+                  <p className="text-sm font-semibold text-foreground">{detailStudent.faculty || <span className="text-muted-foreground italic">Chưa cập nhật</span>}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Khóa</p>
+                  <p className="text-sm font-semibold text-foreground">{detailStudent.course || <span className="text-muted-foreground italic">Chưa cập nhật</span>}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-muted-foreground mb-0.5">Số điện thoại</p>
+                  <p className="text-sm font-semibold text-foreground">{detailStudent.phone || <span className="text-muted-foreground italic">Chưa cập nhật</span>}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-border/50 bg-muted/20 p-4">
+              <h3 className="text-xs font-bold text-foreground uppercase tracking-wider mb-4 border-b border-border/50 pb-2">
+                <Door size={14} className="inline mr-1.5 -mt-0.5" weight="duotone" />
+                Thông tin phòng
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Khu nhà</p>
+                  <p className="text-sm font-semibold text-foreground">{detailStudent.buildingCode}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Phòng</p>
+                  <p className="text-sm font-semibold text-foreground">{detailStudent.roomCode}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Ngày vào ở</p>
+                  <p className="text-sm font-semibold text-foreground">{detailStudent.moveInDate}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-0.5">Trạng thái</p>
+                  <span className={`inline-flex items-center justify-center px-2.5 py-0.5 rounded text-[11px] font-bold mt-0.5 ${detailStudent.status === 'Đang ở' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {detailStudent.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { PageTransition } from '../components/ui/PageTransition';
 import { useAuth } from '../auth/auth-context';
 import { type UserRole } from '../types/auth';
-import { getMockReportsSummary } from '../lib/frontend-mock';
+import { getDashboardSummary } from '../services/reports';
 import {
   List,
   X,
@@ -79,8 +79,10 @@ export function DashboardLayout() {
   const [pendingDamageCount, setPendingDamageCount] = useState(0);
 
   useEffect(() => {
-    getMockReportsSummary().then(data => {
-      setPendingDamageCount(data.pendingDamageReports);
+    getDashboardSummary().then(data => {
+      if ('pendingDamageReports' in data) {
+        setPendingDamageCount(data.pendingDamageReports);
+      }
     }).catch(() => {});
   }, []);
 
