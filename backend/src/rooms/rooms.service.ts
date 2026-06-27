@@ -55,8 +55,26 @@ export class RoomsService {
   }
 
   async delete(id: number) {
-    const room = await this.prisma.room.findUnique({ where: { id } });
+    const room = await this.prisma.room.findUnique({
+      where: { id },
+      include: {
+        assets: { take: 1 },
+        damageReports: { take: 1 },
+        inventoryChecks: { take: 1 },
+        roomStudentAssignments: { take: 1 },
+      },
+    });
     if (!room) throw new NotFoundException('Room not found');
+
+    const hasHistory =
+      room.assets.length > 0 ||
+      room.damageReports.length > 0 ||
+      room.inventoryChecks.length > 0 ||
+      room.roomStudentAssignments.length > 0;
+
+    if (hasHistory) {
+      throw new ConflictException('Không thể xóa phòng đã phát sinh dữ liệu nghiệp vụ. Vui lòng vô hiệu hóa thay vì xóa.');
+    }
 
     await this.prisma.room.delete({ where: { id } });
     return { deleted: true };
