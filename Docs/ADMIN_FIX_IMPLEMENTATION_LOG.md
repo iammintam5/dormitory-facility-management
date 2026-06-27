@@ -23,8 +23,8 @@
 
 | Trang thai | Hang muc | Huong xu ly | Ghi chu |
 |---|---|---|---|
-| Hoan thanh | Branding favicon | Dua `Logo_PTIT_University_khong_khung.png` vao public asset va khai bao favicon trong `index.html`. | Dung chung moi role. |
-| Hoan thanh | Branding header/login/print | Dung `Logo_PTIT_University.png` trong layout chung va man hinh login; doi ten truong thanh ten HV CNBCVT co so TP.HCM. | Asset dung chuan frontend nam trong `frontend/public`. |
+| Hoan thanh | Branding favicon | Dung `Logo_PTIT_University_khong_khung.png` lam favicon trong `index.html`. | Dung chung moi role, bo ban logo co khung. |
+| Hoan thanh | Branding header/login/print | Dung `Logo_PTIT_University_khong_khung.png` trong layout chung va man hinh login; doi ten truong thanh ten HV CNBCVT co so TP.HCM. | Asset dung chuan frontend nam trong `frontend/public`. |
 | Hoan thanh | Audit log | Them ham ghi log, ghi LOGIN va thao tac users, hien thi nguoi thuc hien bang ten/ma tai khoan. | Khong doi schema. |
 | Hoan thanh | Phan quyen audit/users | Audit log chi Admin xem; thao tac ghi users chi Admin. Endpoint doc users giu Admin/Manager vi cac luong Manager dang tim thanh vien hoi dong/sinh vien. | Giam rui ro vo luong Manager. |
 | Hoan thanh | Tai khoan nguoi dung | Check trung username khi sua, xu ly mat khau trong modal sua hoac bo nham lan, cap nhat thong ke/luong reset. | Uu tien khong tao cam giac "bam ma khong co tac dung". |

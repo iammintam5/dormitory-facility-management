@@ -4,7 +4,7 @@ import { useAuth } from '../auth/auth-context';
 import { UserRole } from '../types/auth';
 import { useToast } from '../toast/toast-context';
 
-import { Eye, EyeSlash, ArrowRight } from '@phosphor-icons/react';
+import { Eye, EyeSlash } from '@phosphor-icons/react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
@@ -55,42 +55,27 @@ export function LoginPage() {
     <main className="min-h-[100dvh] w-full flex items-center justify-center bg-background p-4">
       <div className="w-full max-w-[1080px] bg-card rounded-2xl shadow-2xl flex flex-col lg:flex-row overflow-hidden border border-border/40 animate-fade-in">
         {/* Left Panel */}
-        <section className="hidden lg:flex w-[52%] relative flex-col justify-between p-10 text-white bg-primary">
+        <section className="hidden lg:flex w-[52%] relative flex-col p-10 text-white bg-primary">
           {/* Gradient overlays */}
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.12),transparent_40%),radial-gradient(circle_at_80%_90%,rgba(255,255,255,0.08),transparent_35%)]" />
           
-          <div className="relative z-10 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2.5 mb-8">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
-                  <img src="/Logo_PTIT_University.png" alt="PTIT" className="h-8 w-8 object-contain" />
-                </div>
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-white/70">
-                  Ký túc xá sinh viên
-                </span>
+          <div className="relative z-10 flex min-h-[520px] flex-col">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <div className="flex h-20 w-20 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
+                <img src="/Logo_PTIT_University_khong_khung.png" alt="PTIT" className="h-[76px] w-[76px] object-contain" />
               </div>
-
-              <h1 className="text-3xl font-bold leading-tight text-white">
-                Hệ thống quản lý
-                <br />
-                cơ sở vật chất
-              </h1>
-              <p className="mt-5 max-w-sm text-sm leading-relaxed text-white/70">
-                Quản lý tài sản, phòng ở, sinh viên, báo hỏng và bảo trì một cách thông minh và hiệu quả.
-              </p>
+              <span className="max-w-[430px] text-xs font-bold uppercase leading-snug tracking-[0.08em] text-[#f0b1b1]">
+                <span className="block">HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG</span>
+                <span className="block">CƠ SỞ TẠI THÀNH PHỐ HỒ CHÍ MINH</span>
+              </span>
             </div>
 
-            <div className="space-y-3">
-              {[
-                'Theo dõi báo hỏng, bàn giao, kiểm kê và bảo trì.',
-                'Dữ liệu mẫu cho cả Admin, Quản lý và Sinh viên.',
-                'Giao diện hiện đại, tối ưu cho mọi thiết bị.',
-              ].map((item) => (
-                <div key={item} className="flex items-start gap-3 rounded-xl border border-white/8 bg-white/5 p-3.5 backdrop-blur-sm">
-                  <ArrowRight size={14} weight="bold" className="mt-0.5 shrink-0 text-white/50" />
-                  <p className="text-[13px] leading-relaxed text-white/80">{item}</p>
-                </div>
-              ))}
+            <div className="flex flex-1 items-center justify-center text-center">
+              <h1 className="max-w-[460px] text-[36px] font-bold leading-[1.22] text-white">
+                <span className="block">HỆ THỐNG</span>
+                <span className="mt-2 block">QUẢN LÝ CƠ SỞ</span>
+                <span className="mt-2 block">VẬT CHẤT KÝ TÚC XÁ</span>
+              </h1>
             </div>
           </div>
         </section>
@@ -99,8 +84,8 @@ export function LoginPage() {
         <section className="relative w-full bg-card p-8 md:p-12 flex flex-col justify-center lg:w-[48%]">
           <div className="w-full max-w-[380px] mx-auto">
             <div className="text-center mb-8">
-              <div className="w-14 h-14 mx-auto bg-primary/8 text-primary rounded-xl flex items-center justify-center mb-5">
-                <img src="/Logo_PTIT_University.png" alt="PTIT" className="h-12 w-12 object-contain" />
+              <div className="w-20 h-20 mx-auto bg-primary/8 text-primary rounded-xl flex items-center justify-center mb-5">
+                <img src="/Logo_PTIT_University_khong_khung.png" alt="PTIT" className="h-[72px] w-[72px] object-contain" />
               </div>
               <h2 className="text-xl font-bold text-foreground mb-1.5">Đăng nhập hệ thống</h2>
               <p className="text-muted-foreground text-sm">Vui lòng đăng nhập để tiếp tục.</p>

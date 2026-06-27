@@ -165,7 +165,7 @@ export function DashboardLayout() {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
-              <img src="/Logo_PTIT_University.png" alt="PTIT" className="h-8 w-8 object-contain" />
+              <img src="/Logo_PTIT_University_khong_khung.png" alt="PTIT" className="h-8 w-8 object-contain" />
             </div>
             <div className="hidden flex-col md:flex">
               <span className="max-w-[620px] text-[9px] font-bold uppercase leading-tight tracking-[0.08em] text-[#f0b1b1]">
@@ -232,7 +232,7 @@ export function DashboardLayout() {
             <aside className="absolute inset-y-0 left-0 w-72 bg-sidebar-bg shadow-2xl animate-slide-in-right custom-scrollbar overflow-y-auto">
               <div className="flex h-[60px] items-center justify-between border-b border-sidebar-border px-4">
                 <div className="flex items-center gap-2">
-                  <img src="/Logo_PTIT_University.png" alt="PTIT" className="h-8 w-8 object-contain" />
+                  <img src="/Logo_PTIT_University_khong_khung.png" alt="PTIT" className="h-8 w-8 object-contain" />
                   <span className="text-sm font-bold text-foreground">Menu</span>
                 </div>
                 <button
