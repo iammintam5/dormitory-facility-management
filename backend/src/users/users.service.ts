@@ -128,12 +128,13 @@ export class UsersService {
       include: { role: true, profile: true },
     });
 
+    // Audit log
     await this.auditLogsService.create({
       userId: actorUserId,
       action: 'CREATE_USER',
-      tableName: 'user',
+      tableName: 'users',
       recordId: user.id,
-      content: `Tạo tài khoản ${user.userCode}`,
+      content: `Tạo tài khoản mới: ${payload.username} (${payload.fullName})`,
       newValue: auditUserSnapshot(user),
       ipAddress,
     });
@@ -176,18 +177,20 @@ export class UsersService {
     }
 
     const data: any = {};
-    if (payload.fullName !== undefined) data.fullName = payload.fullName;
-    if (payload.username !== undefined) data.userCode = payload.username;
+    let changes: string[] = [];
+    if (payload.fullName !== undefined) { data.fullName = payload.fullName; changes.push('họ tên'); }
+    if (payload.username !== undefined) { data.userCode = payload.username; changes.push('tên đăng nhập'); }
     if (payload.password !== undefined && payload.password.trim()) {
       if (payload.password.length < 6) {
         throw new BadRequestException('Mật khẩu phải có ít nhất 6 ký tự');
       }
       data.password = await bcrypt.hash(payload.password, 10);
+      changes.push('mật khẩu');
     }
-    if (payload.email !== undefined) data.email = payload.email;
-    if (payload.phone !== undefined) data.phone = payload.phone;
-    if (payload.studentCode !== undefined) data.studentCode = payload.studentCode;
-    if (payload.roleId !== undefined) data.roleId = parseInt(payload.roleId, 10);
+    if (payload.email !== undefined) { data.email = payload.email; changes.push('email'); }
+    if (payload.phone !== undefined) { data.phone = payload.phone; changes.push('số điện thoại'); }
+    if (payload.studentCode !== undefined) { data.studentCode = payload.studentCode; changes.push('mã sinh viên'); }
+    if (payload.roleId !== undefined) { data.roleId = parseInt(payload.roleId, 10); changes.push('vai trò'); }
 
     const updated = await this.prisma.user.update({
       where: { id },
@@ -195,12 +198,13 @@ export class UsersService {
       include: { role: true, profile: true },
     });
 
+    // Audit log
     await this.auditLogsService.create({
       userId: actorUserId,
       action: 'UPDATE_USER',
-      tableName: 'user',
-      recordId: updated.id,
-      content: `Cập nhật tài khoản ${updated.userCode}`,
+      tableName: 'users',
+      recordId: id,
+      content: `Cập nhật tài khoản #${id}: ${changes.join(', ')}`,
       oldValue: auditUserSnapshot(user),
       newValue: {
         ...auditUserSnapshot(updated),
@@ -238,12 +242,13 @@ export class UsersService {
       include: { role: true },
     });
 
+    // Audit log
     await this.auditLogsService.create({
       userId: actorUserId,
       action: 'LOCK_USER',
-      tableName: 'user',
-      recordId: updated.id,
-      content: `Khóa tài khoản ${updated.userCode}`,
+      tableName: 'users',
+      recordId: id,
+      content: `Khóa tài khoản #${id} (${user.fullName})`,
       oldValue: auditUserSnapshot(user),
       newValue: auditUserSnapshot(updated),
       ipAddress,
@@ -278,12 +283,13 @@ export class UsersService {
       include: { role: true },
     });
 
+    // Audit log
     await this.auditLogsService.create({
       userId: actorUserId,
       action: 'UNLOCK_USER',
-      tableName: 'user',
-      recordId: updated.id,
-      content: `Mở khóa tài khoản ${updated.userCode}`,
+      tableName: 'users',
+      recordId: id,
+      content: `Mở khóa tài khoản #${id} (${user.fullName})`,
       oldValue: auditUserSnapshot(user),
       newValue: auditUserSnapshot(updated),
       ipAddress,
@@ -318,12 +324,13 @@ export class UsersService {
     const hashed = await bcrypt.hash(newPassword, 10);
     await this.prisma.user.update({ where: { id }, data: { password: hashed } });
 
+    // Audit log
     await this.auditLogsService.create({
       userId: actorUserId,
       action: 'RESET_PASSWORD',
-      tableName: 'user',
+      tableName: 'users',
       recordId: id,
-      content: `Đặt lại mật khẩu tài khoản ${user.userCode}`,
+      content: `Đặt lại mật khẩu cho tài khoản #${id} (${user.fullName})`,
       oldValue: auditUserSnapshot(user),
       newValue: { ...auditUserSnapshot(user), passwordChanged: true },
       ipAddress,
