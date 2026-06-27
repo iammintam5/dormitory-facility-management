@@ -97,6 +97,34 @@ async function main() {
   const users = [user1, user2, user3, user4, user5, user6];
 
   // ========================
+  // 2.5 PROFILES
+  // ========================
+  await prisma.profile.create({
+    data: {
+      userId: user3.id,
+      faculty: 'CNTT',
+      course: 'K21',
+      gender: 'Nam',
+      address: 'Hà Nội',
+      dateOfBirth: '2004-05-15',
+      emergencyName: 'Nguyễn Văn B',
+      emergencyPhone: '0901000099',
+    },
+  });
+  await prisma.profile.create({
+    data: {
+      userId: user4.id,
+      faculty: 'Kinh tế',
+      course: 'K22',
+      gender: 'Nữ',
+      address: 'Hải Phòng',
+      dateOfBirth: '2005-03-22',
+      emergencyName: 'Lê Văn C',
+      emergencyPhone: '0901000088',
+    },
+  });
+
+  // ========================
   // 3. LOCATIONS: BUILDINGS → FLOORS → ROOMS
   // ========================
   const buildingA = await prisma.dormBuilding.create({
