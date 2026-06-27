@@ -102,6 +102,19 @@
     transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
     transition-duration: 150ms;
   }
+
+  /* 
+    Prevent CSS Grid Blowout: by default, grid items have min-width: auto
+    which means they can't shrink below their content size. This causes
+    overflow when content (e.g. long text, Select elements) is wider than
+    the allocated column.
+  */
+  .grid {
+    min-width: 0;
+  }
+  .grid > * {
+    min-width: 0;
+  }
 }
 
 @layer utilities {

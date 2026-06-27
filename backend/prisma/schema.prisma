@@ -133,6 +133,7 @@ model Profile {
   address       String?
   faculty       String?
   className     String?
+  course        String?
   emergencyName String?
   emergencyPhone String?
   notes         String?
@@ -176,6 +177,9 @@ model Room {
   id        Int      @id @default(autoincrement())
   roomCode  String   @unique
   capacity  Int?
+  roomType  String?
+  areaM2    Float?
+  condition String?
   note      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

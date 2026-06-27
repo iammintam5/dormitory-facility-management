@@ -17,6 +17,7 @@ export class UsersController {
     @Query('keyword') keyword?: string,
     @Query('roleCode') roleCode?: string,
     @Query('status') status?: string,
+    @Query('studentCode') studentCode?: string,
   ) {
     return this.usersService.findAll({
       page: page ? parseInt(page, 10) : 1,
@@ -24,6 +25,7 @@ export class UsersController {
       keyword,
       roleCode,
       status,
+      studentCode,
     });
   }
 

@@ -14,7 +14,6 @@ import {
   Wrench,
   Prohibit,
   Plus,
-  Funnel,
   ArrowsClockwise,
   PencilSimple,
   Trash,
@@ -75,7 +74,11 @@ export function AssetsManagementPage() {
   const [deleteTarget, setDeleteTarget] = useState<AssetRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  const [assetCounts, setAssetCounts] = useState({ inUse: 0, maintenance: 0, damaged: 0 });
+  const assetCounts = {
+    inUse: assets.filter(a => a.status === 'IN_USE').length,
+    maintenance: assets.filter(a => a.status === 'UNDER_MAINTENANCE').length,
+    damaged: assets.filter(a => ['PENDING_LIQUIDATION', 'LIQUIDATED', 'DAMAGED'].includes(a.status)).length,
+  };
 
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetSchema),
@@ -138,17 +141,6 @@ export function AssetsManagementPage() {
     });
   }, []);
 
-  // Load all assets for summary counts
-  useEffect(() => {
-    getAssets({ pageSize: 1000 }).then(res => {
-      const all = res.items;
-      setAssetCounts({
-        inUse: all.filter(a => a.status === 'IN_USE').length,
-        maintenance: all.filter(a => a.status === 'UNDER_MAINTENANCE').length,
-        damaged: all.filter(a => ['PENDING_LIQUIDATION', 'LIQUIDATED', 'DAMAGED'].includes(a.status)).length,
-      });
-    }).catch(() => {});
-  }, []);
 
   const openAddModal = () => {
     setSelectedAsset(null);
@@ -182,7 +174,7 @@ export function AssetsManagementPage() {
     form.reset({
       assetCode: asset.assetCode,
       assetName: asset.assetName,
-      categoryId: asset.categoryCode || '', 
+      categoryId: '',
       description: asset.description || '',
       buildingId: matchedBuildingId,
       roomId: roomMatches ? roomMatches.id : '',
@@ -388,12 +380,9 @@ export function AssetsManagementPage() {
           </div>
           
           <div className="flex w-full items-center gap-2 lg:w-auto">
-            <Button onClick={loadData} className="flex-1 gap-2 lg:flex-none">
-              <Funnel size={16} weight="bold" />
-              Lọc
-            </Button>
             <Button 
-              variant="outline"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setKeyword('');
                 setFilterCategory('');
@@ -402,10 +391,10 @@ export function AssetsManagementPage() {
                 setFilterStatus('');
                 setPagination(p => ({ ...p, page: 1 }));
               }}
-              className="flex-1 gap-2 lg:flex-none"
+              className="gap-1.5 text-muted-foreground hover:text-foreground"
             >
-              <ArrowsClockwise size={16} weight="bold" />
-              Xóa
+              <ArrowsClockwise size={14} weight="bold" />
+              Làm mới bộ lọc
             </Button>
           </div>
         </CardContent>
@@ -610,7 +599,7 @@ export function AssetsManagementPage() {
                 <option value="DAMAGED">Hỏng</option>
                 <option value="PENDING_LIQUIDATION">Chờ thanh lý</option>
                 <option value="LIQUIDATED">Đã thanh lý</option>
-                <option value="INACTIVE">Không hoạt động</option>
+
               </Select>
             </div>
             <div>

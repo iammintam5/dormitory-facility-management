@@ -18,7 +18,7 @@ import {
   Spinner
 } from '@phosphor-icons/react';
 import { CouncilMemberSelect, CouncilMemberState } from '../../components/council/CouncilMemberSelect';
-import { createInventoryCheck, getInventoryCheck, saveInventoryCheckItems, completeInventoryCheck } from '../../services/inventory-checks';
+import { createInventoryCheck, getInventoryChecks, getInventoryCheck, saveInventoryCheckItems, completeInventoryCheck } from '../../services/inventory-checks';
 import { getRooms } from '../../services/locations';
 import { formatDateOnly, formatDateTime } from '../../lib/date';
 import { useToast } from '../../toast/toast-context';
@@ -34,16 +34,54 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { useAuth } from '../../auth/auth-context';
 
-// Dummy data matching the screenshot
-const inventoryData = [
-  { id: 1, code: 'KK2024-05', name: 'Kiểm kê định kỳ Quý I/2024', building: 'A, B, C', fromDate: '01/05/2024', toDate: '05/05/2024', status: 'Hoàn thành', total: '1.250', checked: '1.250', diff: 5, creator: 'Nguyễn Văn A' },
-  { id: 2, code: 'KK2024-04', name: 'Kiểm kê định kỳ Quý I/2024', building: 'A, B, C', fromDate: '15/02/2024', toDate: '20/02/2024', status: 'Hoàn thành', total: '1.230', checked: '1.230', diff: 2, creator: 'Nguyễn Văn A' },
-  { id: 3, code: 'KK2024-03', name: 'Kiểm kê toàn bộ năm 2023', building: 'A, B, C', fromDate: '01/12/2023', toDate: '10/12/2023', status: 'Hoàn thành', total: '1.210', checked: '1.210', diff: 8, creator: 'Trần Văn K' },
-  { id: 4, code: 'KK2024-02', name: 'Kiểm kê định kỳ Quý IV/2023', building: 'B, C', fromDate: '01/11/2023', toDate: '05/11/2023', status: 'Đang thực hiện', total: '840', checked: '620', diff: 0, creator: 'Trần Văn K' },
-  { id: 5, code: 'KK2024-01', name: 'Kiểm kê định kỳ Quý III/2023', building: 'A, B', fromDate: '01/08/2023', toDate: '05/08/2023', status: 'Đang thực hiện', total: '780', checked: '300', diff: 0, creator: 'Nguyễn Văn A' },
-  { id: 6, code: 'KK2023-02', name: 'Kiểm kê bổ sung Khu C', building: 'C', fromDate: '15/06/2023', toDate: '16/06/2023', status: 'Chưa thực hiện', total: '210', checked: '0', diff: 0, creator: 'Nguyễn Văn A' },
-  { id: 7, code: 'KK2023-01', name: 'Kiểm kê định kỳ Quý II/2023', building: 'A, B', fromDate: '01/05/2023', toDate: '05/05/2023', status: 'Chưa thực hiện', total: '760', checked: '0', diff: 0, creator: 'Trần Văn K' },
-];
+type DisplayRow = {
+  id: number;
+  code: string;
+  name: string;
+  building: string;
+  fromDate: string;
+  toDate: string;
+  status: 'Hoàn thành' | 'Đang thực hiện' | 'Chưa thực hiện';
+  total: string;
+  checked: string;
+  diff: number;
+  creator: string;
+};
+
+function toDisplayStatus(item: InventoryCheck): DisplayRow['status'] {
+  if (item.status === 'COMPLETED') return 'Hoàn thành';
+  // DRAFT: check if any items have been modified (has condition/note set or non-zero diff)
+  const hasProgress = item.inventoryCheckItems.some(
+    (i) => (i.actualCondition && i.actualCondition.trim() !== '') || (i.note && i.note.trim() !== ''),
+  );
+  return hasProgress ? 'Đang thực hiện' : 'Chưa thực hiện';
+}
+
+function toDisplayRow(item: InventoryCheck): DisplayRow {
+  const building = item.room?.floor?.building;
+  const buildingCodes = building ? building.code : '--';
+  const total = item.inventoryCheckItems.length;
+  const checked = item.inventoryCheckItems.filter((i) => i.actualQuantity > 0).length;
+  const diff = item.inventoryCheckItems.reduce((sum, i) => sum + (i.difference ?? 0), 0);
+  const dateFormat = (d: string) => {
+    const parts = d.split('-');
+    return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : d;
+  };
+  const rawDate = item.checkDate.split('T')[0];
+  return {
+    id: item.id,
+    code: item.inventoryCode,
+    name: item.generalNote || `Kiểm kê phòng ${item.room?.roomCode ?? '--'}`,
+    building: buildingCodes,
+    fromDate: dateFormat(rawDate),
+    toDate: item.completedAt ? dateFormat(item.completedAt.split('T')[0]) : dateFormat(rawDate),
+    status: toDisplayStatus(item),
+    total: String(total),
+    checked: String(checked),
+    diff,
+    creator: item.checkedByUser?.fullName ?? '--',
+  };
+}
 
 export function InventoryChecksManagementPage() {
   const [activeTab, setActiveTab] = useState('DANH SÁCH ĐỢT KIỂM KÊ');
@@ -58,8 +96,31 @@ export function InventoryChecksManagementPage() {
   const [yearFilter, setYearFilter] = useState('Tất cả');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
-  
+
+  // API data states
+  const [isLoadingList, setIsLoadingList] = useState(true);
+  const [listError, setListError] = useState('');
+  const [inventoryCheckList, setInventoryCheckList] = useState<InventoryCheck[]>([]);
+
   const navigate = useNavigate();
+
+  // Fetch inventory checks from API
+  async function fetchInventoryChecks() {
+    setIsLoadingList(true);
+    setListError('');
+    try {
+      const response = await getInventoryChecks({ pageSize: 50 });
+      setInventoryCheckList(response.items);
+    } catch (error) {
+      setListError(error instanceof Error ? error.message : 'Không thể tải dữ liệu kiểm kê.');
+    } finally {
+      setIsLoadingList(false);
+    }
+  }
+
+  useEffect(() => {
+    fetchInventoryChecks();
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -75,15 +136,20 @@ export function InventoryChecksManagementPage() {
   const { showToast } = useToast();
   const basePath = user?.role === 'ADMIN' ? '/admin' : '/manager';
 
-  // Extract unique years from inventoryData
+  // Transform API data to display rows
+  const inventoryCheckDisplayData = useMemo(() => {
+    return inventoryCheckList.map(toDisplayRow);
+  }, [inventoryCheckList]);
+
+  // Extract unique years
   const yearOptions = useMemo(() => {
-    const years = [...new Set(inventoryData.map(item => item.fromDate.split('/')[2]))];
+    const years = [...new Set(inventoryCheckList.map(item => item.checkDate.split('-')[0]))];
     return years.sort((a, b) => Number(b) - Number(a));
-  }, []);
+  }, [inventoryCheckList]);
 
   // Filtered data based on all filter criteria
   const filteredData = useMemo(() => {
-    return inventoryData.filter(item => {
+    return inventoryCheckDisplayData.filter(item => {
       // Search keyword
       if (searchKeyword) {
         const kw = searchKeyword.toLowerCase();
@@ -118,17 +184,17 @@ export function InventoryChecksManagementPage() {
       
       return true;
     });
-  }, [searchKeyword, statusFilter, yearFilter, fromDate, toDate]);
+  }, [searchKeyword, statusFilter, yearFilter, fromDate, toDate, inventoryCheckDisplayData]);
 
   // Summary counts from all data (unfiltered)
   const summaryCounts = useMemo(() => {
-    const total = inventoryData.length;
-    const completed = inventoryData.filter(i => i.status === 'Hoàn thành').length;
-    const inProgress = inventoryData.filter(i => i.status === 'Đang thực hiện').length;
-    const notStarted = inventoryData.filter(i => i.status === 'Chưa thực hiện').length;
-    const totalDiff = inventoryData.reduce((sum, i) => sum + i.diff, 0);
+    const total = inventoryCheckDisplayData.length;
+    const completed = inventoryCheckDisplayData.filter(i => i.status === 'Hoàn thành').length;
+    const inProgress = inventoryCheckDisplayData.filter(i => i.status === 'Đang thực hiện').length;
+    const notStarted = inventoryCheckDisplayData.filter(i => i.status === 'Chưa thực hiện').length;
+    const totalDiff = inventoryCheckDisplayData.reduce((sum, i) => sum + i.diff, 0);
     return { total, completed, inProgress, notStarted, totalDiff };
-  }, []);
+  }, [inventoryCheckDisplayData]);
 
   const completedPercent = summaryCounts.total > 0 
     ? ((summaryCounts.completed / summaryCounts.total) * 100).toFixed(2) 
@@ -289,124 +355,145 @@ export function InventoryChecksManagementPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="pl-6">Mã đợt kiểm kê</TableHead>
-                <TableHead>Tên đợt kiểm kê</TableHead>
-                <TableHead>Khu nhà</TableHead>
-                <TableHead>Từ ngày</TableHead>
-                <TableHead>Đến ngày</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="text-center">Tổng SL thiết bị</TableHead>
-                <TableHead className="text-center">Đã kiểm kê</TableHead>
-                <TableHead className="text-center">Chênh lệch</TableHead>
-                <TableHead>Người tạo</TableHead>
-                <TableHead className="text-center">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredData.map((item) => (
-                <TableRow key={item.id} className={item.id === 3 ? 'bg-primary/5' : ''}>
-                  <TableCell className="pl-6 font-bold text-foreground">{item.code}</TableCell>
-                  <TableCell className={`font-medium ${item.id === 3 ? 'text-primary' : ''}`}>{item.name}</TableCell>
-                  <TableCell className={item.id === 3 ? 'text-primary font-medium' : 'text-muted-foreground'}>{item.building}</TableCell>
-                  <TableCell className="tabular-nums">{item.fromDate}</TableCell>
-                  <TableCell className="tabular-nums">{item.toDate}</TableCell>
-                  <TableCell>
-                    <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${
-                      item.status === 'Hoàn thành' ? 'bg-emerald-100 text-emerald-700' :
-                      item.status === 'Đang thực hiện' ? 'bg-amber-100 text-amber-700' :
-                      'bg-rose-100 text-rose-700'
-                    }`}>
-                      {item.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center tabular-nums">{item.total}</TableCell>
-                  <TableCell className="text-center tabular-nums">{item.checked}</TableCell>
-                  <TableCell className={`text-center font-bold tabular-nums ${item.diff > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
-                    {item.diff > 0 ? item.diff : '-'}
-                  </TableCell>
-                  <TableCell className="font-medium">{item.creator}</TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <Button variant="ghost" size="icon" title="Xem" onClick={() => { setDetailCheckId(item.id); setIsDetailModalOpen(true); }}>
-                        <Eye size={16} className="text-primary" />
-                      </Button>
-                      {item.status !== 'Chưa thực hiện' && (
-                        <Button variant="ghost" size="icon" title="In" onClick={() => navigate(`${basePath}/inventory-checks/${item.id}/print`)}>
-                          <Printer size={16} className="text-primary" />
+          {isLoadingList ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="flex flex-col items-center gap-3">
+                <Spinner size={28} className="animate-spin text-primary" />
+                <p className="text-sm font-medium text-muted-foreground">Đang tải dữ liệu...</p>
+              </div>
+            </div>
+          ) : listError ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3">
+              <div className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium">
+                {listError}
+              </div>
+              <Button variant="outline" size="sm" onClick={fetchInventoryChecks} className="gap-2">
+                <ArrowsClockwise size={14} />
+                Thử lại
+              </Button>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-6">Mã đợt kiểm kê</TableHead>
+                  <TableHead>Tên đợt kiểm kê</TableHead>
+                  <TableHead>Khu nhà</TableHead>
+                  <TableHead>Từ ngày</TableHead>
+                  <TableHead>Đến ngày</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead className="text-center">Tổng SL thiết bị</TableHead>
+                  <TableHead className="text-center">Đã kiểm kê</TableHead>
+                  <TableHead className="text-center">Chênh lệch</TableHead>
+                  <TableHead>Người tạo</TableHead>
+                  <TableHead className="text-center">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredData.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="pl-6 font-bold text-foreground">{item.code}</TableCell>
+                    <TableCell className="font-medium">{item.name}</TableCell>
+                    <TableCell className="text-muted-foreground">{item.building}</TableCell>
+                    <TableCell className="tabular-nums">{item.fromDate}</TableCell>
+                    <TableCell className="tabular-nums">{item.toDate}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${
+                        item.status === 'Hoàn thành' ? 'bg-emerald-100 text-emerald-700' :
+                        item.status === 'Đang thực hiện' ? 'bg-amber-100 text-amber-700' :
+                        'bg-rose-100 text-rose-700'
+                      }`}>
+                        {item.status}
+                      </span>
+                    </TableCell>
+                    <TableCell className="text-center tabular-nums">{item.total}</TableCell>
+                    <TableCell className="text-center tabular-nums">{item.checked}</TableCell>
+                    <TableCell className={`text-center font-bold tabular-nums ${item.diff > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                      {item.diff > 0 ? item.diff : '-'}
+                    </TableCell>
+                    <TableCell className="font-medium">{item.creator}</TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Button variant="ghost" size="icon" title="Xem" onClick={() => { setDetailCheckId(item.id); setIsDetailModalOpen(true); }}>
+                          <Eye size={16} className="text-primary" />
                         </Button>
-                      )}
-                      <div className="relative">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          title="Thêm thao tác"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(openMenuId === item.id ? null : item.id);
-                          }}
-                        >
-                          <DotsThree size={20} className="text-muted-foreground" />
-                        </Button>
-                        {openMenuId === item.id && (
-                          <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-xl border border-border/50 bg-popover shadow-lg">
-                            <div className="py-1.5">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setOpenMenuId(null);
-                                  setDetailCheckId(item.id);
-                                  setIsDetailModalOpen(true);
-                                }}
-                                className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted/50"
-                              >
-                                <Eye size={16} />
-                                Xem chi tiết
-                              </button>
-                              {item.status !== 'Chưa thực hiện' && (
+                        {item.status !== 'Chưa thực hiện' && (
+                          <Button variant="ghost" size="icon" title="In" onClick={() => navigate(`${basePath}/inventory-checks/${item.id}/print`)}>
+                            <Printer size={16} className="text-primary" />
+                          </Button>
+                        )}
+                        <div className="relative">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Thêm thao tác"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setOpenMenuId(openMenuId === item.id ? null : item.id);
+                            }}
+                          >
+                            <DotsThree size={20} className="text-muted-foreground" />
+                          </Button>
+                          {openMenuId === item.id && (
+                            <div className="absolute right-0 top-full z-50 mt-1 w-44 rounded-xl border border-border/50 bg-popover shadow-lg">
+                              <div className="py-1.5">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     setOpenMenuId(null);
-                                    navigate(`${basePath}/inventory-checks/${item.id}/print`);
+                                    setDetailCheckId(item.id);
+                                    setIsDetailModalOpen(true);
                                   }}
                                   className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted/50"
                                 >
-                                  <Printer size={16} />
-                                  In phiếu
+                                  <Eye size={16} />
+                                  Xem chi tiết
                                 </button>
-                              )}
+                                {item.status !== 'Chưa thực hiện' && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenMenuId(null);
+                                      navigate(`${basePath}/inventory-checks/${item.id}/print`);
+                                    }}
+                                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted/50"
+                                  >
+                                    <Printer size={16} />
+                                    In phiếu
+                                  </button>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        )}
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </div>
 
-        <div className="px-6 py-4 border-t border-border/50 flex items-center justify-between text-sm text-muted-foreground bg-muted/30">
-          <div>Hiển thị 1 đến {filteredData.length} của {filteredData.length} đợt kiểm kê</div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled className="gap-1">
-              <CaretLeft size={16} />
-            </Button>
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground shadow">
-              1
+        {!isLoadingList && !listError && (
+          <div className="px-6 py-4 border-t border-border/50 flex items-center justify-between text-sm text-muted-foreground bg-muted/30">
+            <div>Hiển thị 1 đến {filteredData.length} của {filteredData.length} đợt kiểm kê</div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" disabled className="gap-1">
+                <CaretLeft size={16} />
+              </Button>
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-sm font-medium text-primary-foreground shadow">
+                1
+              </div>
+              <Button variant="outline" size="sm" disabled className="gap-1">
+                <CaretRight size={16} />
+              </Button>
+              <Select className="ml-2 h-8 text-sm">
+                <option>10 / trang</option>
+              </Select>
             </div>
-            <Button variant="outline" size="sm" disabled className="gap-1">
-              <CaretRight size={16} />
-            </Button>
-            <Select className="ml-2 h-8 text-sm">
-              <option>10 / trang</option>
-            </Select>
           </div>
-        </div>
+        )}
       </Card>
 
       <Card className="border-border/50">
@@ -449,6 +536,7 @@ export function InventoryChecksManagementPage() {
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         basePath={basePath}
+        onCreated={() => fetchInventoryChecks()}
       />
 
       {/* Detail Modal */}
@@ -457,13 +545,14 @@ export function InventoryChecksManagementPage() {
         isOpen={isDetailModalOpen}
         onClose={() => { setIsDetailModalOpen(false); setDetailCheckId(null); }}
         basePath={basePath}
+        onUpdated={() => fetchInventoryChecks()}
       />
 
     </div>
   );
 }
 
-function CreateInventoryCheckModal({ isOpen, onClose, basePath }: { isOpen: boolean; onClose: () => void; basePath: string }) {
+function CreateInventoryCheckModal({ isOpen, onClose, basePath, onCreated }: { isOpen: boolean; onClose: () => void; basePath: string; onCreated: () => void }) {
   const { showToast } = useToast();
   const [rooms, setRooms] = useState<Room[]>([]);
   const [roomId, setRoomId] = useState('');
@@ -497,6 +586,7 @@ function CreateInventoryCheckModal({ isOpen, onClose, basePath }: { isOpen: bool
         generalNote: generalNote.trim() || undefined,
       });
       showToast('Tạo phiếu kiểm kê thành công.', 'success');
+      onCreated();
       onClose();
       setTimeout(() => navigate(`${basePath}/inventory-checks/${record.id}/print`), 100);
     } catch (error) {
@@ -562,7 +652,7 @@ function CreateInventoryCheckModal({ isOpen, onClose, basePath }: { isOpen: bool
   );
 }
 
-function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath }: { checkId: number | null; isOpen: boolean; onClose: () => void; basePath: string }) {
+function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath, onUpdated }: { checkId: number | null; isOpen: boolean; onClose: () => void; basePath: string; onUpdated?: () => void }) {
   const { showToast } = useToast();
   const [inventoryCheck, setInventoryCheck] = useState<InventoryCheck | null>(null);
   const [draftItems, setDraftItems] = useState<Record<number, { actualQuantity: number; actualCondition: string; note: string }>>({});
@@ -580,9 +670,8 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath }: { che
     setIsLoading(true);
     setErrorMessage('');
     try {
-      try {
-        const response = await getInventoryCheck(id);
-        setInventoryCheck(response);
+      const response = await getInventoryCheck(id);
+      setInventoryCheck(response);
       setGeneralNote(response.generalNote ?? '');
       setDraftItems(
         Object.fromEntries(
@@ -595,12 +684,13 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath }: { che
             },
           ]),
         ),
-      );      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : 'Không thể tải phiếu kiểm kê.');
-        setInventoryCheck(null);
-      } finally {
-        setIsLoading(false);
-      }
+      );
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Không thể tải phiếu kiểm kê.');
+      setInventoryCheck(null);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function updateDraft(itemId: number, field: 'actualQuantity' | 'actualCondition' | 'note', value: string | number) {
@@ -629,6 +719,7 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath }: { che
       await saveInventoryCheckItems(inventoryCheck.id, rows);
       showToast('Đã lưu kết quả kiểm kê.');
       await loadCheck(inventoryCheck.id);
+      onUpdated?.();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không thể lưu kết quả kiểm kê.';
       setErrorMessage(message);
@@ -645,6 +736,7 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath }: { che
       await completeInventoryCheck(inventoryCheck.id, generalNote.trim() || undefined);
       showToast('Đã hoàn tất phiếu kiểm kê.');
       await loadCheck(inventoryCheck.id);
+      onUpdated?.();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Không thể hoàn tất phiếu kiểm kê.';
       setErrorMessage(message);

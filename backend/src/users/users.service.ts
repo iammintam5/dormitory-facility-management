@@ -12,10 +12,14 @@ export class UsersService {
     keyword?: string;
     roleCode?: string;
     status?: string;
+    studentCode?: string;
   }) {
-    const { page, pageSize, keyword, roleCode, status } = params;
+    const { page, pageSize, keyword, roleCode, status, studentCode } = params;
     const where: any = {};
 
+    if (studentCode) {
+      where.studentCode = studentCode;
+    }
     if (keyword) {
       where.OR = [
         { fullName: { contains: keyword, mode: 'insensitive' } },

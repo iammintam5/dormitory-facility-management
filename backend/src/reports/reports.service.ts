@@ -27,7 +27,7 @@ export class ReportsService {
     }
 
     if (role === 'MANAGER') {
-      const [totalBuildings, totalRooms, totalAssets, damagedAssets, maintenanceProcessing, liquidationPending] =
+      const [totalBuildings, totalRooms, totalAssets, damagedAssets, maintenanceProcessing, liquidationPending, pendingDamageReports] =
         await Promise.all([
           this.prisma.dormBuilding.count(),
           this.prisma.room.count(),
@@ -35,6 +35,9 @@ export class ReportsService {
           this.prisma.asset.count({ where: { status: 'DAMAGED' } }),
           this.prisma.asset.count({ where: { status: 'UNDER_MAINTENANCE' } }),
           this.prisma.asset.count({ where: { status: 'PENDING_LIQUIDATION' } }),
+          this.prisma.damageReport.count({
+            where: { status: { in: ['SUBMITTED', 'REVIEWING', 'IN_PROGRESS', 'APPROVED'] } },
+          }),
         ]);
 
       return {
@@ -45,6 +48,7 @@ export class ReportsService {
         damagedAssets,
         maintenanceProcessing,
         liquidationPending,
+        pendingDamageReports,
       };
     }
 

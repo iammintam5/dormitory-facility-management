@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { searchMockUsers } from '../../lib/frontend-mock';
+import { getUsers } from '../../services/users';
 import { User } from '../../types/users';
 import { useToast } from '../../toast/toast-context';
 import { Button } from '../ui/Button';
@@ -31,7 +31,18 @@ export function CouncilMemberSelect({
     setIsSearching(true);
 
     try {
-      const results = await searchMockUsers(searchKeyword);
+      const response = await getUsers({ keyword: searchKeyword, pageSize: 20 });
+      // Transform API response to User[] format
+      const results: User[] = response.items.map((u) => ({
+        id: Number(u.id),
+        fullName: u.fullName,
+        userCode: u.username,
+        email: u.email ?? undefined,
+        phone: u.phone ?? undefined,
+        status: u.status,
+        createdAt: u.createdAt,
+        role: u.role,
+      }));
       setSearchResults(results.filter((user) => !members.some((member) => member.user.id === user.id)));
     } catch {
       showToast('Không thể tìm kiếm thành viên hội đồng.', 'error');

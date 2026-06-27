@@ -35,6 +35,21 @@ export class RoomsController {
     return this.roomsService.getStudents(parseInt(id, 10));
   }
 
+  @Post(':id/students')
+  async assignStudent(@Param('id') id: string, @Body() body: { studentId: number }) {
+    return this.roomsService.assignStudent(parseInt(id, 10), body.studentId);
+  }
+
+  @Post(':id/transfer')
+  async transferStudent(@Param('id') id: string, @Body() body: { studentId: number }) {
+    return this.roomsService.transferStudent(body.studentId, parseInt(id, 10));
+  }
+
+  @Delete(':id/students/:studentId')
+  async removeStudent(@Param('id') id: string, @Param('studentId') studentId: string) {
+    return this.roomsService.removeStudent(parseInt(id, 10), parseInt(studentId, 10));
+  }
+
   @Get(':id/assets')
   async getAssets(@Param('id') id: string) {
     return this.roomsService.getAssets(parseInt(id, 10));

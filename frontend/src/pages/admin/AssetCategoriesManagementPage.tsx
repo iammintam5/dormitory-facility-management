@@ -14,8 +14,6 @@ import { useToast } from '../../toast/toast-context';
 
 import { 
   Folder,
-  FolderOpen,
-  FolderMinus,
   Folders,
   Plus,
   PencilSimple,
@@ -26,7 +24,6 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { SummaryCard } from '../../components/ui/SummaryCard';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
@@ -35,7 +32,6 @@ const categorySchema = z.object({
   code: z.string().min(1, 'Nhập mã loại thiết bị.'),
   name: z.string().min(1, 'Nhập tên loại thiết bị.'),
   description: z.string().optional(),
-  status: z.enum(['Đang sử dụng', 'Ngừng sử dụng']).default('Đang sử dụng'),
 });
 
 type CategoryFormValues = z.infer<typeof categorySchema>;
@@ -45,14 +41,12 @@ type AssetCategoryView = {
   name: string;
   description: string;
   quantity: number;
-  status: 'Đang sử dụng' | 'Ngừng sử dụng';
 };
 
 export function AssetCategoriesManagementPage() {
   const { showToast } = useToast();
   const [categories, setCategories] = useState<AssetCategoryView[]>([]);
   const [keyword, setKeyword] = useState('');
-  const [statusFilter, setStatusFilter] = useState('Tất cả');
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<AssetCategoryView | null>(null);
@@ -63,7 +57,6 @@ export function AssetCategoriesManagementPage() {
       code: '',
       name: '',
       description: '',
-      status: 'Đang sử dụng',
     },
   });
 
@@ -89,7 +82,6 @@ export function AssetCategoriesManagementPage() {
       code: '',
       name: '',
       description: '',
-      status: 'Đang sử dụng',
     });
     setIsModalOpen(true);
   };
@@ -100,7 +92,6 @@ export function AssetCategoriesManagementPage() {
       code: cat.code,
       name: cat.name,
       description: cat.description,
-      status: cat.status,
     });
     setIsModalOpen(true);
   };
@@ -138,16 +129,13 @@ export function AssetCategoriesManagementPage() {
         const matchKeyword =
           !keyword ||
           `${category.code} ${category.name} ${category.description}`.toLowerCase().includes(keyword.toLowerCase());
-        const matchStatus = statusFilter === 'Tất cả' || category.status === statusFilter;
-        return matchKeyword && matchStatus;
+        return matchKeyword;
       }),
-    [categories, keyword, statusFilter],
+    [categories, keyword],
   );
 
   const totalCategories = filteredCategories.length;
-  const activeCategories = filteredCategories.filter((item) => item.status === 'Đang sử dụng').length;
-  const inactiveCategories = filteredCategories.filter((item) => item.status === 'Ngừng sử dụng').length;
-  const totalAssets = filteredCategories.reduce((sum, item) => sum + item.quantity, 0).toLocaleString('vi-VN');
+  const totalAssets = categories.reduce((sum, item) => sum + item.quantity, 0).toLocaleString('vi-VN');
 
   const handleDelete = async (id: string) => {
     try {
@@ -181,20 +169,6 @@ export function AssetCategoriesManagementPage() {
           colorClass="text-blue-600 bg-blue-50 border-blue-100" 
         />
         <SummaryCard 
-          label="Đang sử dụng" 
-          value={String(activeCategories)} 
-          unit="loại" 
-          icon={<FolderOpen size={24} weight="duotone" />} 
-          colorClass="text-emerald-600 bg-emerald-50 border-emerald-100" 
-        />
-        <SummaryCard 
-          label="Ngừng sử dụng" 
-          value={String(inactiveCategories)} 
-          unit="loại" 
-          icon={<FolderMinus size={24} weight="duotone" />} 
-          colorClass="text-amber-600 bg-amber-50 border-amber-100" 
-        />
-        <SummaryCard 
           label="Thiết bị thuộc loại" 
           value={totalAssets} 
           unit="thiết bị" 
@@ -213,18 +187,6 @@ export function AssetCategoriesManagementPage() {
               placeholder="Nhập tên loại thiết bị..."
             />
           </div>
-
-          <div className="w-full md:w-64">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Trạng thái</label>
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option>Tất cả</option>
-              <option>Đang sử dụng</option>
-              <option>Ngừng sử dụng</option>
-            </Select>
-          </div>
         </CardContent>
       </Card>
 
@@ -242,14 +204,13 @@ export function AssetCategoriesManagementPage() {
                 <TableHead>Tên loại thiết bị</TableHead>
                 <TableHead>Mô tả</TableHead>
                 <TableHead className="text-center">Số lượng TB</TableHead>
-                <TableHead className="text-center">Trạng thái</TableHead>
                 <TableHead className="w-24 text-center">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCategories.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     Chưa có danh mục thiết bị.
                   </TableCell>
                 </TableRow>
@@ -260,11 +221,6 @@ export function AssetCategoriesManagementPage() {
                   <TableCell className="font-medium text-foreground">{cat.name}</TableCell>
                   <TableCell className="text-muted-foreground">{cat.description || '-'}</TableCell>
                   <TableCell className="text-center tabular-nums font-medium">{cat.quantity}</TableCell>
-                  <TableCell className="text-center">
-                    <span className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${cat.status === 'Đang sử dụng' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                      {cat.status}
-                    </span>
-                  </TableCell>
                   <TableCell className="text-center">
                     <div className="flex items-center justify-center gap-1">
                       <Button variant="ghost" size="icon" onClick={() => openEditModal(cat)}>
@@ -333,13 +289,6 @@ export function AssetCategoriesManagementPage() {
               className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
             />
           </div>
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">Trạng thái</label>
-            <Select {...form.register('status')}>
-              <option value="Đang sử dụng">Đang sử dụng</option>
-              <option value="Ngừng sử dụng">Ngừng sử dụng</option>
-            </Select>
-          </div>
         </form>
       </Modal>
     </div>
@@ -352,8 +301,7 @@ function mapCategory(category: AssetCategoryRecord): AssetCategoryView {
     code: category.code,
     name: category.name,
     description: category.description ?? '',
-    quantity: 0,
-    status: 'Đang sử dụng',
+    quantity: category._count?.assets ?? 0,
   };
 }
 

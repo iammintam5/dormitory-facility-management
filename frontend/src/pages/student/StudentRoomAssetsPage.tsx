@@ -18,8 +18,7 @@ import {
   Wrench,
   Spinner
 } from '@phosphor-icons/react';
-import { getAssets } from '../../services/assets';
-import { getRooms } from '../../services/locations';
+import { getRooms, getRoomAssets } from '../../services/locations';
 import { Asset } from '../../types/assets';
 
 export function StudentRoomAssetsPage() {
@@ -37,18 +36,20 @@ export function StudentRoomAssetsPage() {
         if (firstRoom) {
           setRoomCode(firstRoom.roomCode);
           setBuildingCode(firstRoom.buildingCode);
+          // Fetch assets for the student's room
+          const assets = await getRoomAssets(Number(firstRoom.id));
+          setRoomAssets(assets.map((a: any) => ({
+            id: a.id,
+            categoryId: a.categoryId,
+            assetCode: a.assetCode,
+            assetName: a.assetName,
+            status: a.status,
+            description: a.description,
+            yearInUse: a.yearInUse,
+            createdAt: a.createdAt,
+            category: a.category,
+          })));
         }
-        const assetData = await getAssets({ pageSize: 100 });
-        setRoomAssets(assetData.items.map((a: any) => ({
-          id: parseInt(a.id),
-          categoryId: 1,
-          assetCode: a.assetCode,
-          assetName: a.assetName,
-          status: a.status,
-          description: a.description,
-          yearInUse: null,
-          createdAt: a.createdAt
-        })));
       } catch {
         // silent
       } finally {

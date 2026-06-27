@@ -1,5 +1,4 @@
 import { apiClient, unwrapApiResponse } from '../lib/api-client';
-import { getMockAssetRecords, createMockAssetRecord, updateMockAssetRecord, deleteMockAssetRecord } from '../lib/frontend-mock';
 
 export type AssetStatus = 
   | 'AVAILABLE' 

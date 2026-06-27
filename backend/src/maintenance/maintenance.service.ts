@@ -5,8 +5,48 @@ import { PrismaService } from '../prisma/prisma.service';
 export class MaintenanceService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private mapPlan(r: any) {
+    return {
+      id: r.id,
+      assetId: r.assetId,
+      createdBy: r.createdBy,
+      cycleMonths: r.cycleMonths,
+      nextDueDate: r.nextDueDate instanceof Date ? r.nextDueDate.toISOString().split('T')[0] : r.nextDueDate,
+      isActive: r.isActive,
+      note: r.note,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      updatedAt: r.updatedAt ? (r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt) : null,
+      asset: r.asset,
+      createdByUser: r.creator,
+      maintenanceRecords: r.maintenanceRecords,
+    };
+  }
+
+  private mapRecord(r: any) {
+    return {
+      id: r.id,
+      maintenanceCode: r.maintenanceCode,
+      planId: r.planId,
+      assetId: r.assetId,
+      performedBy: r.performedBy,
+      maintenanceDate: r.maintenanceDate instanceof Date ? r.maintenanceDate.toISOString().split('T')[0] : r.maintenanceDate,
+      maintenanceType: r.maintenanceType,
+      content: r.content,
+      resultStatus: r.resultStatus,
+      nextMaintenanceDate: r.nextMaintenanceDate ? (r.nextMaintenanceDate instanceof Date ? r.nextMaintenanceDate.toISOString().split('T')[0] : r.nextMaintenanceDate) : null,
+      cost: r.cost ? Number(r.cost) : null,
+      materialNote: r.materialNote,
+      note: r.note,
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      updatedAt: r.updatedAt ? (r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt) : null,
+      asset: r.asset,
+      plan: r.plan,
+      performedByUser: r.performer,
+    };
+  }
+
   async getPlans() {
-    return this.prisma.maintenancePlan.findMany({
+    const plans = await this.prisma.maintenancePlan.findMany({
       include: {
         asset: { include: { category: true } },
         creator: true,
@@ -14,6 +54,7 @@ export class MaintenanceService {
       },
       orderBy: { nextDueDate: 'asc' },
     });
+    return plans.map((p) => this.mapPlan(p));
   }
 
   async getRecords(params: { page: number; pageSize: number }) {
@@ -33,26 +74,7 @@ export class MaintenanceService {
     ]);
 
     return {
-      items: records.map((r) => ({
-        id: r.id,
-        maintenanceCode: r.maintenanceCode,
-        planId: r.planId,
-        assetId: r.assetId,
-        performedBy: r.performedBy,
-        maintenanceDate: r.maintenanceDate.toISOString().split('T')[0],
-        maintenanceType: r.maintenanceType,
-        content: r.content,
-        resultStatus: r.resultStatus,
-        nextMaintenanceDate: r.nextMaintenanceDate?.toISOString().split('T')[0] ?? null,
-        cost: r.cost ? Number(r.cost) : null,
-        materialNote: r.materialNote,
-        note: r.note,
-        createdAt: r.createdAt.toISOString(),
-        updatedAt: r.updatedAt?.toISOString() ?? null,
-        asset: r.asset,
-        plan: r.plan,
-        performedByUser: r.performer,
-      })),
+      items: records.map((r) => this.mapRecord(r)),
       pagination: {
         page,
         pageSize,
@@ -102,7 +124,7 @@ export class MaintenanceService {
       },
     });
 
-    return record;
+    return this.mapRecord(record);
   }
 
   async updateRecord(
@@ -131,7 +153,7 @@ export class MaintenanceService {
     if (body.materialNote !== undefined) updateData.materialNote = body.materialNote;
     if (body.note !== undefined) updateData.note = body.note;
 
-    return this.prisma.maintenanceRecord.update({
+    const updated = await this.prisma.maintenanceRecord.update({
       where: { id },
       data: updateData,
       include: {
@@ -140,6 +162,7 @@ export class MaintenanceService {
         performer: true,
       },
     });
+    return this.mapRecord(updated);
   }
 
   async getDashboardSummary() {
@@ -163,7 +186,7 @@ export class MaintenanceService {
   }
 
   async getHistory(assetId: number) {
-    return this.prisma.maintenanceRecord.findMany({
+    const records = await this.prisma.maintenanceRecord.findMany({
       where: { assetId },
       include: {
         asset: true,
@@ -172,5 +195,6 @@ export class MaintenanceService {
       },
       orderBy: { maintenanceDate: 'desc' },
     });
+    return records.map((r) => this.mapRecord(r));
   }
 }

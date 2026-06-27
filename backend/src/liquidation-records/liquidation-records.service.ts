@@ -39,16 +39,28 @@ export class LiquidationRecordsService {
       }),
     ]);
 
-    const items = records.map((r) => ({
+    return {
+      items: records.map((r) => this.mapRecord(r)),
+      pagination: {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      },
+    };
+  }
+
+  private mapRecord(r: any) {
+    return {
       id: r.id,
       liquidationCode: r.liquidationCode,
       createdBy: r.createdBy,
-      liquidationDate: r.liquidationDate.toISOString().split('T')[0],
+      liquidationDate: r.liquidationDate instanceof Date ? r.liquidationDate.toISOString().split('T')[0] : r.liquidationDate,
       status: r.status,
       note: r.note,
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt?.toISOString() ?? null,
-      liquidationItems: r.liquidationItems.map((li) => ({
+      createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
+      updatedAt: r.updatedAt ? (r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt) : null,
+      liquidationItems: (r.liquidationItems ?? []).map((li: any) => ({
         id: li.id,
         liquidationRecordId: li.liquidationRecordId,
         assetId: li.assetId,
@@ -57,22 +69,12 @@ export class LiquidationRecordsService {
         estimatedRemainingValue: li.estimatedRemainingValue ? Number(li.estimatedRemainingValue) : null,
         asset: li.asset,
       })),
-      createdByUser: {
+      createdByUser: r.creator ? {
         id: r.creator.id,
         fullName: r.creator.fullName,
         userCode: r.creator.userCode,
-      },
+      } : undefined,
       councilMembers: r.councilMembers,
-    }));
-
-    return {
-      items,
-      pagination: {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
-      },
     };
   }
 
@@ -86,7 +88,7 @@ export class LiquidationRecordsService {
       },
     });
     if (!record) throw new NotFoundException('Liquidation record not found');
-    return record;
+    return this.mapRecord(record);
   }
 
   async update(id: number, body: { liquidationDate?: string; note?: string }) {
@@ -94,7 +96,7 @@ export class LiquidationRecordsService {
     if (!record) throw new NotFoundException('Liquidation record not found');
     if (record.status !== 'DRAFT') throw new BadRequestException('Cannot update a non-draft liquidation record');
 
-    return this.prisma.liquidationRecord.update({
+    const updated = await this.prisma.liquidationRecord.update({
       where: { id },
       data: {
         ...(body.liquidationDate !== undefined && { liquidationDate: new Date(body.liquidationDate) }),
@@ -106,6 +108,7 @@ export class LiquidationRecordsService {
         councilMembers: { include: { user: true } },
       },
     });
+    return this.mapRecord(updated);
   }
 
   async create(
@@ -149,7 +152,7 @@ export class LiquidationRecordsService {
       data: { status: 'PENDING_LIQUIDATION' },
     });
 
-    return record;
+    return this.mapRecord(record);
   }
 
   async transition(id: number, action: string, userId: number) {
@@ -185,7 +188,7 @@ export class LiquidationRecordsService {
       });
     }
 
-    return updated;
+    return this.mapRecord(updated);
   }
 
   async exportData(id: number) {
@@ -197,7 +200,7 @@ export class LiquidationRecordsService {
         title: 'Biên bản thanh lý tài sản',
         generatedAt: new Date().toISOString(),
         assetLabel: asset ? `${asset.assetCode} - ${asset.assetName}` : '--',
-        createdByLabel: record.creator?.fullName ?? '--',
+        createdByLabel: record.createdByUser?.fullName ?? '--',
       },
     };
   }
