@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { generateCode } from '../common/utils/code-generator';
 
 @Injectable()
 export class MaintenanceService {
@@ -99,8 +100,7 @@ export class MaintenanceService {
       note?: string;
     },
   ) {
-    const count = await this.prisma.maintenanceRecord.count();
-    const code = `BT-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+    const code = generateCode('BT-');
 
     const record = await this.prisma.maintenanceRecord.create({
       data: {

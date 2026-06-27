@@ -1,5 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { generateCode } from '../common/utils/code-generator';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const WORKFLOW_MAP: Record<string, { newStatus: string; action: string }> = {
   accept: { newStatus: 'REVIEWING', action: 'Tiếp nhận' },
@@ -20,7 +22,10 @@ const VALID_TRANSITIONS: Record<string, string[]> = {
 
 @Injectable()
 export class DamageReportsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
   async findAll(params: {
     userId: number;
@@ -172,8 +177,22 @@ export class DamageReportsService {
     userId: number,
     body: { assetId?: number; roomId?: number; description: string; priority: string },
   ) {
-    const count = await this.prisma.damageReport.count();
-    const reportCode = `BH-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+    if (!body.assetId) {
+      throw new BadRequestException('assetId là bắt buộc');
+    }
+    if (!body.roomId) {
+      throw new BadRequestException('roomId là bắt buộc');
+    }
+
+    // Verify asset and room exist
+    const [asset, room] = await Promise.all([
+      this.prisma.asset.findUnique({ where: { id: body.assetId } }),
+      this.prisma.room.findUnique({ where: { id: body.roomId } }),
+    ]);
+    if (!asset) throw new NotFoundException('Tài sản không tồn tại');
+    if (!room) throw new NotFoundException('Phòng không tồn tại');
+
+    const reportCode = generateCode('BH-');
 
     const report = await this.prisma.damageReport.create({
       data: {
@@ -182,8 +201,8 @@ export class DamageReportsService {
         priority: body.priority as any,
         status: 'SUBMITTED',
         reporterId: userId,
-        assetId: body.assetId ?? 1,
-        roomId: body.roomId ?? 1,
+        assetId: body.assetId,
+        roomId: body.roomId,
         location: `${body.roomId ?? ''}`,
         damageReportLogs: {
           create: {
@@ -200,6 +219,16 @@ export class DamageReportsService {
         room: { include: { floor: { include: { building: true } } } },
         damageReportLogs: { include: { createdByUser: true } },
       },
+    });
+
+    // Audit log
+    await this.auditLogsService.create({
+      userId,
+      action: 'CREATE_DAMAGE_REPORT',
+      tableName: 'damage_reports',
+      recordId: report.id,
+      content: `Tạo phiếu báo hỏng ${reportCode}`,
+      newValue: JSON.stringify({ assetId: body.assetId, roomId: body.roomId, priority: body.priority }),
     });
 
     return report;
@@ -272,11 +301,25 @@ export class DamageReportsService {
       },
     });
 
+    // Audit log
+    await this.auditLogsService.create({
+      userId,
+      action: 'UPDATE_DAMAGE_REPORT',
+      tableName: 'damage_reports',
+      recordId: id,
+      content: `Cập nhật phiếu báo hỏng #${id}: ${changes.join(', ')}`,
+      oldValue: JSON.stringify({ status: report.status, description: report.description }),
+      newValue: JSON.stringify(updateData),
+    });
+
     return updated;
   }
 
   async transition(id: number, action: string, userId: number) {
-    const report = await this.prisma.damageReport.findUnique({ where: { id } });
+    const report = await this.prisma.damageReport.findUnique({
+      where: { id },
+      include: { asset: true },
+    });
     if (!report) throw new NotFoundException('Damage report not found');
 
     const allowed = VALID_TRANSITIONS[report.status] ?? [];
@@ -287,30 +330,96 @@ export class DamageReportsService {
     const workflow = WORKFLOW_MAP[action];
     if (!workflow) throw new BadRequestException(`Invalid action: ${action}`);
 
-    const updated = await this.prisma.damageReport.update({
-      where: { id },
-      data: {
-        status: workflow.newStatus as any,
-        damageReportLogs: {
-          create: {
-            action: workflow.action,
-            oldStatus: report.status as any,
-            newStatus: workflow.newStatus as any,
-            note: `${workflow.action} bởi người dùng #${userId}`,
-            createdByUserId: userId,
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updatedReport = await tx.damageReport.update({
+        where: { id },
+        data: {
+          status: workflow.newStatus as any,
+          ...(action === 'complete' ? { updatedAt: new Date() } : {}),
+        },
+        include: {
+          reporter: { include: { role: true } },
+          asset: { include: { category: true } },
+          room: { include: { floor: { include: { building: true } } } },
+          damageReportLogs: {
+            include: { createdByUser: { include: { role: true } } },
+            orderBy: { createdAt: 'asc' },
           },
         },
-        ...(action === 'complete' ? { updatedAt: new Date() } : {}),
-      },
-      include: {
-        reporter: { include: { role: true } },
-        asset: { include: { category: true } },
-        room: { include: { floor: { include: { building: true } } } },
-        damageReportLogs: {
-          include: { createdByUser: { include: { role: true } } },
-          orderBy: { createdAt: 'asc' },
+      });
+
+      await tx.damageReportLog.create({
+        data: {
+          action: workflow.action,
+          oldStatus: report.status as any,
+          newStatus: workflow.newStatus as any,
+          note: `${workflow.action} bởi người dùng #${userId}`,
+          createdByUserId: userId,
+          damageReportId: id,
         },
-      },
+      });
+
+      // When processing starts, set asset to UNDER_MAINTENANCE
+      if (action === 'start-processing' && report.assetId) {
+        const currentAssetStatus = report.asset?.status ?? 'DAMAGED';
+        await tx.asset.update({
+          where: { id: report.assetId },
+          data: { status: 'UNDER_MAINTENANCE' },
+        });
+
+        await tx.assetHistory.create({
+          data: {
+            assetId: report.assetId,
+            action: 'BẮT_ĐẦU_SỬA_CHỮA',
+            oldStatus: currentAssetStatus,
+            newStatus: 'UNDER_MAINTENANCE',
+            note: `Bắt đầu sửa chữa theo báo hỏng #${report.reportCode}`,
+          },
+        });
+      }
+
+      // When completed, set asset back to IN_USE
+      if (action === 'complete' && report.assetId) {
+        await tx.asset.update({
+          where: { id: report.assetId },
+          data: { status: 'IN_USE' },
+        });
+
+        await tx.assetHistory.create({
+          data: {
+            assetId: report.assetId,
+            action: 'KẾT_THÚC_BÁO_HỎNG',
+            oldStatus: 'UNDER_MAINTENANCE',
+            newStatus: 'IN_USE',
+            note: `Hoàn thành báo hỏng #${report.reportCode}`,
+          },
+        });
+      }
+
+      // When rejected, set asset back to DAMAGED or IN_USE
+      if (action === 'reject' && report.assetId) {
+        await tx.assetHistory.create({
+          data: {
+            assetId: report.assetId,
+            action: 'TỪ_CHỐI_BÁO_HỎNG',
+            newStatus: report.asset?.status,
+            note: `Từ chối báo hỏng #${report.reportCode}`,
+          },
+        });
+      }
+
+      return updatedReport;
+    });
+
+    // Audit log
+    await this.auditLogsService.create({
+      userId,
+      action: workflow.action.toUpperCase().replace(/ /g, '_'),
+      tableName: 'damage_reports',
+      recordId: id,
+      content: `${workflow.action} phiếu báo hỏng #${id} (${report.reportCode}): ${report.status} → ${workflow.newStatus}`,
+      oldValue: report.status,
+      newValue: workflow.newStatus,
     });
 
     return updated;
