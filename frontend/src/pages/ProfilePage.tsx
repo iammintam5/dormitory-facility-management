@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/auth-context';
 import { formatDateOnly, formatDateTime } from '../lib/date';
 import { getApiErrorMessage } from '../lib/api-client';
@@ -23,6 +23,7 @@ export function ProfilePage() {
     fullName: user?.fullName ?? 'Nguyễn Văn An',
     email: user?.email ?? '',
     phone: user?.phone ?? '',
+    avatarUrl: user?.profile?.avatarUrl ?? '',
     dob: user?.profile?.dateOfBirth ? user.profile.dateOfBirth.slice(0, 10) : '',
     gender: user?.profile?.gender ?? 'Nam',
     address: user?.profile?.address ?? '',
@@ -32,11 +33,13 @@ export function ProfilePage() {
   const [fullName, setFullName] = useState(initialProfile.fullName);
   const [email, setEmail] = useState(initialProfile.email);
   const [phone, setPhone] = useState(initialProfile.phone);
+  const [avatarUrl, setAvatarUrl] = useState(initialProfile.avatarUrl);
   const [dob, setDob] = useState(initialProfile.dob);
   const [gender, setGender] = useState(initialProfile.gender);
   const [address, setAddress] = useState(initialProfile.address);
   const [notes, setNotes] = useState(initialProfile.notes);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     async function bootstrapProfile() {
@@ -45,6 +48,7 @@ export function ProfilePage() {
         setFullName(profile.fullName);
         setEmail(profile.email ?? '');
         setPhone(profile.phone ?? '');
+        setAvatarUrl(profile.profile?.avatarUrl ?? '');
         setDob(profile.profile?.dateOfBirth ? profile.profile.dateOfBirth.slice(0, 10) : '');
         setGender(profile.profile?.gender ?? 'Nam');
         setAddress(profile.profile?.address ?? '');
@@ -77,6 +81,7 @@ export function ProfilePage() {
         fullName: fullName.trim(),
         email: email.trim(),
         phone: phone.trim() || null,
+        avatarUrl: avatarUrl || null,
         dateOfBirth: dob || null,
         gender: gender || null,
         address: address.trim() || null,
@@ -95,11 +100,39 @@ export function ProfilePage() {
     setFullName(initialProfile.fullName);
     setEmail(initialProfile.email);
     setPhone(initialProfile.phone);
+    setAvatarUrl(initialProfile.avatarUrl);
     setDob(initialProfile.dob);
     setGender(initialProfile.gender);
     setAddress(initialProfile.address);
     setNotes(initialProfile.notes);
     showToast('Đã khôi phục thông tin ban đầu.');
+  };
+
+  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      showToast('Vui lòng chọn tệp hình ảnh.', 'error');
+      event.target.value = '';
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      showToast('Ảnh đại diện cần nhỏ hơn 2MB.', 'error');
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const nextAvatarUrl = await prepareAvatarDataUrl(file);
+      setAvatarUrl(nextAvatarUrl);
+      showToast('Đã chọn ảnh đại diện. Nhấn cập nhật để lưu.');
+    } catch {
+      showToast('Không thể xử lý ảnh đại diện này. Vui lòng chọn ảnh khác.', 'error');
+    } finally {
+      event.target.value = '';
+    }
   };
 
   return (
@@ -117,10 +150,21 @@ export function ProfilePage() {
           <CardContent className="p-6 flex flex-col items-center">
             <div className="relative mt-4">
               <div className="w-[140px] h-[140px] rounded-full bg-primary/10 border-4 border-background shadow-sm flex items-center justify-center overflow-hidden shrink-0">
-                <User size={80} weight="fill" className="text-primary/40 mt-4" />
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt={fullName} className="h-full w-full object-cover" />
+                ) : (
+                  <User size={80} weight="fill" className="text-primary/40 mt-4" />
+                )}
               </div>
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleAvatarChange}
+              />
               <button
-                onClick={() => showToast('Tính năng ảnh đại diện sẽ được nối API sau.')}
+                onClick={() => avatarInputRef.current?.click()}
                 type="button"
                 className="absolute bottom-1 right-1 w-9 h-9 rounded-full bg-background border border-border/50 text-muted-foreground hover:text-primary hover:bg-muted shadow-md flex items-center justify-center transition-all"
                 title="Đổi ảnh đại diện"
@@ -264,4 +308,58 @@ function InfoRow({
       <span className={`font-bold ${active ? 'text-emerald-600' : 'text-foreground'}`}>{value}</span>
     </div>
   );
+}
+
+async function prepareAvatarDataUrl(file: File) {
+  if (file.type === 'image/gif' && file.size <= 512 * 1024) {
+    return readFileAsDataUrl(file);
+  }
+
+  const image = await loadImage(file);
+  const maxSize = 256;
+  const scale = Math.min(1, maxSize / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Canvas is not supported');
+
+  context.fillStyle = '#ffffff';
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+
+  return canvas.toDataURL('image/jpeg', 0.82);
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') resolve(reader.result);
+      else reject(new Error('Invalid file result'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('Cannot read file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(file: File) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    image.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Cannot load image'));
+    };
+    image.src = objectUrl;
+  });
 }

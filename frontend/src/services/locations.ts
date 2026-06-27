@@ -137,6 +137,8 @@ export async function getRoomStudents(roomId: number) {
     email: string | null;
     phone: string | null;
     studentCode: string | null;
+    assignmentId: number;
+    startDate: string;
     status: string;
     createdAt: string;
   }>>(response.data);

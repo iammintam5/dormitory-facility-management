@@ -570,7 +570,19 @@ function CreateInventoryCheckModal({ isOpen, onClose, basePath, onCreated }: { i
       setGeneralNote('');
       setMembers([]);
       setErrorMessage('');
-      getRooms().then(setRooms).catch(() => showToast('Không thể tải danh sách phòng.', 'error'));
+      getRooms()
+        .then((records) =>
+          setRooms(
+            records.map((room) => ({
+              id: Number(room.id),
+              floorId: 0,
+              roomCode: room.roomCode,
+              capacity: room.capacity,
+              createdAt: '',
+            })),
+          ),
+        )
+        .catch(() => showToast('Không thể tải danh sách phòng.', 'error'));
     }
   }, [isOpen, showToast]);
 
@@ -654,6 +666,7 @@ function CreateInventoryCheckModal({ isOpen, onClose, basePath, onCreated }: { i
 
 function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath, onUpdated }: { checkId: number | null; isOpen: boolean; onClose: () => void; basePath: string; onUpdated?: () => void }) {
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [inventoryCheck, setInventoryCheck] = useState<InventoryCheck | null>(null);
   const [draftItems, setDraftItems] = useState<Record<number, { actualQuantity: number; actualCondition: string; note: string }>>({});
   const [generalNote, setGeneralNote] = useState('');

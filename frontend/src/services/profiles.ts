@@ -13,6 +13,7 @@ export async function updateMyProfile(payload: {
   gender?: string | null;
   dateOfBirth?: string | null;
   address?: string | null;
+  avatarUrl?: string | null;
   notes?: string | null;
 }) {
   const response = await apiClient.patch('/profiles/me', payload);

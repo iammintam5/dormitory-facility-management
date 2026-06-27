@@ -40,10 +40,10 @@ type RoomRecord = {
   id: string;
   code: string;
   roomCode: string;
-  name: string;
+  name: string | null;
   buildingId: string;
   buildingCode: string;
-  buildingName: string;
+  buildingName: string | null;
   floorNumber: number;
   capacity: number;
   currentStudents: number;

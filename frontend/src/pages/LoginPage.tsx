@@ -1,10 +1,10 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/auth-context';
 import { UserRole } from '../types/auth';
 import { useToast } from '../toast/toast-context';
 
-import { Eye, EyeSlash, Buildings, ArrowRight } from '@phosphor-icons/react';
+import { Eye, EyeSlash, ArrowRight } from '@phosphor-icons/react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 
@@ -18,6 +18,10 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    document.documentElement.classList.remove('dark');
+  }, []);
 
   const fallbackPath = useMemo(() => {
     if (!user) return '/login';
@@ -59,7 +63,7 @@ export function LoginPage() {
             <div>
               <div className="flex items-center gap-2.5 mb-8">
                 <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
-                  <Buildings size={20} weight="duotone" />
+                  <img src="/Logo_PTIT_University.png" alt="PTIT" className="h-8 w-8 object-contain" />
                 </div>
                 <span className="text-xs font-bold uppercase tracking-[0.2em] text-white/70">
                   Ký túc xá sinh viên
@@ -96,7 +100,7 @@ export function LoginPage() {
           <div className="w-full max-w-[380px] mx-auto">
             <div className="text-center mb-8">
               <div className="w-14 h-14 mx-auto bg-primary/8 text-primary rounded-xl flex items-center justify-center mb-5">
-                <Buildings size={28} weight="duotone" />
+                <img src="/Logo_PTIT_University.png" alt="PTIT" className="h-12 w-12 object-contain" />
               </div>
               <h2 className="text-xl font-bold text-foreground mb-1.5">Đăng nhập hệ thống</h2>
               <p className="text-muted-foreground text-sm">Vui lòng đăng nhập để tiếp tục.</p>

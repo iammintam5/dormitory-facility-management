@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { JwtStrategy } from './jwt.strategy';
       secret: process.env.JWT_SECRET ?? 'fallback-secret',
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN ?? '1d' },
     }),
+    AuditLogsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],

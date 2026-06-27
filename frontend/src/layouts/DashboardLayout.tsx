@@ -81,7 +81,7 @@ export function DashboardLayout() {
 
   useEffect(() => {
     getDashboardSummary().then(data => {
-      if ('pendingDamageReports' in data) {
+      if ('pendingDamageReports' in data && typeof data.pendingDamageReports === 'number') {
         setPendingDamageCount(data.pendingDamageReports);
       }
     }).catch(() => {});
@@ -165,14 +165,14 @@ export function DashboardLayout() {
           {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
-              <Buildings size={20} weight="duotone" className="text-white" />
+              <img src="/Logo_PTIT_University.png" alt="PTIT" className="h-8 w-8 object-contain" />
             </div>
             <div className="hidden flex-col md:flex">
-              <span className="text-[10px] font-semibold tracking-[0.2em] text-white/60">
-                TRƯỜNG ĐẠI HỌC ABC
+              <span className="max-w-[620px] text-[9px] font-bold uppercase leading-tight tracking-[0.08em] text-[#f0b1b1]">
+                HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG CƠ SỞ TẠI THÀNH PHỐ HỒ CHÍ MINH
               </span>
               <span className="text-xs font-bold uppercase tracking-wide">
-                Quản lý CSVC Ký túc xá
+                QUẢN LÝ CƠ SỞ VẬT CHẤT KÝ TÚC XÁ
               </span>
             </div>
           </div>
@@ -194,8 +194,12 @@ export function DashboardLayout() {
               <span className="text-xs font-semibold leading-tight">{user.fullName}</span>
               <span className="text-[10px] text-white/60">{getHeaderSubtitle(user.role)}</span>
             </div>
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-xs font-bold text-white backdrop-blur-sm">
-              {user.fullName.charAt(0).toUpperCase()}
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/15 text-xs font-bold text-white backdrop-blur-sm">
+              {user.profile?.avatarUrl ? (
+                <img src={user.profile.avatarUrl} alt={user.fullName} className="h-full w-full object-cover" />
+              ) : (
+                user.fullName.charAt(0).toUpperCase()
+              )}
             </div>
           </div>
 
@@ -228,7 +232,7 @@ export function DashboardLayout() {
             <aside className="absolute inset-y-0 left-0 w-72 bg-sidebar-bg shadow-2xl animate-slide-in-right custom-scrollbar overflow-y-auto">
               <div className="flex h-[60px] items-center justify-between border-b border-sidebar-border px-4">
                 <div className="flex items-center gap-2">
-                  <Buildings size={20} weight="duotone" className="text-primary" />
+                  <img src="/Logo_PTIT_University.png" alt="PTIT" className="h-8 w-8 object-contain" />
                   <span className="text-sm font-bold text-foreground">Menu</span>
                 </div>
                 <button
@@ -360,7 +364,7 @@ function getHeaderSubtitle(role: UserRole) {
     case 'ADMIN':
       return 'Quản trị viên';
     case 'MANAGER':
-      return 'Quản lý CSVC';
+      return 'Quản lý cơ sở vật chất';
     case 'STUDENT':
       return 'Sinh viên';
   }

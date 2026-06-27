@@ -127,7 +127,7 @@ export function PrintLayout({
               BỘ THÔNG TIN VÀ TRUYỀN THÔNG
             </p>
             <p className="text-[13pt] font-bold leading-[1.2]">
-              HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG
+              HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG CƠ SỞ TẠI THÀNH PHỐ HỒ CHÍ MINH
             </p>
             <div className="mx-auto mt-1 h-[1.5px] w-[60%] bg-black"></div>
           </div>

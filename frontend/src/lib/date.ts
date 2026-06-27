@@ -4,6 +4,7 @@ export function formatDateTime(value?: string | Date | null) {
   if (Number.isNaN(date.getTime())) return '--';
 
   return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(date);
@@ -15,6 +16,7 @@ export function formatDateOnly(value?: string | Date | null) {
   if (Number.isNaN(date.getTime())) return '--';
 
   return new Intl.DateTimeFormat('vi-VN', {
+    timeZone: 'Asia/Ho_Chi_Minh',
     dateStyle: 'short',
   }).format(date);
 }
