@@ -2,6 +2,8 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../prisma/prisma.service';
 import { generateCode } from '../common/utils/code-generator';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AssetTransitionService } from '../assets/asset-transition.service';
+import { AssetStatus } from '@prisma/client';
 
 const WORKFLOW_MAP: Record<string, { newStatus: string; action: string }> = {
   accept: { newStatus: 'REVIEWING', action: 'Tiếp nhận' },
@@ -25,6 +27,7 @@ export class DamageReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditLogsService: AuditLogsService,
+    private readonly assetTransitionService: AssetTransitionService,
   ) {}
 
   async findAll(params: {
@@ -384,42 +387,23 @@ export class DamageReportsService {
 
       // When processing starts, set asset to UNDER_MAINTENANCE
       if (action === 'start-processing' && report.assetId) {
-        const currentAssetStatus = report.asset?.status ?? 'DAMAGED';
-        await tx.asset.update({
-          where: { id: report.assetId },
-          data: { status: 'UNDER_MAINTENANCE' },
-        });
-
-        await tx.assetHistory.create({
-          data: {
-            assetId: report.assetId,
-            action: 'BẮT_ĐẦU_SỬA_CHỮA',
-            oldStatus: currentAssetStatus,
-            newStatus: 'UNDER_MAINTENANCE',
-            note: `Bắt đầu sửa chữa theo báo hỏng #${report.reportCode}`,
-          },
+        await this.assetTransitionService.transition(tx, report.assetId, AssetStatus.UNDER_MAINTENANCE, {
+          action: 'BẮT_ĐẦU_SỬA_CHỮA',
+          userId,
+          note: `Bắt đầu sửa chữa theo báo hỏng #${report.reportCode}`,
         });
       }
 
       // When completed, set asset back to IN_USE
       if (action === 'complete' && report.assetId) {
-        await tx.asset.update({
-          where: { id: report.assetId },
-          data: { status: 'IN_USE' },
-        });
-
-        await tx.assetHistory.create({
-          data: {
-            assetId: report.assetId,
-            action: 'KẾT_THÚC_BÁO_HỎNG',
-            oldStatus: 'UNDER_MAINTENANCE',
-            newStatus: 'IN_USE',
-            note: `Hoàn thành báo hỏng #${report.reportCode}`,
-          },
+        await this.assetTransitionService.transition(tx, report.assetId, AssetStatus.IN_USE, {
+          action: 'KẾT_THÚC_BÁO_HỎNG',
+          userId,
+          note: `Hoàn thành báo hỏng #${report.reportCode}`,
         });
       }
 
-      // When rejected, set asset back to DAMAGED or IN_USE
+      // When rejected, just create history entry, since status didn't change (still DAMAGED or IN_USE)
       if (action === 'reject' && report.assetId) {
         await tx.assetHistory.create({
           data: {

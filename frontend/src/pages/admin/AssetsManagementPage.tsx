@@ -204,13 +204,10 @@ export function AssetsManagementPage() {
       
       const payload = {
         categoryId: data.categoryId,
-        buildingId: data.buildingId,
-        roomId: data.roomId,
         supplierId: data.supplierId || undefined,
         assetCode: data.assetCode,
         assetName: data.assetName,
         serialNumber: data.serialNumber || undefined,
-        status: data.status as AssetStatus,
         condition: data.condition as AssetCondition,
         description: data.description || undefined,
         notes: data.notes || undefined,
@@ -532,15 +529,14 @@ export function AssetsManagementPage() {
           <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-6 mb-3">Cập nhật Trạng thái</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Trạng thái sử dụng</label>
-              <Select {...form.register('status')}>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Trạng thái sử dụng <span className="text-muted-foreground text-xs font-normal ml-1">(chỉ xem)</span></label>
+              <Select {...form.register('status')} disabled className="bg-muted">
                 <option value="AVAILABLE">Sẵn sàng</option>
                 <option value="IN_USE">Đang sử dụng</option>
                 <option value="UNDER_MAINTENANCE">Đang bảo trì</option>
                 <option value="DAMAGED">Hỏng</option>
                 <option value="PENDING_LIQUIDATION">Chờ thanh lý</option>
                 <option value="LIQUIDATED">Đã thanh lý</option>
-
               </Select>
             </div>
             <div>

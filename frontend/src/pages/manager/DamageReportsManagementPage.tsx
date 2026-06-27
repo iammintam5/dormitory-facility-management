@@ -27,6 +27,7 @@ import {
   CheckCircle, 
   Check, 
   Play, 
+  X,
   MagnifyingGlass 
 } from '@phosphor-icons/react';
 
@@ -404,14 +405,24 @@ export function DamageReportsManagementPage() {
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-center gap-1.5">
                         {report.status === 'SUBMITTED' && (
-                          <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'accept')} title="Duyệt">
-                            <Check size={16} className="text-primary" />
-                          </Button>
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'accept')} title="Duyệt">
+                              <Check size={16} className="text-primary" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'reject')} title="Từ chối">
+                              <X size={16} className="text-destructive" />
+                            </Button>
+                          </>
                         )}
-                        {report.status === 'APPROVED' && (
-                          <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'start')} title="Bắt đầu sửa">
-                            <Play size={16} className="text-amber-600" />
-                          </Button>
+                        {(report.status === 'APPROVED' || report.status === 'REVIEWING') && (
+                          <>
+                            <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'start')} title="Bắt đầu sửa">
+                              <Play size={16} className="text-amber-600" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'reject')} title="Từ chối">
+                              <X size={16} className="text-destructive" />
+                            </Button>
+                          </>
                         )}
                         {report.status === 'IN_PROGRESS' && (
                           <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'complete')} title="Hoàn thành">

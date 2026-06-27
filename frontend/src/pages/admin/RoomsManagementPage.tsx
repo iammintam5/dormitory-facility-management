@@ -106,6 +106,7 @@ export function RoomsManagementPage() {
     email: string | null;
   }>>([]);
   const [isSearchingStudents, setIsSearchingStudents] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [assigningStudentId, setAssigningStudentId] = useState<number | null>(null);
 
   // Transfer student states
@@ -298,6 +299,7 @@ export function RoomsManagementPage() {
   async function searchStudents() {
     if (!studentSearchQuery.trim()) return;
     setIsSearchingStudents(true);
+    setHasSearched(true);
     try {
       const result = await getUsers({
         keyword: studentSearchQuery.trim(),
@@ -966,7 +968,10 @@ export function RoomsManagementPage() {
                     <Input
                       placeholder="Tìm theo tên, mã SV, email..."
                       value={studentSearchQuery}
-                      onChange={(e) => setStudentSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setStudentSearchQuery(e.target.value);
+                        if (e.target.value.trim() === '') setHasSearched(false);
+                      }}
                       onKeyDown={(e) => { if (e.key === 'Enter') searchStudents(); }}
                       className="pl-9"
                     />
@@ -1006,7 +1011,7 @@ export function RoomsManagementPage() {
                     ))}
                   </div>
                 )}
-                {studentSearchQuery && studentSearchResults.length === 0 && !isSearchingStudents && (
+                {studentSearchQuery && hasSearched && studentSearchResults.length === 0 && !isSearchingStudents && (
                   <p className="text-xs text-muted-foreground text-center py-2">Không tìm thấy sinh viên nào.</p>
                 )}
               </div>
