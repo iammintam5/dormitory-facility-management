@@ -19,7 +19,8 @@ import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 import { getAssetCategories, AssetCategoryRecord } from '../../services/asset-categories';
 import { getBuildings, getRooms, BuildingRecord, RoomRecord } from '../../services/locations';
-import { getAssets, updateAsset, AssetRecord } from '../../services/assets';
+import { getAssets, AssetRecord } from '../../services/assets';
+import { createExportReceipt } from '../../services/asset-receipts';
 import { getApiErrorMessage } from '../../lib/api-client';
 
 type ExportItem = {
@@ -131,13 +132,16 @@ export function ExportEquipmentPage() {
     try {
       setSaving(true);
 
-      // For each export item, update the asset status
-      for (const item of exportItems) {
-        await updateAsset(item.id, {
-          status: 'LIQUIDATED',
-          notes: formData.reason,
-        });
-      }
+      const payload = {
+        ...formData,
+        items: exportItems.map(i => ({
+          id: i.id,
+          qty: i.qty,
+          note: i.note,
+        }))
+      };
+
+      await createExportReceipt(payload);
 
       showToast(`Đã xuất ${exportItems.length} thiết bị thành công`, 'success');
       navigate(`${basePath}/asset-transactions`);
@@ -202,7 +206,7 @@ export function ExportEquipmentPage() {
 
   // Get unique building codes from assets
   const buildingCodes = useMemo(() => {
-    const codes = new Set(allAssets.map(a => a.buildingCode).filter(Boolean));
+    const codes = new Set(allAssets.map(a => a.buildingCode).filter((c): c is string => Boolean(c)));
     return Array.from(codes).sort();
   }, [allAssets]);
 
@@ -261,11 +265,11 @@ export function ExportEquipmentPage() {
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 Loại phiếu xuất <span className="text-destructive">*</span>
               </label>
-              <Select defaultValue="Xuất điều chuyển">
-                <option>Xuất điều chuyển</option>
-                <option>Xuất thanh lý</option>
-                <option>Xuất trả lại</option>
-                <option>Xuất hủy</option>
+              <Select defaultValue="Xuất điều chuyển (sang cơ sở khác)">
+                <option>Xuất điều chuyển (sang cơ sở khác)</option>
+                <option>Xuất trả Trường</option>
+                <option>Xuất trả Nhà cung cấp</option>
+                <option>Xuất thanh lý / Hủy bỏ</option>
               </Select>
             </div>
             <div>
@@ -279,10 +283,10 @@ export function ExportEquipmentPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Số phiếu xuất <span className="text-destructive">*</span>
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                Số phiếu xuất
               </label>
-              <Input type="text" value={exportNumber} readOnly className="bg-muted font-medium" />
+              <div className="font-bold text-lg text-primary mt-1">{exportNumber}</div>
             </div>
           </div>
 
@@ -294,67 +298,30 @@ export function ExportEquipmentPage() {
               <Input type="text" value={user?.fullName || ''} readOnly className="bg-muted" />
             </div>
             <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Đơn vị nhận</label>
+              <Input 
+                type="text" 
+                placeholder="VD: P.Quản trị Thiết bị"
+                value={formData.recipient}
+                onChange={(e) => setFormData(prev => ({ ...prev, recipient: e.target.value }))}
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 Lý do xuất <span className="text-destructive">*</span>
               </label>
               <Input 
                 type="text" 
-                placeholder="Nhập lý do xuất"
+                placeholder="VD: Trả lại đồ hỏng"
                 value={formData.reason}
                 onChange={(e) => setFormData(prev => ({ ...prev, reason: e.target.value }))}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Đơn vị nhận</label>
-              <Input 
-                type="text" 
-                placeholder="Tên đơn vị nhận"
-                value={formData.recipient}
-                onChange={(e) => setFormData(prev => ({ ...prev, recipient: e.target.value }))}
-              />
-            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Ngày yêu cầu</label>
-              <Input 
-                type="date" 
-                value={formData.requestDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, requestDate: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Ngày xuất dự kiến</label>
-              <Input 
-                type="date" 
-                value={formData.expectedDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, expectedDate: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Số điện thoại liên hệ</label>
-              <Input 
-                type="text" 
-                placeholder="Số điện thoại"
-                value={formData.contactPhone}
-                onChange={(e) => setFormData(prev => ({ ...prev, contactPhone: e.target.value }))}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Hợp đồng / Quyết định</label>
-              <Input 
-                type="text" 
-                placeholder="Số hợp đồng/QĐ"
-                value={formData.contractNumber}
-                onChange={(e) => setFormData(prev => ({ ...prev, contractNumber: e.target.value }))}
-              />
-            </div>
-            <div className="relative md:col-span-2">
-              <label className="block text-sm font-medium text-foreground mb-1.5">Ghi chú</label>
+          <div className="grid grid-cols-1 gap-6">
+            <div className="relative">
+              <label className="block text-sm font-medium text-foreground mb-1.5">Ghi chú thêm</label>
               <textarea 
                 rows={1}
                 value={formData.note}

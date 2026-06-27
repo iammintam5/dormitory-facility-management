@@ -20,6 +20,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { getAssetCategories, AssetCategoryRecord } from '../../services/asset-categories';
 import { getBuildings, getRooms, BuildingRecord, RoomRecord } from '../../services/locations';
 import { createAsset, createBulkAssets, getAssets, AssetRecord } from '../../services/assets';
+import { createImportReceipt } from '../../services/asset-receipts';
 import { getApiErrorMessage } from '../../lib/api-client';
 
 type ImportItem = {
@@ -46,7 +47,6 @@ export function ImportEquipmentPage() {
   const [categories, setCategories] = useState<AssetCategoryRecord[]>([]);
   const [buildings, setBuildings] = useState<BuildingRecord[]>([]);
   const [rooms, setRooms] = useState<RoomRecord[]>([]);
-  const [existingAssets, setExistingAssets] = useState<AssetRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -63,13 +63,10 @@ export function ImportEquipmentPage() {
     contractDate: '',
     documentNumber: '',
     note: '',
-    buildingId: '',
-    roomId: '',
   });
 
   // Add item modal - New tab
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [modalTab, setModalTab] = useState<'new' | 'existing'>('new');
   const [newItem, setNewItem] = useState({
     assetCode: '',
     assetName: '',
@@ -81,24 +78,17 @@ export function ImportEquipmentPage() {
     note: '',
   });
 
-  // Existing assets selection
-  const [searchKeyword, setSearchKeyword] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
-  const [selectedExistingIds, setSelectedExistingIds] = useState<Set<string>>(new Set());
-  const [existingQty, setExistingQty] = useState<Record<string, number>>({});
 
   // Load data on mount
   useEffect(() => {
     async function loadData() {
       try {
-        const [cats, blds, assetsData] = await Promise.all([
+        const [cats, blds] = await Promise.all([
           getAssetCategories(),
           getBuildings(),
-          getAssets({ pageSize: 1000 }).catch(() => ({ items: [] as AssetRecord[], pagination: { page: 1, pageSize: 1000, total: 0, totalPages: 0 } })),
         ]);
         setCategories(cats || []);
         setBuildings(blds || []);
-        setExistingAssets(assetsData?.items || []);
         if (blds?.length > 0) {
           try {
             const roomData = await getRooms({ buildingId: blds[0].id });
@@ -114,17 +104,7 @@ export function ImportEquipmentPage() {
     loadData();
   }, []);
 
-  const handleBuildingChange = useCallback(async (buildingId: string) => {
-    setFormData(prev => ({ ...prev, buildingId, roomId: '' }));
-    if (buildingId) {
-      try {
-        const roomData = await getRooms({ buildingId });
-        setRooms(roomData || []);
-      } catch { setRooms([]); }
-    } else {
-      setRooms([]);
-    }
-  }, []);
+  // Building/Room selection removed - imports always go to warehouse
 
   // Add new item
   const handleAddNewItem = () => {
@@ -150,33 +130,6 @@ export function ImportEquipmentPage() {
     setNewItem({ assetCode: '', assetName: '', categoryId: '', unit: 'Cái', qty: 1, unitPrice: 0, warranty: 12, note: '' });
     setIsAddModalOpen(false);
     showToast(`Đã thêm ${item.assetName} vào danh sách`, 'success');
-  };
-
-  // Add existing assets
-  const handleAddExistingItems = () => {
-    const selectedAssets = existingAssets.filter(a => selectedExistingIds.has(a.id));
-    if (selectedAssets.length === 0) {
-      showToast('Vui lòng chọn ít nhất một thiết bị', 'error');
-      return;
-    }
-    const newItems: ImportItem[] = selectedAssets.map(a => ({
-      tempId: `existing-${a.id}-${Date.now()}-${Math.random().toString(36).slice(2, 4)}`,
-      assetCode: a.assetCode,
-      assetName: a.assetName,
-      categoryId: a.categoryCode,
-      categoryName: a.categoryName,
-      unit: 'Cái',
-      qty: existingQty[a.id] || 1,
-      unitPrice: 0,
-      total: 0,
-      warranty: 0,
-      note: '',
-    }));
-    setImportItems(prev => [...prev, ...newItems]);
-    setSelectedExistingIds(new Set());
-    setExistingQty({});
-    setIsAddModalOpen(false);
-    showToast(`Đã thêm ${newItems.length} thiết bị vào danh sách`, 'success');
   };
 
   const removeItem = (tempId: string) => {
@@ -205,32 +158,22 @@ export function ImportEquipmentPage() {
 
     try {
       setSaving(true);
-      const roomId = formData.roomId || undefined;
+      
+      const payload = {
+        ...formData,
+        totalAmount: importItems.reduce((sum, i) => sum + i.total, 0),
+        items: importItems.map(i => ({
+          assetCode: i.assetCode,
+          assetName: i.assetName,
+          categoryId: i.categoryId,
+          qty: i.qty,
+          unitPrice: i.unitPrice,
+          warranty: i.warranty,
+          note: i.note,
+        }))
+      };
 
-      for (const item of importItems) {
-        if (item.qty > 1) {
-          const prefix = item.assetCode.replace(/\d+$/g, '') || 'IMP';
-          const startMatch = item.assetCode.match(/\d+$/);
-          const startNum = startMatch ? parseInt(startMatch[0], 10) : 1;
-          await createBulkAssets({
-            prefix,
-            startNumber: startNum,
-            endNumber: startNum + item.qty - 1,
-            assetName: item.assetName,
-            categoryId: item.categoryId,
-            roomId: roomId || undefined,
-            status: 'AVAILABLE',
-          });
-        } else {
-          await createAsset({
-            assetCode: item.assetCode,
-            assetName: item.assetName,
-            categoryId: item.categoryId,
-            roomId: roomId || undefined,
-            status: 'AVAILABLE',
-          });
-        }
-      }
+      await createImportReceipt(payload);
 
       const totalItems = importItems.reduce((sum, i) => sum + i.qty, 0);
       showToast(`Đã nhập ${totalItems} thiết bị thành công`, 'success');
@@ -252,28 +195,6 @@ export function ImportEquipmentPage() {
   const totalAmount = importItems.reduce((sum, i) => sum + i.total, 0);
   const vatAmount = Math.round(totalAmount * 0.1);
   const grandTotal = totalAmount + vatAmount;
-
-  const filteredExisting = useMemo(() => {
-    return existingAssets.filter(a => {
-      if (searchKeyword && !a.assetCode.toLowerCase().includes(searchKeyword.toLowerCase()) && !a.assetName.toLowerCase().includes(searchKeyword.toLowerCase())) return false;
-      if (filterCategory && a.categoryCode !== filterCategory) return false;
-      return true;
-    });
-  }, [existingAssets, searchKeyword, filterCategory]);
-
-  const toggleExistingSelection = (id: string) => {
-    setSelectedExistingIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else {
-        next.add(id);
-        if (!existingQty[id]) {
-          setExistingQty(q => ({ ...q, [id]: 1 }));
-        }
-      }
-      return next;
-    });
-  };
 
   const formatCurrency = (n: number) => n.toLocaleString('vi-VN');
   const receiptNumber = `NN${new Date().getFullYear()}-${String(importItems.length > 0 ? Math.floor(Date.now() / 1000) % 10000 : 0).padStart(4, '0')}`;
@@ -318,11 +239,10 @@ export function ImportEquipmentPage() {
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 Loại phiếu nhập <span className="text-destructive">*</span>
               </label>
-              <Select defaultValue="Nhập mua sắm">
-                <option>Nhập mua sắm</option>
-                <option>Nhập cấp phát</option>
-                <option>Nhập điều chuyển</option>
-                <option>Nhập trả lại</option>
+              <Select defaultValue="Mua sắm mới">
+                <option>Mua sắm mới</option>
+                <option>Trường cấp phát / Tài trợ</option>
+                <option>Nhập bù dữ liệu kiểm kê</option>
               </Select>
             </div>
             <div>
@@ -336,14 +256,14 @@ export function ImportEquipmentPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Số phiếu nhập <span className="text-destructive">*</span>
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
+                Số phiếu nhập
               </label>
-              <Input type="text" value={receiptNumber} readOnly className="bg-muted font-medium" />
+              <div className="font-bold text-lg text-primary mt-1">{receiptNumber}</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-2">
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 Người thực hiện <span className="text-destructive">*</span>
@@ -352,97 +272,21 @@ export function ImportEquipmentPage() {
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">
-                Nơi nhận / Phòng <span className="text-destructive">*</span>
-              </label>
-              <div className="flex gap-2">
-                <Select 
-                  value={formData.buildingId}
-                  onChange={(e) => handleBuildingChange(e.target.value)}
-                  className="flex-1"
-                >
-                  <option value="">-- Chọn khu nhà --</option>
-                  {buildings.map(b => (
-                    <option key={b.id} value={b.id}>{b.name}</option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">&nbsp;</label>
-              <Select 
-                value={formData.roomId}
-                onChange={(e) => setFormData(prev => ({ ...prev, roomId: e.target.value }))}
-                disabled={!formData.buildingId}
-              >
-                <option value="">-- Chọn phòng --</option>
-                {rooms.map(r => (
-                  <option key={r.id} value={r.id}>{r.roomCode}</option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="md:col-span-1">
-              <label className="block text-sm font-medium text-foreground mb-1.5">
                 Nhà cung cấp <span className="text-destructive">*</span>
               </label>
               <Input 
                 type="text" 
-                placeholder="Nhập tên nhà cung cấp"
+                placeholder="VD: Công ty TNHH Nội thất Hòa Phát"
                 value={formData.supplierName}
                 onChange={(e) => setFormData(prev => ({ ...prev, supplierName: e.target.value }))}
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Địa chỉ nhà cung cấp</label>
-              <Input 
-                type="text" 
-                placeholder="Địa chỉ"
-                value={formData.supplierAddress}
-                onChange={(e) => setFormData(prev => ({ ...prev, supplierAddress: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Số điện thoại</label>
-              <Input 
-                type="text" 
-                placeholder="Số điện thoại"
-                value={formData.supplierPhone}
-                onChange={(e) => setFormData(prev => ({ ...prev, supplierPhone: e.target.value }))}
-              />
-            </div>
           </div>
+          <p className="text-xs text-muted-foreground italic mb-6">* Lưu ý: Toàn bộ thiết bị nhập mới sẽ được tự động đưa vào <b>Kho trung tâm</b> chờ cấp phát.</p>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Hợp đồng / Đơn hàng</label>
-              <Input 
-                type="text" 
-                placeholder="Số hợp đồng"
-                value={formData.contractNumber}
-                onChange={(e) => setFormData(prev => ({ ...prev, contractNumber: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Ngày chứng từ</label>
-              <Input 
-                type="date" 
-                value={formData.contractDate}
-                onChange={(e) => setFormData(prev => ({ ...prev, contractDate: e.target.value }))}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Số chứng từ</label>
-              <Input 
-                type="text" 
-                placeholder="Số chứng từ"
-                value={formData.documentNumber}
-                onChange={(e) => setFormData(prev => ({ ...prev, documentNumber: e.target.value }))}
-              />
-            </div>
+          <div className="grid grid-cols-1 gap-6">
             <div className="relative">
-              <label className="block text-sm font-medium text-foreground mb-1.5">Ghi chú</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Ghi chú đợt nhập hàng</label>
               <textarea 
                 rows={1} 
                 value={formData.note}
@@ -460,13 +304,9 @@ export function ImportEquipmentPage() {
           <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-4">2. Danh sách thiết bị nhập</h3>
           
           <div className="flex flex-wrap gap-4 mb-4">
-            <Button variant="outline" className="gap-2" onClick={() => { setIsAddModalOpen(true); setModalTab('new'); }}>
+            <Button variant="outline" className="gap-2" onClick={() => setIsAddModalOpen(true)}>
               <Plus size={16} weight="bold" />
               Thêm thiết bị mới
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={() => { setIsAddModalOpen(true); setModalTab('existing'); }}>
-              <ArrowsClockwise size={16} weight="bold" />
-              Chọn từ kho
             </Button>
           </div>
 
@@ -607,237 +447,121 @@ export function ImportEquipmentPage() {
         <ModalHeader onClose={() => setIsAddModalOpen(false)}>
           <ModalTitle>Thêm thiết bị</ModalTitle>
         </ModalHeader>
-        {/* Tabs */}
-        <div className="flex border-b border-border/50 px-6">
-          <button
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              modalTab === 'new'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setModalTab('new')}
-          >
-            Thiết bị mới
-          </button>
-          <button
-            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-              modalTab === 'existing'
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-            onClick={() => setModalTab('existing')}
-          >
-            Chọn từ kho
-          </button>
-        </div>
-
         <ModalBody>
-          {modalTab === 'new' ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Mã thiết bị <span className="text-destructive">*</span>
-                  </label>
-                  <Input
-                    placeholder="VD: TB00XXX"
-                    value={newItem.assetCode}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, assetCode: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Tên thiết bị <span className="text-destructive">*</span>
-                  </label>
-                  <Input
-                    placeholder="Tên thiết bị"
-                    value={newItem.assetName}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, assetName: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Loại thiết bị <span className="text-destructive">*</span>
-                  </label>
-                  <Select
-                    value={newItem.categoryId}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, categoryId: e.target.value }))}
-                  >
-                    <option value="">-- Chọn loại --</option>
-                    {categories.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </Select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">ĐVT</label>
-                  <Input
-                    placeholder="Cái"
-                    value={newItem.unit}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, unit: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    Số lượng
-                  </label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={newItem.qty}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, qty: parseInt(e.target.value) || 1 }))}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Đơn giá (VNĐ)</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={newItem.unitPrice || ''}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: parseInt(e.target.value) || 0 }))}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Bảo hành (tháng)</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={newItem.warranty}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, warranty: parseInt(e.target.value) || 0 }))}
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Ghi chú</label>
-                  <Input
-                    placeholder="Ghi chú (nếu có)"
-                    value={newItem.note}
-                    onChange={(e) => setNewItem(prev => ({ ...prev, note: e.target.value }))}
-                  />
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                Chọn thiết bị có sẵn trong kho để thêm vào phiếu nhập. Những thiết bị này sẽ được cập nhật thông tin vị trí.
-              </p>
-
-              {/* Filters */}
-              <div className="flex flex-wrap gap-3">
-                <div className="relative flex-1 min-w-[200px] max-w-xs">
-                  <Input 
-                    type="text" 
-                    placeholder="Tìm kiếm thiết bị..." 
-                    className="pl-9"
-                    value={searchKeyword}
-                    onChange={(e) => setSearchKeyword(e.target.value)}
-                  />
-                  <MagnifyingGlass size={16} className="absolute left-3 top-2.5 text-muted-foreground" />
-                </div>
-                <Select 
-                  className="w-[180px]"
-                  value={filterCategory}
-                  onChange={(e) => setFilterCategory(e.target.value)}
+          <div className="space-y-4 pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Loại thiết bị <span className="text-destructive">*</span>
+                </label>
+                <Select
+                  value={newItem.categoryId}
+                  onChange={(e) => {
+                    const catId = e.target.value;
+                    const cat = categories.find(c => c.id === catId);
+                    setNewItem(prev => {
+                      const prevCat = categories.find(c => c.id === prev.categoryId);
+                      const isNameUnchanged = !prev.assetName || prev.assetName === prevCat?.name;
+                      const isCodeUnchanged = !prev.assetCode || prev.assetCode === (prevCat ? `${prevCat.code}-001` : '');
+                      
+                      return {
+                        ...prev, 
+                        categoryId: catId,
+                        assetName: isNameUnchanged ? (cat?.name || '') : prev.assetName,
+                        unit: cat?.unit || prev.unit || 'Cái',
+                        assetCode: isCodeUnchanged ? (cat ? `${cat.code}-001` : '') : prev.assetCode
+                      };
+                    });
+                  }}
                 >
-                  <option value="">Tất cả loại</option>
+                  <option value="">-- Chọn loại --</option>
                   {categories.map(c => (
-                    <option key={c.id} value={c.code}>{c.name}</option>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </Select>
               </div>
-
-              {/* Existing assets table */}
-              <div className="overflow-x-auto max-h-64 overflow-y-auto border border-border/50 rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-12 text-center">
-                        <input 
-                          type="checkbox" 
-                          className="rounded border-gray-300"
-                          checked={filteredExisting.length > 0 && filteredExisting.every(a => selectedExistingIds.has(a.id))}
-                          onChange={() => {
-                            if (filteredExisting.every(a => selectedExistingIds.has(a.id))) {
-                              setSelectedExistingIds(new Set());
-                            } else {
-                              setSelectedExistingIds(new Set(filteredExisting.map(a => a.id)));
-                              filteredExisting.forEach(a => {
-                                if (!existingQty[a.id]) {
-                                  setExistingQty(q => ({ ...q, [a.id]: 1 }));
-                                }
-                              });
-                            }
-                          }}
-                        />
-                      </TableHead>
-                      <TableHead>Mã TB</TableHead>
-                      <TableHead>Tên thiết bị</TableHead>
-                      <TableHead>Loại</TableHead>
-                      <TableHead>Phòng</TableHead>
-                      <TableHead className="text-center w-24">Số lượng</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredExisting.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                          Không tìm thấy thiết bị
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredExisting.map(a => (
-                        <TableRow 
-                          key={a.id} 
-                          className={`cursor-pointer ${selectedExistingIds.has(a.id) ? 'bg-primary/5' : ''}`}
-                          onClick={() => toggleExistingSelection(a.id)}
-                        >
-                          <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                            <input 
-                              type="checkbox" 
-                              className="rounded border-gray-300"
-                              checked={selectedExistingIds.has(a.id)}
-                              onChange={() => toggleExistingSelection(a.id)}
-                            />
-                          </TableCell>
-                          <TableCell className="font-medium">{a.assetCode}</TableCell>
-                          <TableCell>{a.assetName}</TableCell>
-                          <TableCell>{a.categoryName}</TableCell>
-                          <TableCell>{a.roomCode || '-'}</TableCell>
-                          <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                            {selectedExistingIds.has(a.id) ? (
-                              <Input 
-                                type="number" 
-                                min="1"
-                                value={existingQty[a.id] || 1}
-                                onChange={(e) => setExistingQty(q => ({ ...q, [a.id]: parseInt(e.target.value) || 1 }))}
-                                className="text-center h-8 w-16"
-                              />
-                            ) : '-'}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Tên thiết bị <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  placeholder="Tên thiết bị"
+                  value={newItem.assetName}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, assetName: e.target.value }))}
+                />
               </div>
             </div>
-          )}
-        </ModalBody>
+            
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Mã thiết bị (khởi điểm) <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  placeholder="VD: TB00XXX"
+                  value={newItem.assetCode}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, assetCode: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">ĐVT</label>
+                <Input
+                  placeholder="Cái"
+                  value={newItem.unit}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, unit: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Số lượng</label>
+                <Input
+                  type="number"
+                  min="1"
+                  value={newItem.qty}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, qty: parseInt(e.target.value) || 1 }))}
+                />
+              </div>
+            </div>
 
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Đơn giá (VNĐ)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={newItem.unitPrice || ''}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, unitPrice: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Bảo hành (tháng)</label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={newItem.warranty}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, warranty: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-foreground mb-1.5">Ghi chú</label>
+                <Input
+                  placeholder="Ghi chú (nếu có)"
+                  value={newItem.note}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, note: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+        </ModalBody>
         <ModalFooter>
           <Button variant="outline" onClick={() => setIsAddModalOpen(false)}>
             Hủy
           </Button>
           <Button 
-            onClick={modalTab === 'new' ? handleAddNewItem : handleAddExistingItems}
-            disabled={modalTab === 'new' ? (!newItem.assetCode || !newItem.assetName || !newItem.categoryId) : selectedExistingIds.size === 0}
+            onClick={handleAddNewItem}
+            disabled={!newItem.assetCode || !newItem.assetName || !newItem.categoryId}
           >
             <Plus size={16} weight="bold" className="mr-1" />
-            {modalTab === 'new' ? 'Thêm vào danh sách' : `Thêm ${selectedExistingIds.size} thiết bị`}
+            Thêm vào danh sách
           </Button>
         </ModalFooter>
       </Modal>
