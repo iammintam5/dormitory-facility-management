@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Query, UseGuards, Req } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { getRequestIp } from '../common/utils/request-ip';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
@@ -35,7 +37,7 @@ export class UsersController {
     return this.usersService.getRoles();
   }
 
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @Post()
   async create(@Body() body: {
     roleId: string;
@@ -45,11 +47,11 @@ export class UsersController {
     email?: string;
     phone?: string;
     studentCode?: string;
-  }) {
-    return this.usersService.create(body);
+  }, @CurrentUser('sub') actorUserId: number, @Req() request: any) {
+    return this.usersService.create(body, actorUserId, getRequestIp(request));
   }
 
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @Patch(':id')
   async update(
     @Param('id') id: string,
@@ -57,29 +59,37 @@ export class UsersController {
       roleId?: string;
       fullName?: string;
       username?: string;
+      password?: string;
       email?: string | null;
       phone?: string | null;
       studentCode?: string | null;
     },
+    @CurrentUser('sub') actorUserId: number,
+    @Req() request: any,
   ) {
-    return this.usersService.update(parseInt(id, 10), body);
+    return this.usersService.update(parseInt(id, 10), body, actorUserId, getRequestIp(request));
   }
 
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @Patch(':id/lock')
-  async lock(@Param('id') id: string) {
-    return this.usersService.lock(parseInt(id, 10));
+  async lock(@Param('id') id: string, @CurrentUser('sub') actorUserId: number, @Req() request: any) {
+    return this.usersService.lock(parseInt(id, 10), actorUserId, getRequestIp(request));
   }
 
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @Patch(':id/unlock')
-  async unlock(@Param('id') id: string) {
-    return this.usersService.unlock(parseInt(id, 10));
+  async unlock(@Param('id') id: string, @CurrentUser('sub') actorUserId: number, @Req() request: any) {
+    return this.usersService.unlock(parseInt(id, 10), actorUserId, getRequestIp(request));
   }
 
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @Post(':id/reset-password')
-  async resetPassword(@Param('id') id: string, @Body() body: { newPassword: string }) {
-    return this.usersService.resetPassword(parseInt(id, 10), body.newPassword);
+  async resetPassword(
+    @Param('id') id: string,
+    @Body() body: { newPassword: string },
+    @CurrentUser('sub') actorUserId: number,
+    @Req() request: any,
+  ) {
+    return this.usersService.resetPassword(parseInt(id, 10), body.newPassword, actorUserId, getRequestIp(request));
   }
 }

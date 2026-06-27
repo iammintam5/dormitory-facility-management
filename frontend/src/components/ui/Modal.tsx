@@ -9,9 +9,10 @@ interface ModalProps {
   footer?: React.ReactNode;
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full';
+  className?: string;
 }
 
-export function Modal({ isOpen, onClose, title, footer, children, size = 'md' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, footer, children, size = 'md', className = '' }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
 
   // Close on Escape
@@ -55,7 +56,7 @@ export function Modal({ isOpen, onClose, title, footer, children, size = 'md' }:
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className={`relative z-50 w-full ${sizeClasses[size]} rounded-xl border border-border/50 bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-scale-in`}
+        className={`relative z-50 w-full ${sizeClasses[size]} rounded-xl border border-border/50 bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-scale-in ${className}`}
       >
         {title && (
           <ModalHeader onClose={onClose}>

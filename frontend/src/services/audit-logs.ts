@@ -3,11 +3,15 @@ import { apiClient, unwrapApiResponse } from '../lib/api-client';
 export type AuditLogItem = {
   id: string;
   actorUserId: string;
+  actorName: string;
+  actorUsername: string;
   actorRole: string;
   action: string;
   entityType: string;
   entityId: string;
   content: string;
+  oldValue: string | null;
+  newValue: string | null;
   ipAddress: string | null;
   userAgent: string | null;
   createdAt: string;

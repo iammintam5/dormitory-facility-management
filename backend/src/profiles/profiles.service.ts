@@ -54,6 +54,7 @@ export class ProfilesService {
       gender?: string | null;
       dateOfBirth?: string | null;
       address?: string | null;
+      avatarUrl?: string | null;
       notes?: string | null;
     },
   ) {
@@ -78,16 +79,24 @@ export class ProfilesService {
           gender: payload.gender !== undefined ? payload.gender : undefined,
           dateOfBirth: payload.dateOfBirth !== undefined ? payload.dateOfBirth : undefined,
           address: payload.address !== undefined ? payload.address : undefined,
+          avatarUrl: payload.avatarUrl !== undefined ? payload.avatarUrl : undefined,
           notes: payload.notes !== undefined ? payload.notes : undefined,
         },
       });
-    } else if (payload.gender !== undefined || payload.dateOfBirth !== undefined || payload.address !== undefined || payload.notes !== undefined) {
+    } else if (
+      payload.gender !== undefined ||
+      payload.dateOfBirth !== undefined ||
+      payload.address !== undefined ||
+      payload.avatarUrl !== undefined ||
+      payload.notes !== undefined
+    ) {
       await this.prisma.profile.create({
         data: {
           userId,
           gender: payload.gender ?? null,
           dateOfBirth: payload.dateOfBirth ?? null,
           address: payload.address ?? null,
+          avatarUrl: payload.avatarUrl ?? null,
           notes: payload.notes ?? null,
         },
       });

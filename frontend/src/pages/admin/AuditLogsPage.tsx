@@ -16,6 +16,7 @@ import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Pagination } from '../../components/ui/Pagination';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { Modal } from '../../components/ui/Modal';
 
 type AuditLogRow = AuditLogItem & {
   actorLabel: string;
@@ -36,6 +37,8 @@ export function AuditLogsPage() {
     totalPages: 1,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedLog, setSelectedLog] = useState<AuditLogItem | null>(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
 
   useEffect(() => {
     async function loadLogs() {
@@ -68,21 +71,18 @@ export function AuditLogsPage() {
   }, [pagination]);
 
   const openDetail = async (id: string) => {
+    setIsDetailLoading(true);
     try {
       const detail = await getAuditLogDetail(id);
-      window.alert(
-        [
-          `Hành động: ${detail.action}`,
-          `Đối tượng: ${detail.entityType}`,
-          `Nội dung: ${detail.content || '--'}`,
-          `Thời gian: ${formatDateTime(detail.createdAt)}`,
-          `IP: ${detail.ipAddress ?? '--'}`,
-        ].join('\n'),
-      );
+      setSelectedLog(detail);
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Không thể tải chi tiết audit log.'), 'error');
+    } finally {
+      setIsDetailLoading(false);
     }
   };
+
+  const closeDetail = () => setSelectedLog(null);
 
   return (
     <div className="space-y-6 mx-auto max-w-7xl pb-10">
@@ -115,13 +115,11 @@ export function AuditLogsPage() {
               }}
             >
               <option value="ALL">Tất cả</option>
-              <option value="LOGIN">LOGIN</option>
-              <option value="LOGOUT">LOGOUT</option>
-              <option value="LOCK">LOCK</option>
-              <option value="UNLOCK">UNLOCK</option>
-              <option value="RESET_PASSWORD">RESET_PASSWORD</option>
-              <option value="CREATE">CREATE</option>
-              <option value="UPDATE">UPDATE</option>
+              {auditActionOptions.map((option) => (
+                <option key={option} value={option}>
+                  {actionLabel[option] ?? option}
+                </option>
+              ))}
             </Select>
           </div>
 
@@ -192,16 +190,21 @@ export function AuditLogsPage() {
                       {log.content || '--'}
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                      {log.ipAddress ?? '--'}
+                      {formatIp(log.ipAddress)}
                     </TableCell>
                     <TableCell className="text-center">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => void openDetail(log.id)}
+                        disabled={isDetailLoading}
                         title="Xem chi tiết"
                       >
-                        <Eye size={16} className="text-muted-foreground" />
+                        {isDetailLoading ? (
+                          <Spinner size={16} className="animate-spin text-muted-foreground" />
+                        ) : (
+                          <Eye size={16} className="text-muted-foreground" />
+                        )}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -220,6 +223,36 @@ export function AuditLogsPage() {
           label={totalLabel}
         />
       </Card>
+
+      <Modal isOpen={Boolean(selectedLog)} onClose={closeDetail} title="Chi tiết nhật ký" size="2xl">
+        {selectedLog && (
+          <div className="space-y-5">
+            <div className="grid gap-3 md:grid-cols-2">
+              <DetailRow label="Thời gian" value={formatDateTime(selectedLog.createdAt)} />
+              <DetailRow label="IP" value={formatIp(selectedLog.ipAddress)} mono />
+              <DetailRow label="Người thực hiện" value={formatActor(selectedLog)} />
+              <DetailRow label="Vai trò" value={roleLabel[selectedLog.actorRole] ?? selectedLog.actorRole ?? '--'} />
+              <DetailRow label="Hành động" value={actionLabel[selectedLog.action] ?? selectedLog.action} />
+              <DetailRow
+                label="Đối tượng"
+                value={`${selectedLog.entityType}${selectedLog.entityId ? ` #${selectedLog.entityId}` : ''}`}
+              />
+            </div>
+
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Nội dung</p>
+              <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-sm leading-relaxed text-foreground">
+                {selectedLog.content || '--'}
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <AuditValueBlock label="Giá trị cũ" value={selectedLog.oldValue} />
+              <AuditValueBlock label="Giá trị mới" value={selectedLog.newValue} />
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -227,8 +260,93 @@ export function AuditLogsPage() {
 function mapAuditLog(item: AuditLogItem): AuditLogRow {
   return {
     ...item,
-    actorLabel: item.actorUserId,
-    roleLabel: item.actorRole,
-    actionLabel: item.action,
+    actorLabel: formatActor(item),
+    roleLabel: roleLabel[item.actorRole] ?? item.actorRole ?? '--',
+    actionLabel: actionLabel[item.action] ?? item.action,
   };
 }
+
+function formatActor(item: AuditLogItem) {
+  if (item.actorName && item.actorUsername) return `${item.actorName} (${item.actorUsername})`;
+  if (item.actorName) return item.actorName;
+  if (item.actorUsername) return item.actorUsername;
+  if (item.actorUserId) return `#${item.actorUserId}`;
+  return 'Hệ thống';
+}
+
+function formatIp(ipAddress?: string | null) {
+  return ipAddress?.trim() || 'Chưa ghi nhận';
+}
+
+function formatAuditValue(value?: string | null) {
+  if (!value) return '--';
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+function DetailRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-background p-3">
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className={`break-words text-sm font-semibold text-foreground ${mono ? 'font-mono' : ''}`}>{value || '--'}</p>
+    </div>
+  );
+}
+
+function AuditValueBlock({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+      <pre className="max-h-64 overflow-auto rounded-lg border border-border/60 bg-slate-950 p-3 text-xs leading-relaxed text-slate-100">
+        {formatAuditValue(value)}
+      </pre>
+    </div>
+  );
+}
+
+const auditActionOptions = [
+  'LOGIN',
+  'LOGOUT',
+  'CREATE_USER',
+  'UPDATE_USER',
+  'LOCK_USER',
+  'UNLOCK_USER',
+  'RESET_PASSWORD',
+  'CHANGE_PASSWORD',
+  'CREATE',
+  'UPDATE',
+  'LOCK',
+  'UNLOCK',
+];
+
+const roleLabel: Record<string, string> = {
+  ADMIN: 'Admin',
+  MANAGER: 'Quản lý CSVC',
+  STUDENT: 'Sinh viên',
+};
+
+const actionLabel: Record<string, string> = {
+  LOGIN: 'Đăng nhập',
+  LOGOUT: 'Đăng xuất',
+  LOCK: 'Khóa',
+  UNLOCK: 'Mở khóa',
+  RESET_PASSWORD: 'Đặt lại mật khẩu',
+  CREATE: 'Tạo mới',
+  UPDATE: 'Cập nhật',
+  CREATE_USER: 'Tạo tài khoản',
+  UPDATE_USER: 'Cập nhật tài khoản',
+  LOCK_USER: 'Khóa tài khoản',
+  UNLOCK_USER: 'Mở khóa tài khoản',
+  CHANGE_PASSWORD: 'Đổi mật khẩu',
+};

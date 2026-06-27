@@ -55,8 +55,12 @@ export function ChangePasswordPage() {
       showToast('Mật khẩu mới và xác nhận không khớp.', 'error');
       return;
     }
-    if (strength.level < 2) {
-      showToast('Mật khẩu mới còn quá yếu.', 'error');
+    if (newPassword.length < 6) {
+      showToast('Mật khẩu mới phải có ít nhất 6 ký tự.', 'error');
+      return;
+    }
+    if (newPassword === currentPassword) {
+      showToast('Mật khẩu mới phải khác mật khẩu hiện tại.', 'error');
       return;
     }
 

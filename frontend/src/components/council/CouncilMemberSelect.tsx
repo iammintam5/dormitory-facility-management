@@ -41,7 +41,10 @@ export function CouncilMemberSelect({
         phone: u.phone ?? undefined,
         status: u.status,
         createdAt: u.createdAt,
-        role: u.role,
+        role: {
+          ...u.role,
+          id: Number(u.role.id),
+        },
       }));
       setSearchResults(results.filter((user) => !members.some((member) => member.user.id === user.id)));
     } catch {

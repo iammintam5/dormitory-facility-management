@@ -38,11 +38,12 @@ export function StudentRoomPage() {
             floorId: 1,
             roomCode: studentRoom.roomCode,
             capacity: studentRoom.capacity,
+            createdAt: '',
             floor: {
               id: 1,
               buildingId: parseInt(studentRoom.buildingId),
               floorNumber: studentRoom.floorNumber,
-              building: { id: parseInt(studentRoom.buildingId), code: studentRoom.buildingCode, name: studentRoom.buildingName, createdAt: '' }
+              building: { id: parseInt(studentRoom.buildingId), code: studentRoom.buildingCode, name: studentRoom.buildingName ?? '', createdAt: '' }
             }
           });
         }

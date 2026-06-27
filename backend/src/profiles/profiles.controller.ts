@@ -23,6 +23,7 @@ export class ProfilesController {
       gender?: string | null;
       dateOfBirth?: string | null;
       address?: string | null;
+      avatarUrl?: string | null;
       notes?: string | null;
     },
   ) {
