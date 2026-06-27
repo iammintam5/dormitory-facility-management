@@ -12,7 +12,7 @@ import { BulkCreateAssetDto } from './dto/bulk-create-asset.dto';
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
-  @Roles('MANAGER', 'STUDENT')
+  @Roles('MANAGER')
   @Get()
   async findAll(
     @Query('page') page?: string,
@@ -58,7 +58,7 @@ export class AssetsController {
     return this.assetsService.delete(parseInt(id, 10), userId);
   }
 
-  @Roles('MANAGER', 'STUDENT')
+  @Roles('MANAGER')
   @Get(':id/history')
   async getHistory(@Param('id') id: string) {
     return this.assetsService.getHistory(parseInt(id, 10));

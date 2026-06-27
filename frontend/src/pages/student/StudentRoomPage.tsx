@@ -17,8 +17,7 @@ import {
   UserCircle,
   Spinner
 } from '@phosphor-icons/react';
-import { getRooms } from '../../services/locations';
-import { getAssets } from '../../services/assets';
+import { studentsApi } from '../../services/students';
 import { Room } from '../../types/locations';
 import { User } from '../../types/users';
 
@@ -30,24 +29,13 @@ export function StudentRoomPage() {
   useEffect(() => {
     async function load() {
       try {
-        const rooms = await getRooms();
-        const studentRoom = rooms.length > 0 ? rooms[0] : null;
+        const studentRoom = await studentsApi.getMyRoom();
         if (studentRoom) {
-          setRoom({
-            id: parseInt(studentRoom.id),
-            floorId: 1,
-            roomCode: studentRoom.roomCode,
-            capacity: studentRoom.capacity,
-            createdAt: '',
-            floor: {
-              id: 1,
-              buildingId: parseInt(studentRoom.buildingId),
-              floorNumber: studentRoom.floorNumber,
-              building: { id: parseInt(studentRoom.buildingId), code: studentRoom.buildingCode, name: studentRoom.buildingName ?? '', createdAt: '' }
-            }
-          });
+          setRoom(studentRoom);
         }
-        setRoommates([]);
+        
+        const roommatesData = await studentsApi.getMyRoommates();
+        setRoommates(roommatesData);
       } catch {
         // silent fallback
       } finally {

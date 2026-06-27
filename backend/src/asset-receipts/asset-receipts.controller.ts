@@ -16,26 +16,26 @@ export class AssetReceiptsController {
 
   @Post()
   @Roles('MANAGER')
-  create(@Body() payload: CreateImportReceiptDto, @CurrentUser() user: any) {
-    return this.assetReceiptsService.createImportReceipt(payload, user.userId);
+  create(@Body() payload: CreateImportReceiptDto, @CurrentUser('sub') userId: number) {
+    return this.assetReceiptsService.createImportReceipt(payload, userId);
   }
 
   @Post('handover')
   @Roles('MANAGER')
-  createHandover(@Body() payload: CreateHandoverReceiptDto, @CurrentUser() user: any) {
-    return this.assetReceiptsService.createHandoverReceipt(payload, user.userId);
+  createHandover(@Body() payload: CreateHandoverReceiptDto, @CurrentUser('sub') userId: number) {
+    return this.assetReceiptsService.createHandoverReceipt(payload, userId);
   }
 
   @Post('reclaim')
   @Roles('MANAGER')
-  createReclaim(@Body() payload: CreateReclaimReceiptDto, @CurrentUser() user: any) {
-    return this.assetReceiptsService.createReclaimReceipt(payload, user.userId);
+  createReclaim(@Body() payload: CreateReclaimReceiptDto, @CurrentUser('sub') userId: number) {
+    return this.assetReceiptsService.createReclaimReceipt(payload, userId);
   }
 
   @Post('export')
   @Roles('MANAGER')
-  createExport(@Body() payload: CreateExportReceiptDto, @CurrentUser() user: any) {
-    return this.assetReceiptsService.createExportReceipt(payload, user.userId);
+  createExport(@Body() payload: CreateExportReceiptDto, @CurrentUser('sub') userId: number) {
+    return this.assetReceiptsService.createExportReceipt(payload, userId);
   }
 
   @Get()

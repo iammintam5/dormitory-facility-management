@@ -37,6 +37,7 @@ enum DamageReportStatus {
   REJECTED
   IN_PROGRESS
   COMPLETED
+  CANCELLED
 }
 
 enum DamageReportPriority {

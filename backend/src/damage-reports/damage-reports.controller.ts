@@ -30,8 +30,12 @@ export class DamageReportsController {
 
   @Roles('MANAGER', 'STUDENT')
   @Get(':id')
-  async findOne(@Param('id') id: string) {
-    return this.service.findOne(parseInt(id, 10));
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: number,
+    @CurrentUser('role') role: string,
+  ) {
+    return this.service.findOne(parseInt(id, 10), userId, role);
   }
 
   @Roles('STUDENT')
