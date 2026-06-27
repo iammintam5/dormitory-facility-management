@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { generateCode } from '../common/utils/code-generator';
 
 @Injectable()
 export class InventoryChecksService {
@@ -97,8 +98,7 @@ export class InventoryChecksService {
     userId: number,
     body: { roomId: number; checkDate: string; generalNote?: string },
   ) {
-    const count = await this.prisma.inventoryCheck.count();
-    const code = `KK-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+    const code = generateCode('KK-');
 
     const assets = await this.prisma.asset.findMany({ where: { roomId: body.roomId } });
 

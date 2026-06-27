@@ -10,6 +10,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 export class AuditLogsController {
   constructor(private readonly service: AuditLogsService) {}
 
+  @Roles('ADMIN')
   @Get()
   async findAll(
     @Query('page') page?: string,
@@ -25,6 +26,7 @@ export class AuditLogsController {
     });
   }
 
+  @Roles('ADMIN')
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.service.findOne(parseInt(id, 10));

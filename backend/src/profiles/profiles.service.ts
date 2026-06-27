@@ -61,46 +61,41 @@ export class ProfilesService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    if (payload.fullName !== undefined) {
-      await this.prisma.user.update({ where: { id: userId }, data: { fullName: payload.fullName } });
-    }
-    if (payload.email !== undefined) {
-      await this.prisma.user.update({ where: { id: userId }, data: { email: payload.email } });
-    }
-    if (payload.phone !== undefined) {
-      await this.prisma.user.update({ where: { id: userId }, data: { phone: payload.phone } });
-    }
+    await this.prisma.$transaction(async (tx) => {
+      const userUpdateData: any = {};
+      if (payload.fullName !== undefined) userUpdateData.fullName = payload.fullName;
+      if (payload.email !== undefined) userUpdateData.email = payload.email;
+      if (payload.phone !== undefined) userUpdateData.phone = payload.phone;
 
-    const existingProfile = await this.prisma.profile.findUnique({ where: { userId } });
-    if (existingProfile) {
-      await this.prisma.profile.update({
-        where: { userId },
-        data: {
-          gender: payload.gender !== undefined ? payload.gender : undefined,
-          dateOfBirth: payload.dateOfBirth !== undefined ? payload.dateOfBirth : undefined,
-          address: payload.address !== undefined ? payload.address : undefined,
-          avatarUrl: payload.avatarUrl !== undefined ? payload.avatarUrl : undefined,
-          notes: payload.notes !== undefined ? payload.notes : undefined,
-        },
-      });
-    } else if (
-      payload.gender !== undefined ||
-      payload.dateOfBirth !== undefined ||
-      payload.address !== undefined ||
-      payload.avatarUrl !== undefined ||
-      payload.notes !== undefined
-    ) {
-      await this.prisma.profile.create({
-        data: {
-          userId,
-          gender: payload.gender ?? null,
-          dateOfBirth: payload.dateOfBirth ?? null,
-          address: payload.address ?? null,
-          avatarUrl: payload.avatarUrl ?? null,
-          notes: payload.notes ?? null,
-        },
-      });
-    }
+      if (Object.keys(userUpdateData).length > 0) {
+        await tx.user.update({ where: { id: userId }, data: userUpdateData });
+      }
+
+      const existingProfile = await tx.profile.findUnique({ where: { userId } });
+      if (existingProfile) {
+        const profileUpdateData: any = {};
+        if (payload.gender !== undefined) profileUpdateData.gender = payload.gender;
+        if (payload.dateOfBirth !== undefined) profileUpdateData.dateOfBirth = payload.dateOfBirth;
+        if (payload.address !== undefined) profileUpdateData.address = payload.address;
+        if (payload.avatarUrl !== undefined) profileUpdateData.avatarUrl = payload.avatarUrl;
+        if (payload.notes !== undefined) profileUpdateData.notes = payload.notes;
+
+        if (Object.keys(profileUpdateData).length > 0) {
+          await tx.profile.update({ where: { userId }, data: profileUpdateData });
+        }
+      } else if (payload.gender !== undefined || payload.dateOfBirth !== undefined || payload.address !== undefined || payload.avatarUrl !== undefined || payload.notes !== undefined) {
+        await tx.profile.create({
+          data: {
+            userId,
+            gender: payload.gender ?? null,
+            dateOfBirth: payload.dateOfBirth ?? null,
+            address: payload.address ?? null,
+            avatarUrl: payload.avatarUrl ?? null,
+            notes: payload.notes ?? null,
+          },
+        });
+      }
+    });
 
     return this.getMyProfile(userId);
   }

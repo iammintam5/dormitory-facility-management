@@ -4,6 +4,10 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CreateImportReceiptDto } from './dto/create-import-receipt.dto';
+import { CreateHandoverReceiptDto } from './dto/create-handover-receipt.dto';
+import { CreateReclaimReceiptDto } from './dto/create-reclaim-receipt.dto';
+import { CreateExportReceiptDto } from './dto/create-export-receipt.dto';
 
 @Controller('asset-receipts')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -11,37 +15,37 @@ export class AssetReceiptsController {
   constructor(private readonly assetReceiptsService: AssetReceiptsService) {}
 
   @Post()
-  @Roles('ADMIN', 'MANAGER')
-  create(@Body() payload: any, @CurrentUser() user: any) {
+  @Roles('MANAGER')
+  create(@Body() payload: CreateImportReceiptDto, @CurrentUser() user: any) {
     return this.assetReceiptsService.createImportReceipt(payload, user.userId);
   }
 
   @Post('handover')
-  @Roles('ADMIN', 'MANAGER')
-  createHandover(@Body() payload: any, @CurrentUser() user: any) {
+  @Roles('MANAGER')
+  createHandover(@Body() payload: CreateHandoverReceiptDto, @CurrentUser() user: any) {
     return this.assetReceiptsService.createHandoverReceipt(payload, user.userId);
   }
 
   @Post('reclaim')
-  @Roles('ADMIN', 'MANAGER')
-  createReclaim(@Body() payload: any, @CurrentUser() user: any) {
+  @Roles('MANAGER')
+  createReclaim(@Body() payload: CreateReclaimReceiptDto, @CurrentUser() user: any) {
     return this.assetReceiptsService.createReclaimReceipt(payload, user.userId);
   }
 
   @Post('export')
-  @Roles('ADMIN', 'MANAGER')
-  createExport(@Body() payload: any, @CurrentUser() user: any) {
+  @Roles('MANAGER')
+  createExport(@Body() payload: CreateExportReceiptDto, @CurrentUser() user: any) {
     return this.assetReceiptsService.createExportReceipt(payload, user.userId);
   }
 
   @Get()
-  @Roles('ADMIN', 'MANAGER')
-  findAll(@Query() query: any) {
+  @Roles('MANAGER')
+  findAll(@Query() query: Record<string, string>) {
     return this.assetReceiptsService.findAll(query);
   }
 
   @Get(':id')
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('MANAGER')
   findOne(@Param('id') id: string) {
     return this.assetReceiptsService.findOne(+id);
   }

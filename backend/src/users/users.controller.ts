@@ -5,13 +5,14 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { getRequestIp } from '../common/utils/request-ip';
+import { CreateUserDto, UpdateUserDto, ResetPasswordDto } from './dto/create-user.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @Get()
   async findAll(
     @Query('page') page?: string,
@@ -31,7 +32,7 @@ export class UsersController {
     });
   }
 
-  @Roles('ADMIN', 'MANAGER')
+  @Roles('ADMIN')
   @Get('roles')
   async getRoles() {
     return this.usersService.getRoles();
@@ -39,15 +40,11 @@ export class UsersController {
 
   @Roles('ADMIN')
   @Post()
-  async create(@Body() body: {
-    roleId: string;
-    fullName: string;
-    username: string;
-    password: string;
-    email?: string;
-    phone?: string;
-    studentCode?: string;
-  }, @CurrentUser('sub') actorUserId: number, @Req() request: any) {
+  async create(
+    @Body() body: CreateUserDto,
+    @CurrentUser('sub') actorUserId: number,
+    @Req() request: any,
+  ) {
     return this.usersService.create(body, actorUserId, getRequestIp(request));
   }
 
@@ -55,15 +52,7 @@ export class UsersController {
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body() body: {
-      roleId?: string;
-      fullName?: string;
-      username?: string;
-      password?: string;
-      email?: string | null;
-      phone?: string | null;
-      studentCode?: string | null;
-    },
+    @Body() body: UpdateUserDto,
     @CurrentUser('sub') actorUserId: number,
     @Req() request: any,
   ) {
@@ -86,7 +75,7 @@ export class UsersController {
   @Post(':id/reset-password')
   async resetPassword(
     @Param('id') id: string,
-    @Body() body: { newPassword: string },
+    @Body() body: ResetPasswordDto,
     @CurrentUser('sub') actorUserId: number,
     @Req() request: any,
   ) {

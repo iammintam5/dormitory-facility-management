@@ -115,6 +115,7 @@ export class AuditLogsService {
       createdAt: log.createdAt.toISOString(),
     };
   }
+
 }
 
 function serializeAuditValue(value: unknown) {

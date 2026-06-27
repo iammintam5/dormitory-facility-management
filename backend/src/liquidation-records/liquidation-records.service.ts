@@ -1,5 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { generateCode } from '../common/utils/code-generator';
 
 const WORKFLOW: Record<string, string> = {
   'submit-approval': 'PENDING_APPROVAL',
@@ -122,34 +123,46 @@ export class LiquidationRecordsService {
       note?: string;
     },
   ) {
-    const count = await this.prisma.liquidationRecord.count();
-    const code = `TL-${new Date().getFullYear()}-${String(count + 1).padStart(3, '0')}`;
+    const code = generateCode('TL-');
 
-    const record = await this.prisma.liquidationRecord.create({
-      data: {
-        liquidationCode: code,
-        createdBy: userId,
-        liquidationDate: new Date(body.liquidationDate),
-        note: body.note ?? null,
-        status: 'DRAFT',
-        liquidationItems: {
-          create: {
-            assetId: body.assetId,
-            assetCondition: body.assetCondition,
-            reason: body.reason,
-            estimatedRemainingValue: body.estimatedRemainingValue ?? null,
+    const record = await this.prisma.$transaction(async (tx) => {
+      // Update asset status to PENDING_LIQUIDATION
+      await tx.asset.update({
+        where: { id: body.assetId },
+        data: { status: 'PENDING_LIQUIDATION' },
+      });
+
+      await tx.assetHistory.create({
+        data: {
+          assetId: body.assetId,
+          action: 'CHỜ_THANH_LÝ',
+          newStatus: 'PENDING_LIQUIDATION',
+          note: 'Đưa vào danh sách thanh lý',
+        },
+      });
+
+      // Create liquidation record
+      return tx.liquidationRecord.create({
+        data: {
+          liquidationCode: code,
+          createdBy: userId,
+          liquidationDate: new Date(body.liquidationDate),
+          note: body.note ?? null,
+          status: 'DRAFT',
+          liquidationItems: {
+            create: {
+              assetId: body.assetId,
+              assetCondition: body.assetCondition,
+              reason: body.reason,
+              estimatedRemainingValue: body.estimatedRemainingValue ?? null,
+            },
           },
         },
-      },
-      include: {
-        creator: true,
-        liquidationItems: { include: { asset: true } },
-      },
-    });
-
-    await this.prisma.asset.update({
-      where: { id: body.assetId },
-      data: { status: 'PENDING_LIQUIDATION' },
+        include: {
+          creator: true,
+          liquidationItems: { include: { asset: true } },
+        },
+      });
     });
 
     return this.mapRecord(record);
@@ -162,31 +175,57 @@ export class LiquidationRecordsService {
     const newStatus = WORKFLOW[action];
     if (!newStatus) throw new NotFoundException(`Invalid action: ${action}`);
 
-    const updated = await this.prisma.liquidationRecord.update({
-      where: { id },
-      data: { status: newStatus as any },
-      include: {
-        creator: true,
-        liquidationItems: { include: { asset: { include: { category: true } } } },
-        councilMembers: { include: { user: true } },
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const updatedRecord = await tx.liquidationRecord.update({
+        where: { id },
+        data: { status: newStatus as any },
+        include: {
+          creator: true,
+          liquidationItems: { include: { asset: { include: { category: true } } } },
+          councilMembers: { include: { user: true } },
+        },
+      });
+
+      const assetIds = updatedRecord.liquidationItems.map((li: any) => li.assetId);
+
+      if (action === 'complete') {
+        await tx.asset.updateMany({
+          where: { id: { in: assetIds } },
+          data: { status: 'LIQUIDATED' },
+        });
+
+        for (const assetId of assetIds) {
+          await tx.assetHistory.create({
+            data: {
+              assetId,
+              action: 'ĐÃ_THANH_LÝ',
+              newStatus: 'LIQUIDATED',
+              note: `Hoàn tất thanh lý theo hồ sơ #${updatedRecord.liquidationCode}`,
+            },
+          });
+        }
+      }
+
+      if (action === 'reject') {
+        await tx.asset.updateMany({
+          where: { id: { in: assetIds } },
+          data: { status: 'IN_USE' },
+        });
+
+        for (const assetId of assetIds) {
+          await tx.assetHistory.create({
+            data: {
+              assetId,
+              action: 'HỦY_THANH_LÝ',
+              newStatus: 'IN_USE',
+              note: `Hủy thanh lý theo hồ sơ #${updatedRecord.liquidationCode}`,
+            },
+          });
+        }
+      }
+
+      return updatedRecord;
     });
-
-    if (action === 'complete') {
-      const assetIds = updated.liquidationItems.map((li) => li.assetId);
-      await this.prisma.asset.updateMany({
-        where: { id: { in: assetIds } },
-        data: { status: 'LIQUIDATED' },
-      });
-    }
-
-    if (action === 'reject') {
-      const assetIds = updated.liquidationItems.map((li) => li.assetId);
-      await this.prisma.asset.updateMany({
-        where: { id: { in: assetIds } },
-        data: { status: 'IN_USE' },
-      });
-    }
 
     return this.mapRecord(updated);
   }

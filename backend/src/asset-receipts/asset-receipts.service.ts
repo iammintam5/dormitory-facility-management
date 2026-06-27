@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReceiptType } from '@prisma/client';
+import { generateCode } from '../common/utils/code-generator';
 
 @Injectable()
 export class AssetReceiptsService {
@@ -21,8 +22,7 @@ export class AssetReceiptsService {
     } = payload;
 
     // Generate receiptCode
-    const count = await this.prisma.assetReceipt.count();
-    const receiptCode = `IMP${new Date().getFullYear()}${String(count + 1).padStart(4, '0')}`;
+    const receiptCode = generateCode('IMP');
 
     try {
       const result = await this.prisma.$transaction(async (prisma) => {
@@ -130,8 +130,7 @@ export class AssetReceiptsService {
 
   async createHandoverReceipt(payload: any, userId: number) {
     const { targetRoomId, assetIds, note, receiptDate } = payload;
-    const count = await this.prisma.assetReceipt.count();
-    const receiptCode = `CP${new Date().getFullYear()}${String(count + 1).padStart(4, '0')}`;
+    const receiptCode = generateCode('CP');
 
     return this.prisma.$transaction(async (prisma) => {
       const receipt = await prisma.assetReceipt.create({
@@ -178,8 +177,7 @@ export class AssetReceiptsService {
 
   async createReclaimReceipt(payload: any, userId: number) {
     const { fromRoomId, assetIds, note, receiptDate } = payload;
-    const count = await this.prisma.assetReceipt.count();
-    const receiptCode = `TH${new Date().getFullYear()}${String(count + 1).padStart(4, '0')}`;
+    const receiptCode = generateCode('TH');
 
     return this.prisma.$transaction(async (prisma) => {
       const receipt = await prisma.assetReceipt.create({
@@ -237,8 +235,7 @@ export class AssetReceiptsService {
       items,
     } = payload;
 
-    const count = await this.prisma.assetReceipt.count();
-    const receiptCode = `XX${new Date().getFullYear()}${String(count + 1).padStart(4, '0')}`;
+    const receiptCode = generateCode('XX');
 
     try {
       const result = await this.prisma.$transaction(async (prisma) => {

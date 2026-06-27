@@ -1,13 +1,17 @@
 import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { InventoryChecksService } from './inventory-checks.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { CreateInventoryCheckDto, UpdateInventoryCheckDto, SaveInventoryItemsDto, CompleteInventoryCheckDto } from './dto/inventory-check.dto';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('inventory-checks')
 export class InventoryChecksController {
   constructor(private readonly service: InventoryChecksService) {}
 
+  @Roles('MANAGER')
   @Get()
   async findAll(
     @Query('page') page?: string,
@@ -21,47 +25,49 @@ export class InventoryChecksController {
     });
   }
 
+  @Roles('MANAGER')
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.service.findOne(parseInt(id, 10));
   }
 
+  @Roles('MANAGER')
   @Post()
   async create(
     @CurrentUser('sub') userId: number,
-    @Body() body: {
-      roomId: number;
-      checkDate: string;
-      generalNote?: string;
-    },
+    @Body() body: CreateInventoryCheckDto,
   ) {
     return this.service.create(userId, body);
   }
 
+  @Roles('MANAGER')
   @Patch(':id')
   async update(
     @Param('id') id: string,
-    @Body() body: { checkDate?: string; generalNote?: string },
+    @Body() body: UpdateInventoryCheckDto,
   ) {
     return this.service.update(parseInt(id, 10), body);
   }
 
+  @Roles('MANAGER')
   @Post(':id/items')
   async saveItems(
     @Param('id') id: string,
-    @Body() body: { items: Array<{ itemId: number; actualQuantity: number; actualCondition?: string; note?: string }> },
+    @Body() body: SaveInventoryItemsDto,
   ) {
     return this.service.saveItems(parseInt(id, 10), body.items);
   }
 
+  @Roles('MANAGER')
   @Post(':id/complete')
   async complete(
     @Param('id') id: string,
-    @Body() body: { generalNote?: string },
+    @Body() body: CompleteInventoryCheckDto,
   ) {
     return this.service.complete(parseInt(id, 10), body.generalNote);
   }
 
+  @Roles('MANAGER')
   @Get(':id/export')
   async export(@Param('id') id: string) {
     return this.service.exportData(parseInt(id, 10));

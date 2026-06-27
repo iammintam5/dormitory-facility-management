@@ -1,13 +1,16 @@
 import { Controller, Get, Post, Patch, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { DamageReportsService } from './damage-reports.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('damage-reports')
 export class DamageReportsController {
   constructor(private readonly service: DamageReportsService) {}
 
+  @Roles('MANAGER', 'STUDENT')
   @Get()
   async findAll(
     @CurrentUser('sub') userId: number,
@@ -25,11 +28,13 @@ export class DamageReportsController {
     });
   }
 
+  @Roles('MANAGER', 'STUDENT')
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.service.findOne(parseInt(id, 10));
   }
 
+  @Roles('STUDENT')
   @Post()
   async create(
     @CurrentUser('sub') userId: number,
@@ -43,26 +48,31 @@ export class DamageReportsController {
     return this.service.create(userId, body);
   }
 
+  @Roles('MANAGER')
   @Post(':id/accept')
   async accept(@Param('id') id: string, @CurrentUser('sub') userId: number) {
     return this.service.transition(parseInt(id, 10), 'accept', userId);
   }
 
+  @Roles('MANAGER')
   @Post(':id/reject')
   async reject(@Param('id') id: string, @CurrentUser('sub') userId: number) {
     return this.service.transition(parseInt(id, 10), 'reject', userId);
   }
 
+  @Roles('MANAGER')
   @Post(':id/start-processing')
   async startProcessing(@Param('id') id: string, @CurrentUser('sub') userId: number) {
     return this.service.transition(parseInt(id, 10), 'start-processing', userId);
   }
 
+  @Roles('MANAGER')
   @Post(':id/complete')
   async complete(@Param('id') id: string, @CurrentUser('sub') userId: number) {
     return this.service.transition(parseInt(id, 10), 'complete', userId);
   }
 
+  @Roles('STUDENT')
   @Patch(':id')
   async update(
     @Param('id') id: string,
@@ -77,6 +87,7 @@ export class DamageReportsController {
     return this.service.update(parseInt(id, 10), userId, body);
   }
 
+  @Roles('STUDENT')
   @Post(':id/cancel')
   async cancel(@Param('id') id: string, @CurrentUser('sub') userId: number) {
     return this.service.transition(parseInt(id, 10), 'cancel', userId);

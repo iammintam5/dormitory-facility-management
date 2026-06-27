@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssetStatus } from '@prisma/client';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const statusLabels: Record<string, string> = {
   AVAILABLE: 'Sẵn sàng',
@@ -13,7 +14,10 @@ const statusLabels: Record<string, string> = {
 
 @Injectable()
 export class AssetsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditLogsService: AuditLogsService,
+  ) {}
 
   async findAll(params: {
     page: number;
@@ -95,8 +99,14 @@ export class AssetsService {
     };
   }
 
-  async create(payload: any) {
-    const categoryId = payload.categoryId ? parseInt(String(payload.categoryId), 10) : 1;
+  async create(payload: any, userId: number = 0) {
+    if (!payload.categoryId) {
+      throw new BadRequestException('categoryId is required');
+    }
+    const categoryId = parseInt(String(payload.categoryId), 10);
+    if (isNaN(categoryId)) {
+      throw new BadRequestException('Invalid categoryId');
+    }
     const roomId = payload.roomId ? parseInt(String(payload.roomId), 10) : null;
     const asset = await this.prisma.asset.create({
       data: {
@@ -114,12 +124,28 @@ export class AssetsService {
       },
     });
 
+    // Audit log
+    await this.auditLogsService.create({
+      userId,
+      action: 'CREATE_ASSET',
+      tableName: 'assets',
+      recordId: asset.id,
+      content: `Tạo tài sản mới: ${asset.assetCode} - ${asset.assetName}`,
+      newValue: JSON.stringify({ assetCode: asset.assetCode, categoryId, roomId }),
+    });
+
     return this.formatAsset(asset);
   }
 
-  async bulkCreate(payload: any) {
+  async bulkCreate(payload: any, userId: number = 0) {
     const { prefix, startNumber, endNumber, assetName, description, status } = payload;
-    const categoryId = payload.categoryId ? parseInt(String(payload.categoryId), 10) : 1;
+    if (!payload.categoryId) {
+      throw new BadRequestException('categoryId is required');
+    }
+    const categoryId = parseInt(String(payload.categoryId), 10);
+    if (isNaN(categoryId)) {
+      throw new BadRequestException('Invalid categoryId');
+    }
     const roomId = payload.roomId ? parseInt(String(payload.roomId), 10) : null;
     const assetsData: Array<{
       assetCode: string;
@@ -144,10 +170,20 @@ export class AssetsService {
     }
 
     await this.prisma.asset.createMany({ data: assetsData });
+
+    // Audit log for bulk create
+    await this.auditLogsService.create({
+      userId,
+      action: 'BULK_CREATE_ASSET',
+      tableName: 'assets',
+      content: `Tạo hàng loạt ${assetsData.length} tài sản (prefix: ${prefix}, từ ${startNumber} đến ${endNumber})`,
+      newValue: JSON.stringify({ prefix, startNumber, endNumber, count: assetsData.length }),
+    });
+
     return { count: assetsData.length };
   }
 
-  async update(id: number, payload: any) {
+  async update(id: number, payload: any, userId: number = 0) {
     const existing = await this.prisma.asset.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Asset not found');
 
@@ -159,46 +195,138 @@ export class AssetsService {
     if (payload.categoryId !== undefined) data.categoryId = parseInt(payload.categoryId, 10);
     if (payload.roomId !== undefined) data.roomId = payload.roomId ? parseInt(payload.roomId, 10) : null;
 
+    const historyEntries: Array<{
+      assetId: number;
+      action: string;
+      oldStatus?: string;
+      newStatus?: string;
+      oldRoomId?: number | null;
+      newRoomId?: number | null;
+      note?: string;
+    }> = [];
+
     if (data.status && data.status !== existing.status) {
-      await this.prisma.assetHistory.create({
-        data: {
-          assetId: id,
-          action: data.status === 'UNDER_MAINTENANCE' ? 'BẢO_TRÌ' : 'CHUYỂN_TRẠNG_THÁI',
-          oldStatus: existing.status,
-          newStatus: data.status,
-          note: `Chuyển từ ${existing.status} sang ${data.status}`,
-        },
+      historyEntries.push({
+        assetId: id,
+        action: data.status === 'UNDER_MAINTENANCE' ? 'BẢO_TRÌ' : 'CHUYỂN_TRẠNG_THÁI',
+        oldStatus: existing.status,
+        newStatus: data.status,
+        note: `Chuyển từ ${existing.status} sang ${data.status}`,
       });
     }
 
     if (data.roomId !== undefined && data.roomId !== existing.roomId) {
-      await this.prisma.assetHistory.create({
-        data: {
-          assetId: id,
-          action: 'ĐIỀU_CHUYỂN',
-          oldRoomId: existing.roomId,
-          newRoomId: data.roomId,
-          note: `Chuyển phòng`,
-        },
+      historyEntries.push({
+        assetId: id,
+        action: 'ĐIỀU_CHUYỂN',
+        oldRoomId: existing.roomId,
+        newRoomId: data.roomId,
+        note: `Chuyển phòng`,
       });
     }
 
-    const asset = await this.prisma.asset.update({
-      where: { id },
-      data,
-      include: {
-        category: true,
-        room: { include: { floor: { include: { building: true } } } },
-      },
+    const asset = await this.prisma.$transaction(async (tx) => {
+      for (const entry of historyEntries) {
+        await tx.assetHistory.create({ data: entry as any });
+      }
+
+      return tx.asset.update({
+        where: { id },
+        data,
+        include: {
+          category: true,
+          room: { include: { floor: { include: { building: true } } } },
+        },
+      });
+    });
+
+    // Audit log
+    await this.auditLogsService.create({
+      userId,
+      action: 'UPDATE_ASSET',
+      tableName: 'assets',
+      recordId: id,
+      content: `Cập nhật tài sản #${id} (${existing.assetCode})`,
+      oldValue: JSON.stringify({ status: existing.status, roomId: existing.roomId }),
+      newValue: JSON.stringify(data),
     });
 
     return this.formatAsset(asset);
   }
 
-  async delete(id: number) {
-    const existing = await this.prisma.asset.findUnique({ where: { id } });
+  async delete(id: number, userId: number = 0) {
+    const existing = await this.prisma.asset.findUnique({
+      where: { id },
+      include: {
+        damageReports: { take: 1 },
+        maintenanceRecords: { take: 1 },
+        maintenancePlans: { take: 1 },
+        inventoryCheckItems: { take: 1 },
+        liquidationItems: { take: 1 },
+        receiptItems: { take: 1 },
+        assetHistories: { take: 1 },
+      },
+    });
     if (!existing) throw new NotFoundException('Asset not found');
+
+    // Soft delete: if asset has business history, mark as LIQUIDATED instead of deleting
+    const hasHistory =
+      existing.damageReports.length > 0 ||
+      existing.maintenanceRecords.length > 0 ||
+      existing.maintenancePlans.length > 0 ||
+      existing.inventoryCheckItems.length > 0 ||
+      existing.liquidationItems.length > 0 ||
+      existing.receiptItems.length > 0 ||
+      existing.assetHistories.length > 0;
+
+    if (hasHistory) {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.asset.update({
+          where: { id },
+          data: {
+            status: 'LIQUIDATED',
+            roomId: null,
+            description: existing.description
+              ? `${existing.description} (Đã xóa mềm)`
+              : 'Đã xóa mềm',
+          },
+        });
+
+        await tx.assetHistory.create({
+          data: {
+            assetId: id,
+            action: 'XÓA_MỀM',
+            oldStatus: existing.status,
+            newStatus: 'LIQUIDATED',
+            note: 'Xóa mềm tài sản (có lịch sử nghiệp vụ)',
+          },
+        });
+      });
+
+      // Audit log
+      await this.auditLogsService.create({
+        userId,
+        action: 'SOFT_DELETE_ASSET',
+        tableName: 'assets',
+        recordId: id,
+        content: `Xóa mềm tài sản #${id} (${existing.assetCode}) - có lịch sử nghiệp vụ`,
+        oldValue: JSON.stringify({ status: existing.status, assetCode: existing.assetCode }),
+      });
+
+      return { message: 'Asset soft-deleted (has business history)' };
+    }
+
     await this.prisma.asset.delete({ where: { id } });
+
+    // Audit log
+    await this.auditLogsService.create({
+      userId,
+      action: 'DELETE_ASSET',
+      tableName: 'assets',
+      recordId: id,
+      content: `Xóa cứng tài sản #${id} (${existing.assetCode}) - không có lịch sử`,
+    });
+
     return { message: 'Deleted' };
   }
 
