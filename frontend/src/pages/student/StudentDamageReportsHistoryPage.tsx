@@ -7,8 +7,7 @@ import { useToast } from '../../toast/toast-context';
 import { getStudentDamageReports, getDamageReportById, createDamageReport } from '../../services/damage-reports';
 import { getApiErrorMessage } from '../../lib/api-client';
 import { DamageReport, DamageReportPriority } from '../../types/damage-reports';
-import { getRooms, RoomRecord } from '../../services/locations';
-import { getAssets, AssetRecord } from '../../services/assets';
+import { studentsApi } from '../../services/students';
 
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -27,7 +26,6 @@ import {
 } from '@phosphor-icons/react';
 
 const reportSchema = z.object({
-  roomId: z.string().min(1, 'Chọn phòng/địa điểm.'),
   assetId: z.string().min(1, 'Chọn thiết bị.'),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
   description: z.string().min(1, 'Nhập mô tả chi tiết.'),
@@ -41,8 +39,7 @@ export function StudentDamageReportsHistoryPage() {
   const [reports, setReports] = useState<DamageReport[]>([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
   
-  const [rooms, setRooms] = useState<RoomRecord[]>([]);
-  const [assets, setAssets] = useState<AssetRecord[]>([]);
+  const [assets, setAssets] = useState<any[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
@@ -54,14 +51,11 @@ export function StudentDamageReportsHistoryPage() {
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportSchema),
     defaultValues: {
-      roomId: '',
       assetId: '',
       priority: 'MEDIUM',
       description: '',
     },
   });
-
-  const selectedRoomId = form.watch('roomId');
 
   const loadReports = useCallback(async () => {
     setIsFetching(true);
@@ -84,19 +78,10 @@ export function StudentDamageReportsHistoryPage() {
   }, [loadReports]);
 
   useEffect(() => {
-    // For student, they might only see their assigned room. We load all rooms for now or assume backend filters.
-    getRooms().then(setRooms).catch(() => {});
+    studentsApi.getMyRoomAssets()
+      .then(res => setAssets(res))
+      .catch(() => setAssets([]));
   }, []);
-
-  useEffect(() => {
-    if (selectedRoomId) {
-      getAssets({ roomId: selectedRoomId, pageSize: 100 }).then(res => {
-        setAssets(res.items);
-      }).catch(() => {});
-    } else {
-      setAssets([]);
-    }
-  }, [selectedRoomId]);
 
   useEffect(() => {
     if (selectedReportId) {
@@ -113,8 +98,7 @@ export function StudentDamageReportsHistoryPage() {
     setIsLoading(true);
     try {
       await createDamageReport({
-        roomId: data.roomId,
-        assetId: data.assetId,
+        assetId: Number(data.assetId),
         priority: data.priority as DamageReportPriority,
         description: data.description,
       });
@@ -365,7 +349,28 @@ export function StudentDamageReportsHistoryPage() {
                 </div>
               )}
             </ModalBody>
-            <ModalFooter>
+            <ModalFooter className="flex justify-between w-full">
+              <div>
+                {activeReportDetail.status === 'SUBMITTED' && (
+                  <Button 
+                    variant="destructive" 
+                    onClick={async () => {
+                      if (window.confirm('Bạn có chắc chắn muốn hủy báo hỏng này?')) {
+                        try {
+                          await import('../../services/damage-reports').then(m => m.cancelReport(activeReportDetail.id));
+                          alert('Hủy thành công');
+                          setSelectedReportId(null);
+                          loadReports();
+                        } catch (err: any) {
+                          alert(err?.response?.data?.message || 'Lỗi khi hủy báo hỏng');
+                        }
+                      }
+                    }}
+                  >
+                    Hủy báo hỏng
+                  </Button>
+                )}
+              </div>
               <Button onClick={() => setSelectedReportId(null)} variant="outline">
                 Đóng
               </Button>
@@ -382,18 +387,9 @@ export function StudentDamageReportsHistoryPage() {
         <form onSubmit={form.handleSubmit(onSubmit)}>
           <ModalBody className="space-y-6 max-h-[70vh] overflow-y-auto">
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-muted-foreground">Địa điểm / Phòng <span className="text-destructive">*</span></label>
-              <UISelect {...form.register('roomId')}>
-                <option value="">Chọn phòng</option>
-                {rooms.map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
-              </UISelect>
-              {form.formState.errors.roomId && <p className="mt-1 text-xs text-destructive">{form.formState.errors.roomId.message}</p>}
-            </div>
-
-            <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-muted-foreground">Thiết bị <span className="text-destructive">*</span></label>
-              <UISelect {...form.register('assetId')} disabled={!selectedRoomId}>
-                <option value="">{selectedRoomId ? 'Chọn thiết bị' : 'Vui lòng chọn phòng trước'}</option>
+              <UISelect {...form.register('assetId')}>
+                <option value="">Chọn thiết bị</option>
                 {assets.map(a => <option key={a.id} value={a.id}>{a.assetName}</option>)}
               </UISelect>
               {form.formState.errors.assetId && <p className="mt-1 text-xs text-destructive">{form.formState.errors.assetId.message}</p>}

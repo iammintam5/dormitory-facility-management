@@ -18,7 +18,7 @@ import {
   Wrench,
   Spinner
 } from '@phosphor-icons/react';
-import { getRooms, getRoomAssets } from '../../services/locations';
+import { studentsApi } from '../../services/students';
 import { Asset } from '../../types/assets';
 
 export function StudentRoomAssetsPage() {
@@ -31,25 +31,14 @@ export function StudentRoomAssetsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const rooms = await getRooms();
-        const firstRoom = rooms[0];
-        if (firstRoom) {
-          setRoomCode(firstRoom.roomCode);
-          setBuildingCode(firstRoom.buildingCode);
-          // Fetch assets for the student's room
-          const assets = await getRoomAssets(Number(firstRoom.id));
-          setRoomAssets(assets.map((a: any) => ({
-            id: a.id,
-            categoryId: a.categoryId,
-            assetCode: a.assetCode,
-            assetName: a.assetName,
-            status: a.status,
-            description: a.description,
-            yearInUse: a.yearInUse,
-            createdAt: a.createdAt,
-            category: a.category,
-          })));
+        const roomData = await studentsApi.getMyRoom();
+        if (roomData) {
+          setRoomCode(roomData.roomCode);
+          setBuildingCode(roomData.floor?.building?.code || 'A');
         }
+        
+        const assets = await studentsApi.getMyRoomAssets();
+        setRoomAssets(assets);
       } catch {
         // silent
       } finally {
