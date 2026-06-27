@@ -16,6 +16,7 @@ import { LiquidationRecordsModule } from './liquidation-records/liquidation-reco
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
 import { ReportsModule } from './reports/reports.module';
+import { AssetReceiptsModule } from './asset-receipts/asset-receipts.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { ReportsModule } from './reports/reports.module';
     NotificationsModule,
     AuditLogsModule,
     ReportsModule,
+    AssetReceiptsModule,
   ],
 })
 export class AppModule {}
