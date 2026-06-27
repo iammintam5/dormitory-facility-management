@@ -34,9 +34,19 @@ export type StudentDashboardSummary = {
   damageReportProcessing: number;
 };
 
+export type DamageByMonth = {
+  month: string;
+  count: number;
+};
+
 export async function getDashboardSummary() {
   const response = await apiClient.get('/reports/summary');
   return unwrapApiResponse<
     AdminDashboardSummary | ManagerDashboardSummary | StudentDashboardSummary
   >(response.data);
+}
+
+export async function getDamageByMonth() {
+  const response = await apiClient.get('/reports/damage-by-month');
+  return unwrapApiResponse<DamageByMonth[]>(response.data);
 }

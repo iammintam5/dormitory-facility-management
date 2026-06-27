@@ -8,6 +8,9 @@ export type AssetCategoryRecord = {
   unit: string | null;
   createdAt: string;
   updatedAt: string;
+  _count?: {
+    assets: number;
+  };
 };
 
 export async function getAssetCategories() {
