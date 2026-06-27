@@ -187,57 +187,23 @@ export class AssetsService {
     const existing = await this.prisma.asset.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException('Asset not found');
 
+    if (payload.status !== undefined || payload.roomId !== undefined) {
+      throw new BadRequestException('Không thể cập nhật trạng thái (status) hoặc vị trí (roomId) qua chức năng sửa thông tin cơ bản. Vui lòng sử dụng luồng nghiệp vụ.');
+    }
+
     const data: any = {};
     if (payload.assetCode !== undefined) data.assetCode = payload.assetCode;
     if (payload.assetName !== undefined) data.assetName = payload.assetName;
-    if (payload.status !== undefined) data.status = payload.status;
     if (payload.description !== undefined) data.description = payload.description;
     if (payload.categoryId !== undefined) data.categoryId = parseInt(payload.categoryId, 10);
-    if (payload.roomId !== undefined) data.roomId = payload.roomId ? parseInt(payload.roomId, 10) : null;
 
-    const historyEntries: Array<{
-      assetId: number;
-      action: string;
-      oldStatus?: string;
-      newStatus?: string;
-      oldRoomId?: number | null;
-      newRoomId?: number | null;
-      note?: string;
-    }> = [];
-
-    if (data.status && data.status !== existing.status) {
-      historyEntries.push({
-        assetId: id,
-        action: data.status === 'UNDER_MAINTENANCE' ? 'BẢO_TRÌ' : 'CHUYỂN_TRẠNG_THÁI',
-        oldStatus: existing.status,
-        newStatus: data.status,
-        note: `Chuyển từ ${existing.status} sang ${data.status}`,
-      });
-    }
-
-    if (data.roomId !== undefined && data.roomId !== existing.roomId) {
-      historyEntries.push({
-        assetId: id,
-        action: 'ĐIỀU_CHUYỂN',
-        oldRoomId: existing.roomId,
-        newRoomId: data.roomId,
-        note: `Chuyển phòng`,
-      });
-    }
-
-    const asset = await this.prisma.$transaction(async (tx) => {
-      for (const entry of historyEntries) {
-        await tx.assetHistory.create({ data: entry as any });
-      }
-
-      return tx.asset.update({
-        where: { id },
-        data,
-        include: {
-          category: true,
-          room: { include: { floor: { include: { building: true } } } },
-        },
-      });
+    const asset = await this.prisma.asset.update({
+      where: { id },
+      data,
+      include: {
+        category: true,
+        room: { include: { floor: { include: { building: true } } } },
+      },
     });
 
     // Audit log
@@ -246,8 +212,8 @@ export class AssetsService {
       action: 'UPDATE_ASSET',
       tableName: 'assets',
       recordId: id,
-      content: `Cập nhật tài sản #${id} (${existing.assetCode})`,
-      oldValue: JSON.stringify({ status: existing.status, roomId: existing.roomId }),
+      content: `Cập nhật thông tin cơ bản tài sản #${id} (${existing.assetCode})`,
+      oldValue: JSON.stringify({ assetName: existing.assetName, description: existing.description }),
       newValue: JSON.stringify(data),
     });
 
