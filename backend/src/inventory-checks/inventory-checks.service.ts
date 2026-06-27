@@ -10,7 +10,7 @@ export class InventoryChecksService {
     if (!record) throw new NotFoundException('Inventory check not found');
     if (record.status !== 'DRAFT') throw new BadRequestException('Cannot update a completed inventory check');
 
-    return this.prisma.inventoryCheck.update({
+    const updated = await this.prisma.inventoryCheck.update({
       where: { id },
       data: {
         ...(body.checkDate !== undefined && { checkDate: new Date(body.checkDate) }),
@@ -23,6 +23,7 @@ export class InventoryChecksService {
         councilMembers: { include: { user: true } },
       },
     });
+    return this.mapRecord(updated);
   }
 
   async findAll(params: { page: number; pageSize: number; status?: string }) {
@@ -46,22 +47,7 @@ export class InventoryChecksService {
       }),
     ]);
 
-    const items = records.map((r) => ({
-      id: r.id,
-      inventoryCode: r.inventoryCode,
-      roomId: r.roomId,
-      checkedBy: r.checkedBy,
-      checkDate: r.checkDate.toISOString().split('T')[0],
-      status: r.status,
-      generalNote: r.generalNote,
-      completedAt: r.completedAt?.toISOString() ?? null,
-      createdAt: r.createdAt.toISOString(),
-      updatedAt: r.updatedAt?.toISOString() ?? null,
-      room: r.room,
-      checkedByUser: r.checker,
-      inventoryCheckItems: r.inventoryCheckItems,
-      councilMembers: r.councilMembers,
-    }));
+    const items = records.map((r) => this.mapRecord(r));
 
     return {
       items,
@@ -85,7 +71,26 @@ export class InventoryChecksService {
       },
     });
     if (!record) throw new NotFoundException('Inventory check not found');
-    return record;
+    return this.mapRecord(record);
+  }
+
+  private mapRecord(r: any) {
+    return {
+      id: r.id,
+      inventoryCode: r.inventoryCode,
+      roomId: r.roomId,
+      checkedBy: r.checkedBy,
+      checkDate: r.checkDate.toISOString().split('T')[0],
+      status: r.status,
+      generalNote: r.generalNote,
+      completedAt: r.completedAt?.toISOString() ?? null,
+      createdAt: r.createdAt.toISOString(),
+      updatedAt: r.updatedAt?.toISOString() ?? null,
+      room: r.room,
+      checkedByUser: r.checker,
+      inventoryCheckItems: r.inventoryCheckItems,
+      councilMembers: r.councilMembers,
+    };
   }
 
   async create(
@@ -120,7 +125,7 @@ export class InventoryChecksService {
       },
     });
 
-    return record;
+    return this.mapRecord(record);
   }
 
   async saveItems(
@@ -149,7 +154,7 @@ export class InventoryChecksService {
     const record = await this.prisma.inventoryCheck.findUnique({ where: { id } });
     if (!record) throw new NotFoundException('Inventory check not found');
 
-    return this.prisma.inventoryCheck.update({
+    const completed = await this.prisma.inventoryCheck.update({
       where: { id },
       data: {
         status: 'COMPLETED',
@@ -162,6 +167,7 @@ export class InventoryChecksService {
         inventoryCheckItems: { include: { asset: { include: { category: true } } } },
       },
     });
+    return this.mapRecord(completed);
   }
 
   async exportData(id: number) {
@@ -172,7 +178,7 @@ export class InventoryChecksService {
         title: 'Phiếu kiểm kê tài sản',
         generatedAt: new Date().toISOString(),
         roomLabel: record.room?.roomCode ?? '--',
-        checkedByLabel: record.checker?.fullName ?? '--',
+        checkedByLabel: record.checkedByUser?.fullName ?? '--',
       },
     };
   }

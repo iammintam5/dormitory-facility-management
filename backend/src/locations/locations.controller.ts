@@ -19,6 +19,13 @@ export class LocationsController {
     genderZone?: string | null;
     status?: 'ACTIVE' | 'INACTIVE';
     description?: string | null;
+    floors?: number;
+    rooms?: number;
+    defaultCapacity?: number;
+    defaultRoomType?: string | null;
+    defaultAreaM2?: number | null;
+    defaultCondition?: string | null;
+    defaultNote?: string | null;
   }) {
     return this.locationsService.createBuilding(body);
   }
@@ -40,6 +47,21 @@ export class LocationsController {
   @Delete('buildings/:id')
   async deleteBuilding(@Param('id') id: string) {
     return this.locationsService.deleteBuilding(parseInt(id, 10));
+  }
+
+  @Patch('buildings/:id/rooms/batch')
+  async batchUpdateRooms(
+    @Param('id') id: string,
+    @Body() body: {
+      roomIds: number[];
+      capacity?: number;
+      roomType?: string | null;
+      areaM2?: number | null;
+      condition?: string | null;
+      note?: string | null;
+    },
+  ) {
+    return this.locationsService.batchUpdateRooms(parseInt(id, 10), body);
   }
 
   @Get('rooms')
