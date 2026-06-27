@@ -89,7 +89,7 @@ export class AssetReceiptsService {
                 assetCode: code,
                 assetName: qty > 1 ? `${item.assetName} ${code}` : item.assetName,
                 categoryId,
-                roomId: roomId ? parseInt(roomId, 10) : null,
+                roomId: null,
                 status: 'AVAILABLE',
                 description: item.note ?? null,
                 yearInUse: currentYear,
@@ -114,7 +114,7 @@ export class AssetReceiptsService {
                 assetId: asset.id,
                 action: 'NHẬP_KHO',
                 newStatus: 'AVAILABLE',
-                newRoomId: roomId ? parseInt(roomId, 10) : null,
+                newRoomId: null,
                 note: `Nhập mới từ phiếu ${receiptCode}`,
               }
             });

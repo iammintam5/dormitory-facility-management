@@ -107,14 +107,13 @@ export class AssetsService {
     if (isNaN(categoryId)) {
       throw new BadRequestException('Invalid categoryId');
     }
-    const roomId = payload.roomId ? parseInt(String(payload.roomId), 10) : null;
     const asset = await this.prisma.asset.create({
       data: {
         assetCode: payload.assetCode,
         assetName: payload.assetName,
         categoryId,
-        roomId,
-        status: payload.status ?? 'AVAILABLE',
+        roomId: null,
+        status: 'AVAILABLE',
         description: payload.description ?? null,
         yearInUse: payload.purchaseDate ? new Date(payload.purchaseDate).getFullYear() : new Date().getFullYear(),
       },
@@ -131,7 +130,7 @@ export class AssetsService {
       tableName: 'assets',
       recordId: asset.id,
       content: `Tạo tài sản mới: ${asset.assetCode} - ${asset.assetName}`,
-      newValue: JSON.stringify({ assetCode: asset.assetCode, categoryId, roomId }),
+      newValue: JSON.stringify({ assetCode: asset.assetCode, categoryId, roomId: null }),
     });
 
     return this.formatAsset(asset);
@@ -146,7 +145,6 @@ export class AssetsService {
     if (isNaN(categoryId)) {
       throw new BadRequestException('Invalid categoryId');
     }
-    const roomId = payload.roomId ? parseInt(String(payload.roomId), 10) : null;
     const assetsData: Array<{
       assetCode: string;
       assetName: string;
@@ -162,8 +160,8 @@ export class AssetsService {
         assetCode: code,
         assetName: `${assetName} ${code}`,
         categoryId,
-        roomId,
-        status: (status ?? 'AVAILABLE') as AssetStatus,
+        roomId: null,
+        status: 'AVAILABLE',
         description: description ?? null,
         yearInUse: new Date().getFullYear(),
       });

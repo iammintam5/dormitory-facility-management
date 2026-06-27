@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Req } from '@nestjs/common';
 import { RoomsService } from './rooms.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -39,8 +39,8 @@ export class RoomsController {
 
   @Roles('MANAGER', 'STUDENT')
   @Get(':id/students')
-  async getStudents(@Param('id') id: string) {
-    return this.roomsService.getStudents(parseInt(id, 10));
+  async getStudents(@Param('id') id: string, @Req() req: any) {
+    return this.roomsService.getStudents(parseInt(id, 10), req.user);
   }
 
   @Roles('MANAGER')
@@ -63,7 +63,7 @@ export class RoomsController {
 
   @Roles('MANAGER', 'STUDENT')
   @Get(':id/assets')
-  async getAssets(@Param('id') id: string) {
-    return this.roomsService.getAssets(parseInt(id, 10));
+  async getAssets(@Param('id') id: string, @Req() req: any) {
+    return this.roomsService.getAssets(parseInt(id, 10), req.user);
   }
 }

@@ -1,5 +1,6 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class LocationsService {
@@ -192,24 +193,53 @@ export class LocationsService {
       note?: string | null;
     },
   ) {
-    const building = await this.prisma.dormBuilding.findUnique({ where: { id: buildingId } });
-    if (!building) throw new NotFoundException('Building not found');
-
-    const updateData: any = {};
-    if (payload.capacity !== undefined) updateData.capacity = payload.capacity;
-    if (payload.roomType !== undefined) updateData.roomType = payload.roomType;
-    if (payload.areaM2 !== undefined) updateData.areaM2 = payload.areaM2;
-    if (payload.condition !== undefined) updateData.condition = payload.condition;
-    if (payload.note !== undefined) updateData.note = payload.note;
-
-    if (Object.keys(updateData).length > 0 && payload.roomIds.length > 0) {
-      await this.prisma.room.updateMany({
-        where: { id: { in: payload.roomIds } },
-        data: updateData,
-      });
+    if (!payload.roomIds || payload.roomIds.length === 0) {
+      return { message: 'No rooms to update' };
     }
 
-    return { message: `Updated ${payload.roomIds.length} rooms` };
+    return this.prisma.$transaction(async (tx) => {
+      const building = await tx.dormBuilding.findUnique({ where: { id: buildingId } });
+      if (!building) throw new NotFoundException('Building not found');
+
+      const rooms = await tx.room.findMany({
+        where: { id: { in: payload.roomIds } },
+        include: { floor: true, roomStudentAssignments: { where: { isActive: true } } },
+      });
+
+      if (rooms.length !== payload.roomIds.length) {
+        throw new BadRequestException('Một số phòng không tồn tại.');
+      }
+
+      for (const room of rooms) {
+        if (room.floor.buildingId !== buildingId) {
+          throw new BadRequestException(`Phòng ${room.roomCode} không thuộc tòa nhà này.`);
+        }
+        if (payload.capacity !== undefined && payload.capacity !== null) {
+          if (payload.capacity <= 0) {
+            throw new BadRequestException('Sức chứa phải là số nguyên dương lớn hơn 0.');
+          }
+          if (room.roomStudentAssignments.length > payload.capacity) {
+            throw new ConflictException(`Không thể giảm sức chứa của phòng ${room.roomCode} xuống ${payload.capacity} vì đang có ${room.roomStudentAssignments.length} sinh viên.`);
+          }
+        }
+      }
+
+      const updateData: any = {};
+      if (payload.capacity !== undefined) updateData.capacity = payload.capacity;
+      if (payload.roomType !== undefined) updateData.roomType = payload.roomType;
+      if (payload.areaM2 !== undefined) updateData.areaM2 = payload.areaM2;
+      if (payload.condition !== undefined) updateData.condition = payload.condition;
+      if (payload.note !== undefined) updateData.note = payload.note;
+
+      if (Object.keys(updateData).length > 0) {
+        await tx.room.updateMany({
+          where: { id: { in: payload.roomIds } },
+          data: updateData,
+        });
+      }
+
+      return { message: `Updated ${payload.roomIds.length} rooms` };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async getRooms(buildingId?: number) {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -93,7 +93,16 @@ export class RoomsService {
     return { deleted: true };
   }
 
-  async getStudents(roomId: number) {
+  async getStudents(roomId: number, user?: any) {
+    if (user && user.role === 'STUDENT') {
+      const assignment = await this.prisma.roomStudentAssignment.findFirst({
+        where: { studentId: user.userId, roomId, isActive: true },
+      });
+      if (!assignment) {
+        throw new ForbiddenException('Bạn không có quyền xem thông tin sinh viên của phòng này.');
+      }
+    }
+
     const assignments = await this.prisma.roomStudentAssignment.findMany({
       where: { roomId, isActive: true },
       include: { student: { include: { role: true } } },
@@ -259,7 +268,16 @@ export class RoomsService {
     };
   }
 
-  async getAssets(roomId: number) {
+  async getAssets(roomId: number, user?: any) {
+    if (user && user.role === 'STUDENT') {
+      const assignment = await this.prisma.roomStudentAssignment.findFirst({
+        where: { studentId: user.userId, roomId, isActive: true },
+      });
+      if (!assignment) {
+        throw new ForbiddenException('Bạn không có quyền xem thông tin tài sản của phòng này.');
+      }
+    }
+
     return this.prisma.asset.findMany({
       where: { roomId },
       include: { category: true },

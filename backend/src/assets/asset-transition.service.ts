@@ -52,14 +52,31 @@ export class AssetTransitionService {
       throw new ConflictException(`Trạng thái IN_USE yêu cầu tài sản phải thuộc về một phòng.`);
     }
 
-    // Update asset
-    const updatedAsset = await tx.asset.update({
-      where: { id: assetId },
+    // Blocker 4: Prevent IN_USE -> IN_USE room change unless it's a TRANSFER
+    if (currentStatus === AssetStatus.IN_USE && newStatus === AssetStatus.IN_USE && asset.roomId !== targetRoomId) {
+      if (context.action !== 'ĐIỀU_CHUYỂN') {
+        throw new ConflictException(`Không thể đổi phòng cho tài sản đang IN_USE mà không qua luồng ĐIỀU_CHUYỂN.`);
+      }
+    }
+
+    // Update asset atomically
+    const updateResult = await tx.asset.updateMany({
+      where: { 
+        id: assetId,
+        status: currentStatus,
+        roomId: asset.roomId,
+      },
       data: {
         status: newStatus,
         roomId: targetRoomId,
       },
     });
+
+    if (updateResult.count === 0) {
+      throw new ConflictException(`Xung đột dữ liệu: Tài sản ID ${assetId} đã bị thay đổi bởi giao dịch khác.`);
+    }
+
+    const updatedAsset = { ...asset, status: newStatus, roomId: targetRoomId };
 
     // Write history
     if (currentStatus !== newStatus || asset.roomId !== targetRoomId) {
