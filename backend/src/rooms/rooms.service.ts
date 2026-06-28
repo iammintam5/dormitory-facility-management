@@ -76,7 +76,7 @@ export class RoomsService {
       include: {
         assets: { take: 1 },
         damageReports: { take: 1 },
-        inventoryChecks: { take: 1 },
+
         roomStudentAssignments: { take: 1 },
       },
     });
@@ -85,7 +85,6 @@ export class RoomsService {
     const hasHistory =
       room.assets.length > 0 ||
       room.damageReports.length > 0 ||
-      room.inventoryChecks.length > 0 ||
       room.roomStudentAssignments.length > 0;
 
     if (hasHistory) {

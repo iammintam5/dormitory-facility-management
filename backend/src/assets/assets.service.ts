@@ -225,7 +225,7 @@ export class AssetsService {
         damageReports: { take: 1 },
         maintenanceRecords: { take: 1 },
         maintenancePlans: { take: 1 },
-        inventoryCheckItems: { take: 1 },
+
         liquidationItems: { take: 1 },
         receiptItems: { take: 1 },
         assetHistories: { take: 1 },
@@ -239,7 +239,7 @@ export class AssetsService {
       existing.damageReports.length > 0 ||
       existing.maintenanceRecords.length > 0 ||
       existing.maintenancePlans.length > 0 ||
-      existing.inventoryCheckItems.length > 0 ||
+
       existing.liquidationItems.length > 0 ||
       existing.receiptItems.length > 0 ||
       existing.assetHistories.length > 0;
