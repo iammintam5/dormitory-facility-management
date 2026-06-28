@@ -20,10 +20,13 @@ export type AssetReceiptRecord = {
   supplierPhone?: string;
   contractNumber?: string;
   documentNumber?: string;
-  totalAmount?: number;
+  totalAmount?: number | string;
   note?: string;
   createdAt: string;
   items?: AssetReceiptItemRecord[];
+  _count?: {
+    items: number;
+  };
   creator?: {
     fullName: string;
   };

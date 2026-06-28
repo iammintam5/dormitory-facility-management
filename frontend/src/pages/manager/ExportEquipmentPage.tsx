@@ -83,14 +83,21 @@ export function ExportEquipmentPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const [cats, blds, assetsData] = await Promise.all([
+        const exportableStatuses = ['AVAILABLE', 'DAMAGED', 'UNDER_MAINTENANCE', 'PENDING_LIQUIDATION'];
+        const [cats, blds, ...assetResponses] = await Promise.all([
           getAssetCategories(),
           getBuildings(),
-          getAssets({ pageSize: 1000, status: 'PENDING_LIQUIDATION' }).catch(() => ({ items: [] as AssetRecord[], pagination: { page: 1, pageSize: 1000, total: 0, totalPages: 0 } })),
+          ...exportableStatuses.map((status) =>
+            getAssets({ pageSize: 1000, status }).catch(() => ({ items: [] as AssetRecord[], pagination: { page: 1, pageSize: 1000, total: 0, totalPages: 0 } }))
+          ),
         ]);
+        const assetsById = new Map<string, AssetRecord>();
+        assetResponses.flatMap((response) => response.items || [])
+          .filter((asset) => asset.status !== 'IN_USE' && !asset.roomCode)
+          .forEach((asset) => assetsById.set(asset.id, asset));
         setCategories(cats || []);
         setBuildings(blds || []);
-        setAllAssets(assetsData?.items || []);
+        setAllAssets(Array.from(assetsById.values()));
       } catch (err) {
         showToast(getApiErrorMessage(err, 'Không thể tải dữ liệu'), 'error');
       } finally {
@@ -210,8 +217,6 @@ export function ExportEquipmentPage() {
     return Array.from(codes).sort();
   }, [allAssets]);
 
-  const exportNumber = `XX${new Date().getFullYear()}-${String(exportItems.length > 0 ? Math.floor(Date.now() / 1000) % 10000 : 0).padStart(4, '0')}`;
-
   const conditionBadge = (conditionLabel: string, condition: string) => {
     const isGood = condition === 'GOOD';
     return (
@@ -240,7 +245,7 @@ export function ExportEquipmentPage() {
         title="Xuất thiết bị" 
         breadcrumbs={[
           { label: 'Nghiệp vụ', href: '#' },
-          { label: 'Nhập - Xuất thiết bị', href: `${basePath}/asset-transactions` },
+          { label: 'Nhập/Xuất thiết bị', href: `${basePath}/asset-transactions` },
           { label: 'Xuất thiết bị' }
         ]}
         actions={
@@ -286,8 +291,12 @@ export function ExportEquipmentPage() {
               <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Số phiếu xuất
               </label>
-              <div className="font-bold text-lg text-primary mt-1">{exportNumber}</div>
+              <div className="font-semibold text-sm text-muted-foreground mt-2">Tự sinh khi lưu phiếu</div>
             </div>
+          </div>
+
+          <div className="mb-6 rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">
+            Phiếu xuất dùng cho thiết bị rời khỏi kho hoặc thanh lý/hủy bỏ. Tài sản đang ở phòng cần được thu hồi về kho trước khi xuất.
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -461,7 +470,7 @@ export function ExportEquipmentPage() {
         </ModalHeader>
         <ModalBody>
           <p className="text-sm text-muted-foreground mb-4">
-            Chọn thiết bị từ kho để thêm vào phiếu xuất. Thiết bị sẽ được đánh dấu là "Đã thanh lý" sau khi xác nhận.
+            Chọn thiết bị trong kho, đang hỏng, đang bảo trì hoặc chờ thanh lý để thêm vào phiếu xuất. Sau khi xác nhận, thiết bị sẽ chuyển sang trạng thái "Đã thanh lý".
           </p>
 
           {/* Filters */}
