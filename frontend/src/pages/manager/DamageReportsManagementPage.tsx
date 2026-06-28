@@ -19,6 +19,7 @@ import { Input } from '../../components/ui/Input';
 import { Select as UISelect } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Pagination } from '../../components/ui/Pagination';
+import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { 
   Plus, 
@@ -229,61 +230,67 @@ export function DamageReportsManagementPage() {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
-              <WarningCircle size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tổng báo hỏng</p>
-              <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-bold text-foreground">{pagination.total}</p>
-                <span className="text-xs text-muted-foreground">yêu cầu</span>
+      {isFetching && reports.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
+                <WarningCircle size={24} weight="duotone" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
-              <Clock size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Chờ xử lý / Đã gửi</p>
-              <p className="text-2xl font-bold text-foreground">
-                {reports.filter(r => ['SUBMITTED', 'REVIEWING', 'APPROVED'].includes(r.status)).length}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-600 shrink-0">
-              <Wrench size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Đang sửa</p>
-              <p className="text-2xl font-bold text-foreground">
-                {reports.filter(r => r.status === 'IN_PROGRESS').length}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
-              <CheckCircle size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Hoàn thành</p>
-              <p className="text-2xl font-bold text-foreground">
-                {reports.filter(r => r.status === 'COMPLETED').length}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tổng báo hỏng</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-2xl font-bold text-foreground">{pagination.total}</p>
+                  <span className="text-xs text-muted-foreground">yêu cầu</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
+                <Clock size={24} weight="duotone" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Chờ xử lý / Đã gửi</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {reports.filter(r => ['SUBMITTED', 'REVIEWING', 'APPROVED'].includes(r.status)).length}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-600 shrink-0">
+                <Wrench size={24} weight="duotone" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Đang sửa</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {reports.filter(r => r.status === 'IN_PROGRESS').length}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
+                <CheckCircle size={24} weight="duotone" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Hoàn thành</p>
+                <p className="text-2xl font-bold text-foreground">
+                  {reports.filter(r => r.status === 'COMPLETED').length}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card className="border-border/50">
         <CardContent className="p-5 flex flex-wrap gap-4 items-end">
@@ -371,9 +378,8 @@ export function DamageReportsManagementPage() {
       <Card className="border-border/50 overflow-hidden">
         <div className="overflow-x-auto py-6">
           {isFetching ? (
-            <div className="flex flex-col items-center justify-center p-10 gap-2 text-muted-foreground">
-              <ArrowsClockwise size={24} className="animate-spin text-primary" />
-              <span className="text-sm">Đang tải dữ liệu...</span>
+            <div className="px-5">
+              <SkeletonTable rows={10} cols={8} />
             </div>
           ) : (
             <table className="w-full text-sm text-left">

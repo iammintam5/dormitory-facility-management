@@ -108,20 +108,20 @@ export function CouncilMemberSelect({
         </div>
 
         {searchResults.length > 0 && (
-          <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200">
+          <div className="max-h-48 overflow-y-auto rounded-lg border border-border">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
-              <thead className="sticky top-0 bg-slate-50">
+              <thead className="sticky top-0 bg-muted/30">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium text-slate-500">Người dùng</th>
-                  <th className="px-4 py-2 text-right font-medium text-slate-500">Thao tác</th>
+                  <th className="px-4 py-2 text-left font-medium text-muted-foreground">Người dùng</th>
+                  <th className="px-4 py-2 text-right font-medium text-muted-foreground">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200 bg-white">
                 {searchResults.map((user) => (
-                  <tr key={user.id} className="hover:bg-slate-50">
+                  <tr key={user.id} className="hover:bg-muted/30">
                     <td className="px-4 py-2 whitespace-nowrap">
-                      <div className="font-medium text-slate-900">{user.fullName}</div>
-                      <div className="text-slate-500">{user.userCode}</div>
+                      <div className="font-medium text-foreground">{user.fullName}</div>
+                      <div className="text-muted-foreground">{user.userCode}</div>
                     </td>
                     <td className="px-4 py-2 text-right">
                       <Button
@@ -150,9 +150,9 @@ export function CouncilMemberSelect({
       </div>
 
       <div>
-        <h4 className="mb-2 text-sm font-medium text-slate-900">Thành viên hiện tại</h4>
+        <h4 className="mb-2 text-sm font-medium text-foreground">Thành viên hiện tại</h4>
         {members.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 py-4 text-center text-sm italic text-slate-500">
+          <div className="rounded-lg border border-dashed border-border bg-muted/30 py-4 text-center text-sm italic text-muted-foreground">
             Chưa có thành viên nào
           </div>
         ) : (
@@ -160,11 +160,11 @@ export function CouncilMemberSelect({
             {members.map((member) => (
               <div
                 key={member.user.id}
-                className="flex items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3"
+                className="flex items-center gap-3 rounded-lg border border-border bg-muted/30 p-3"
               >
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-slate-900">{member.user.fullName}</div>
-                  <div className="text-xs text-slate-500">{member.user.userCode}</div>
+                  <div className="text-sm font-medium text-foreground">{member.user.fullName}</div>
+                  <div className="text-xs text-muted-foreground">{member.user.userCode}</div>
                 </div>
                 <div className="w-1/3">
                   <Input

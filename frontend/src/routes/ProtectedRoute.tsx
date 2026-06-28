@@ -7,8 +7,8 @@ export function ProtectedRoute() {
 
   if (isBootstrapping) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-100">
-        <p className="text-sm font-medium text-slate-600">Đang tải thông tin đăng nhập...</p>
+      <main className="flex min-h-screen items-center justify-center bg-muted/50">
+        <p className="text-sm font-medium text-muted-foreground">Đang tải thông tin đăng nhập...</p>
       </main>
     );
   }

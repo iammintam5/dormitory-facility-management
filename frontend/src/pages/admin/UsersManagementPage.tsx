@@ -31,6 +31,7 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { SummaryCard } from '../../components/ui/SummaryCard';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { SkeletonStatCard, SkeletonTable } from '../../components/ui/Skeleton';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -262,38 +263,44 @@ export function UsersManagementPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <SummaryCard 
-          label="Tổng tài khoản" 
-          value={stats.totalUsers} 
-          icon={<Users size={24} weight="duotone" />} 
-          colorClass="text-blue-600 bg-blue-50 border-blue-100" 
-        />
-        <SummaryCard 
-          label="Admin" 
-          value={stats.totalAdmins} 
-          icon={<ShieldCheck size={24} weight="duotone" />} 
-          colorClass="text-indigo-600 bg-indigo-50 border-indigo-100" 
-        />
-        <SummaryCard 
-          label="Quản lý CSVC" 
-          value={stats.totalManagers} 
-          icon={<Briefcase size={24} weight="duotone" />} 
-          colorClass="text-emerald-600 bg-emerald-50 border-emerald-100" 
-        />
-        <SummaryCard 
-          label="Sinh viên" 
-          value={stats.totalStudents} 
-          icon={<GraduationCap size={24} weight="duotone" />} 
-          colorClass="text-amber-600 bg-amber-50 border-amber-100" 
-        />
-        <SummaryCard 
-          label="Bị khóa" 
-          value={stats.lockedUsers} 
-          icon={<LockKey size={24} weight="duotone" />} 
-          colorClass="text-rose-600 bg-rose-50 border-rose-100" 
-        />
-      </div>
+      {isLoading && total === 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <SummaryCard 
+            label="Tổng tài khoản" 
+            value={stats.totalUsers} 
+            icon={<Users size={24} weight="duotone" />} 
+            colorClass="text-blue-600 bg-blue-50 border-blue-100" 
+          />
+          <SummaryCard 
+            label="Admin" 
+            value={stats.totalAdmins} 
+            icon={<ShieldCheck size={24} weight="duotone" />} 
+            colorClass="text-indigo-600 bg-indigo-50 border-indigo-100" 
+          />
+          <SummaryCard 
+            label="Quản lý CSVC" 
+            value={stats.totalManagers} 
+            icon={<Briefcase size={24} weight="duotone" />} 
+            colorClass="text-emerald-600 bg-emerald-50 border-emerald-100" 
+          />
+          <SummaryCard 
+            label="Sinh viên" 
+            value={stats.totalStudents} 
+            icon={<GraduationCap size={24} weight="duotone" />} 
+            colorClass="text-amber-600 bg-amber-50 border-amber-100" 
+          />
+          <SummaryCard 
+            label="Bị khóa" 
+            value={stats.lockedUsers} 
+            icon={<LockKey size={24} weight="duotone" />} 
+            colorClass="text-rose-600 bg-rose-50 border-rose-100" 
+          />
+        </div>
+      )}
 
       <Card className="border-border/50">
         <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-end">
@@ -360,8 +367,8 @@ export function UsersManagementPage() {
 
       <Card className="border-border/50 overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size={32} className="animate-spin text-primary" />
+          <div className="p-5 bg-card">
+            <SkeletonTable rows={5} cols={5} />
           </div>
         ) : (
           <Table>

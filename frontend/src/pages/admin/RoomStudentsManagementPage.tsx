@@ -24,6 +24,7 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { SummaryCard } from '../../components/ui/SummaryCard';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { SkeletonStatCard, SkeletonTable } from '../../components/ui/Skeleton';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -330,36 +331,42 @@ export function RoomStudentsManagementPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard 
-          label="Tổng số sinh viên" 
-          value={String(totalStudents)} 
-          unit="sinh viên" 
-          icon={<Users size={24} weight="duotone" />} 
-          colorClass="text-blue-600 bg-blue-50 border-blue-100" 
-        />
-        <SummaryCard 
-          label="Đang ở" 
-          value={String(activeStudents)} 
-          unit={`sinh viên (${activePercent}%)`} 
-          icon={<UserCheck size={24} weight="duotone" />} 
-          colorClass="text-emerald-600 bg-emerald-50 border-emerald-100" 
-        />
-        <SummaryCard 
-          label="Đã chuyển / Ra ngoài" 
-          value={String(transferredStudents)} 
-          unit={`sinh viên (${transferPercent}%)`} 
-          icon={<UserMinus size={24} weight="duotone" />} 
-          colorClass="text-amber-600 bg-amber-50 border-amber-100" 
-        />
-        <SummaryCard 
-          label="Tổng số phòng có SV" 
-          value={String(totalRoomsWithStudents)} 
-          unit="phòng" 
-          icon={<Door size={24} weight="duotone" />} 
-          colorClass="text-purple-600 bg-purple-50 border-purple-100" 
-        />
-      </div>
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <SummaryCard 
+            label="Tổng số sinh viên" 
+            value={String(totalStudents)} 
+            unit="sinh viên" 
+            icon={<Users size={24} weight="duotone" />} 
+            colorClass="text-blue-600 bg-blue-50 border-blue-100" 
+          />
+          <SummaryCard 
+            label="Đang ở" 
+            value={String(activeStudents)} 
+            unit={`sinh viên (${activePercent}%)`} 
+            icon={<UserCheck size={24} weight="duotone" />} 
+            colorClass="text-emerald-600 bg-emerald-50 border-emerald-100" 
+          />
+          <SummaryCard 
+            label="Đã chuyển / Ra ngoài" 
+            value={String(transferredStudents)} 
+            unit={`sinh viên (${transferPercent}%)`} 
+            icon={<UserMinus size={24} weight="duotone" />} 
+            colorClass="text-amber-600 bg-amber-50 border-amber-100" 
+          />
+          <SummaryCard 
+            label="Tổng số phòng có SV" 
+            value={String(totalRoomsWithStudents)} 
+            unit="phòng" 
+            icon={<Door size={24} weight="duotone" />} 
+            colorClass="text-purple-600 bg-purple-50 border-purple-100" 
+          />
+        </div>
+      )}
 
       <Card className="border-border/50">
         <CardContent className="flex flex-col gap-4 p-5">
@@ -438,6 +445,11 @@ export function RoomStudentsManagementPage() {
       </Card>
 
       <Card className="border-border/50 overflow-hidden">
+        {isLoading ? (
+          <div className="p-5 bg-card">
+            <SkeletonTable rows={5} cols={11} />
+          </div>
+        ) : (
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -500,6 +512,7 @@ export function RoomStudentsManagementPage() {
             </TableBody>
           </Table>
         </div>
+        )}
         
         <div className="flex items-center justify-between border-t border-border/50 bg-muted/30 px-6 py-4">
           <div className="text-sm text-muted-foreground">

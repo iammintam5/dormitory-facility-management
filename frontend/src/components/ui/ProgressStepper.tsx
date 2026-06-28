@@ -22,7 +22,7 @@ export function ProgressStepper({ currentStatus }: ProgressStepperProps) {
     <div className="mb-6 rounded-2xl bg-background p-6 shadow-sm border border-border/50">
       <div className="relative flex justify-between">
         {/* Connecting Line */}
-        <div className="absolute left-0 top-1/2 -z-10 h-1 w-full -translate-y-1/2 bg-slate-100">
+        <div className="absolute left-0 top-1/2 -z-10 h-1 w-full -translate-y-1/2 bg-muted/50">
           <div 
             className="h-full bg-emerald-500 transition-all duration-500"
             style={{ width: `${(activeIndex / (STEPS.length - 1)) * 100}%` }}
@@ -39,7 +39,7 @@ export function ProgressStepper({ currentStatus }: ProgressStepperProps) {
                 className={`flex h-10 w-10 items-center justify-center rounded-full border-4 border-white font-bold transition-colors ${
                   isCompleted ? 'bg-emerald-500 text-white' :
                   isActive ? 'bg-emerald-100 text-emerald-600 ring-4 ring-emerald-50' :
-                  'bg-slate-100 text-slate-400'
+                  'bg-muted/50 text-muted-foreground'
                 }`}
               >
                 {isCompleted ? (
@@ -53,8 +53,8 @@ export function ProgressStepper({ currentStatus }: ProgressStepperProps) {
               <span 
                 className={`mt-3 text-sm font-semibold ${
                   isActive ? 'text-emerald-700' :
-                  isCompleted ? 'text-slate-700' :
-                  'text-slate-400'
+                  isCompleted ? 'text-foreground' :
+                  'text-muted-foreground'
                 }`}
               >
                 {step.label}

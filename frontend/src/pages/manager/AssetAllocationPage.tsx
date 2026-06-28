@@ -15,6 +15,7 @@ import { getApiErrorMessage } from '../../lib/api-client';
 import { useReactToPrint } from 'react-to-print';
 import { FilePdf, MagnifyingGlass } from '@phosphor-icons/react';
 
+import { SkeletonTable } from '../../components/ui/Skeleton';
 const receiptTemplates = {
   HANDOVER: {
     code: 'QL_BM1',
@@ -33,6 +34,8 @@ export function AssetAllocationPage() {
   const [activeTab, setActiveTab] = useState<'handover' | 'reclaim'>('handover');
   const [buildings, setBuildings] = useState<BuildingRecord[]>([]);
   const [rooms, setRooms] = useState<RoomRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isFetchingRoomAssets, setIsFetchingRoomAssets] = useState(false);
   
   // Handover state
   const [availableAssets, setAvailableAssets] = useState<AssetRecord[]>([]);
@@ -112,8 +115,11 @@ export function AssetAllocationPage() {
   };
 
   useEffect(() => {
-    getBuildings().then(res => setBuildings(res)).catch(console.error);
-    loadAvailableAssets();
+    setIsLoading(true);
+    Promise.all([
+      getBuildings().then(res => setBuildings(res)).catch(console.error),
+      loadAvailableAssets()
+    ]).finally(() => setIsLoading(false));
   }, []);
 
   const loadAvailableAssets = async () => {
@@ -145,11 +151,14 @@ export function AssetAllocationPage() {
       setRoomAssets([]);
       return;
     }
+    setIsFetchingRoomAssets(true);
     try {
       const res = await getAssets({ roomId: parseInt(roomId, 10), pageSize: 1000 });
       setRoomAssets(res.items);
     } catch (error) {
       console.error(error);
+    } finally {
+      setIsFetchingRoomAssets(false);
     }
   };
 
@@ -354,6 +363,11 @@ export function AssetAllocationPage() {
           </div>
 
           <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto mb-6">
+            {isLoading ? (
+              <div className="p-5 bg-card">
+                <SkeletonTable rows={5} cols={5} />
+              </div>
+            ) : (
             <Table>
               <TableHeader className="bg-muted/50 sticky top-0 z-10">
                 <TableRow>
@@ -389,6 +403,7 @@ export function AssetAllocationPage() {
                 )}
               </TableBody>
             </Table>
+            )}
           </div>
 
           <div className="flex justify-end">
@@ -462,6 +477,11 @@ export function AssetAllocationPage() {
           </div>
 
           <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto mb-6">
+            {isFetchingRoomAssets ? (
+              <div className="p-5 bg-card">
+                <SkeletonTable rows={5} cols={5} />
+              </div>
+            ) : (
             <Table>
               <TableHeader className="bg-muted/50 sticky top-0 z-10">
                 <TableRow>
@@ -497,6 +517,7 @@ export function AssetAllocationPage() {
                 )}
               </TableBody>
             </Table>
+            )}
           </div>
 
           <div className="flex justify-end">

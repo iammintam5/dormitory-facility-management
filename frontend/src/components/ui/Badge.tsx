@@ -21,7 +21,7 @@ type WorkflowStatusMeta = {
 };
 
 const toneClassNames: Record<BadgeTone, string> = {
-  slate: 'border-slate-200 bg-slate-100 text-slate-700',
+  slate: 'border-border bg-muted/50 text-foreground',
   amber: 'border-amber-200 bg-amber-100 text-amber-700',
   emerald: 'border-emerald-200 bg-emerald-100 text-emerald-700',
   sky: 'border-sky-200 bg-sky-100 text-sky-700',

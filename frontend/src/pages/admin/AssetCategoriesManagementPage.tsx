@@ -22,6 +22,7 @@ import {
 } from '@phosphor-icons/react';
 import { Card, CardContent } from '../../components/ui/Card';
 import { SummaryCard } from '../../components/ui/SummaryCard';
+import { SkeletonStatCard, SkeletonTable } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
@@ -160,22 +161,29 @@ export function AssetCategoriesManagementPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard 
-          label="Tổng loại thiết bị" 
-          value={String(totalCategories)} 
-          unit="loại" 
-          icon={<Folders size={24} weight="duotone" />} 
-          colorClass="text-blue-600 bg-blue-50 border-blue-100" 
-        />
-        <SummaryCard 
-          label="Thiết bị thuộc loại" 
-          value={totalAssets} 
-          unit="thiết bị" 
-          icon={<Folder size={24} weight="duotone" />} 
-          colorClass="text-purple-600 bg-purple-50 border-purple-100" 
-        />
-      </div>
+      {isLoading && categories.length === 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <SkeletonStatCard />
+          <SkeletonStatCard />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <SummaryCard 
+            label="Tổng loại thiết bị" 
+            value={String(totalCategories)} 
+            unit="loại" 
+            icon={<Folders size={24} weight="duotone" />} 
+            colorClass="text-blue-600 bg-blue-50 border-blue-100" 
+          />
+          <SummaryCard 
+            label="Thiết bị thuộc loại" 
+            value={totalAssets} 
+            unit="thiết bị" 
+            icon={<Folder size={24} weight="duotone" />} 
+            colorClass="text-purple-600 bg-purple-50 border-purple-100" 
+          />
+        </div>
+      )}
 
       <Card className="border-border/50">
         <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-end">
@@ -192,8 +200,8 @@ export function AssetCategoriesManagementPage() {
 
       <Card className="border-border/50 overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size={32} className="animate-spin text-primary" />
+          <div className="p-5 bg-card">
+            <SkeletonTable rows={5} cols={5} />
           </div>
         ) : (
           <Table>

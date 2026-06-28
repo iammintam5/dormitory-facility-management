@@ -1,4 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
+
+// Shared loading fallback for Suspense
+function PageLoader() {
+  return (
+    <div className="space-y-6 mx-auto max-w-7xl pb-10">
+      <div className="space-y-2 mb-6">
+        <div className="h-8 w-64 bg-muted animate-pulse rounded-md"></div>
+        <div className="h-4 w-96 bg-muted animate-pulse rounded-md"></div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="h-28 bg-muted animate-pulse rounded-xl"></div>
+        <div className="h-28 bg-muted animate-pulse rounded-xl"></div>
+        <div className="h-28 bg-muted animate-pulse rounded-xl"></div>
+        <div className="h-28 bg-muted animate-pulse rounded-xl"></div>
+      </div>
+      <div className="h-96 bg-muted animate-pulse rounded-xl mt-6"></div>
+    </div>
+  );
+}
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { PageTransition } from '../components/ui/PageTransition';
 import { useAuth } from '../auth/auth-context';
@@ -27,7 +46,11 @@ import {
   Star,
   GraduationCap,
   ClockCounterClockwise,
+  CaretLeft,
+  CaretRight
 } from '@phosphor-icons/react';
+import { NotificationPopover } from '../components/ui/NotificationPopover';
+import { UserDropdown } from '../components/ui/UserDropdown';
 
 type NavItem = {
   path: string;
@@ -74,8 +97,22 @@ export function DashboardLayout() {
   const location = useLocation();
   const { isDark, toggle: toggleDark } = useDarkMode();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('sidebar_collapsed') === 'true';
+    }
+    return false;
+  });
 
   const [pendingDamageCount, setPendingDamageCount] = useState(0);
+
+  const toggleDesktopSidebar = () => {
+    setIsDesktopCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('sidebar_collapsed', String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     getDashboardSummary().then(data => {
@@ -123,19 +160,22 @@ export function DashboardLayout() {
                   key={item.path}
                   to={`${basePath}/${item.path}`}
                   end={item.path === 'asset-transactions'}
+                  title={isDesktopCollapsed ? item.label : undefined}
                   className={({ isActive }) =>
-                    `group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-150 ${
+                    `group flex items-center gap-3 rounded-lg py-2.5 transition-all duration-150 ${
+                      isDesktopCollapsed ? 'justify-center px-0' : 'px-3'
+                    } ${
                       isActive
                         ? 'bg-primary text-primary-foreground shadow-sm'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     }`
                   }
                 >
-                  <Icon size={18} weight="duotone" className="shrink-0" />
-                  <span className="truncate">{item.label}</span>
+                  <Icon size={isDesktopCollapsed ? 22 : 18} weight={isDesktopCollapsed ? "regular" : "duotone"} className="shrink-0" />
+                  {!isDesktopCollapsed && <span className="truncate">{item.label}</span>}
                   {item.badge ? (
-                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-[10px] font-bold text-destructive-foreground">
-                      {item.badge}
+                    <span className={`flex items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground ${isDesktopCollapsed ? 'absolute right-1 top-1 h-3 w-3' : 'ml-auto h-5 min-w-5 px-1.5'}`}>
+                      {!isDesktopCollapsed && item.badge}
                     </span>
                   ) : null}
                 </NavLink>
@@ -148,7 +188,7 @@ export function DashboardLayout() {
   );
 
   return (
-    <div className="flex min-h-screen w-full flex-col bg-background font-sans text-foreground">
+    <div className="flex h-screen w-full flex-col bg-background font-sans text-foreground overflow-hidden">
       {/* Header */}
       <header className="sticky top-0 z-40 flex h-[60px] shrink-0 items-center justify-between border-b border-white/10 bg-[hsl(var(--header-bg))] px-4 text-white shadow-header print:hidden dark:border-border">
         <div className="flex items-center gap-3">
@@ -177,45 +217,38 @@ export function DashboardLayout() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Dark mode toggle */}
-          <button
-            onClick={toggleDark}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
-            aria-label={isDark ? 'Chuyển sang chế độ sáng' : 'Chuyển sang chế độ tối'}
-          >
-            {isDark ? <Sun size={18} weight="bold" /> : <Moon size={18} weight="bold" />}
-          </button>
+        <div className="flex items-center gap-2 sm:gap-4">
+          <NotificationPopover />
+          
+          <div className="h-6 w-px bg-white/20 hidden sm:block"></div>
 
-          {/* User info */}
-          <div className="hidden items-center gap-3 sm:flex">
-            <div className="flex flex-col items-end text-right">
-              <span className="text-xs font-semibold leading-tight">{user.fullName}</span>
-              <span className="text-[10px] text-white/60">{getHeaderSubtitle(user.role)}</span>
-            </div>
-            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-white/15 text-xs font-bold text-white backdrop-blur-sm">
-              {user.profile?.avatarUrl ? (
-                <img src={user.profile.avatarUrl} alt={user.fullName} className="h-full w-full object-cover" />
-              ) : (
-                user.fullName.charAt(0).toUpperCase()
-              )}
-            </div>
-          </div>
-
-          {/* Logout */}
-          <button
-            onClick={() => void handleLogout()}
-            className="flex h-9 items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 text-xs font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white"
-          >
-            <SignOut size={16} weight="bold" />
-            <span className="hidden sm:inline">Đăng xuất</span>
-          </button>
+          <UserDropdown 
+            user={user} 
+            basePath={basePath} 
+            onLogout={handleLogout} 
+            isDark={isDark} 
+            toggleDark={toggleDark} 
+            subtitle={getHeaderSubtitle(user.role)} 
+          />
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop Sidebar */}
-        <aside className="custom-scrollbar hidden w-60 shrink-0 overflow-y-auto border-r border-sidebar-border bg-sidebar-bg sm:flex sm:flex-col print:hidden">
+        <aside 
+          className={`[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] hidden shrink-0 overflow-y-auto border-r border-sidebar-border bg-sidebar-bg sm:flex sm:flex-col print:hidden transition-all duration-300 relative ${
+            isDesktopCollapsed ? 'w-[72px]' : 'w-64'
+          }`}
+        >
+          <div className="flex items-center justify-end px-2 py-2 border-b border-sidebar-border/50">
+             <button
+                onClick={toggleDesktopSidebar}
+                className="flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                aria-label={isDesktopCollapsed ? "Mở rộng menu" : "Thu gọn menu"}
+             >
+                {isDesktopCollapsed ? <CaretRight size={14} weight="bold" /> : <CaretLeft size={14} weight="bold" />}
+             </button>
+          </div>
           {sidebarContent}
         </aside>
 
@@ -228,7 +261,7 @@ export function DashboardLayout() {
               onClick={() => setIsMobileOpen(false)}
             />
             {/* Sidebar panel */}
-            <aside className="absolute inset-y-0 left-0 w-72 bg-sidebar-bg shadow-2xl animate-slide-in-right custom-scrollbar overflow-y-auto">
+            <aside className="absolute inset-y-0 left-0 w-72 bg-sidebar-bg shadow-2xl animate-slide-in-right overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               <div className="flex h-[60px] items-center justify-between border-b border-sidebar-border px-4">
                 <div className="flex items-center gap-2">
                   <img src="/Logo_PTIT_University_khong_khung.png" alt="PTIT" className="h-8 w-8 object-contain" />
@@ -247,9 +280,11 @@ export function DashboardLayout() {
         )}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto bg-background p-4 md:p-6 lg:p-8">
+        <main className="flex-1 overflow-auto bg-background p-4 md:p-6 lg:p-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <PageTransition>
-            <Outlet />
+            <Suspense fallback={<PageLoader />}>
+              <Outlet />
+            </Suspense>
           </PageTransition>
         </main>
       </div>

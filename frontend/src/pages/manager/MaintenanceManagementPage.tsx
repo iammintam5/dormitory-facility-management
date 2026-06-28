@@ -10,6 +10,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Pagination } from '../../components/ui/Pagination';
+import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { 
   Plus, 
@@ -328,41 +329,47 @@ export function MaintenanceManagementPage() {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
-              <Wrench size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tổng phiếu</p>
-              <p className="text-2xl font-bold text-foreground">{summaryCounts.total}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
-              <CheckCircle size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tốt</p>
-              <p className="text-2xl font-bold text-foreground">{summaryCounts.good}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-600 shrink-0">
-              <Package size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Đề nghị thanh lý</p>
-              <p className="text-2xl font-bold text-foreground">{summaryCounts.recommendLiquidation}</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {isFetching && records.length === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
+                <Wrench size={24} weight="duotone" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tổng phiếu</p>
+                <p className="text-2xl font-bold text-foreground">{summaryCounts.total}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
+                <CheckCircle size={24} weight="duotone" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tốt</p>
+                <p className="text-2xl font-bold text-foreground">{summaryCounts.good}</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-600 shrink-0">
+                <Package size={24} weight="duotone" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Đề nghị thanh lý</p>
+                <p className="text-2xl font-bold text-foreground">{summaryCounts.recommendLiquidation}</p>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card className="border-border/50">
         <CardContent className="p-5 flex flex-wrap gap-4 items-end">
@@ -423,9 +430,8 @@ export function MaintenanceManagementPage() {
 
         <div className="overflow-x-auto">
           {isFetching ? (
-            <div className="flex flex-col items-center justify-center p-10 gap-2 text-muted-foreground">
-              <ArrowsClockwise size={24} className="animate-spin text-primary" />
-              <span className="text-sm">Đang tải dữ liệu...</span>
+            <div className="px-5 py-4">
+              <SkeletonTable rows={10} cols={8} />
             </div>
           ) : (
             <table className="w-full text-sm text-left">
@@ -651,9 +657,9 @@ export function MaintenanceManagementPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-200/50">
-                <p className="text-xs font-bold text-slate-700 mb-2">Nội dung thực hiện</p>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap">{selectedRecord.content}</p>
+              <div className="rounded-xl bg-muted/30 p-4 ring-1 ring-inset ring-border">
+                <p className="text-xs font-bold text-foreground mb-2">Nội dung thực hiện</p>
+                <p className="text-sm text-foreground whitespace-pre-wrap">{selectedRecord.content}</p>
               </div>
 
               {selectedRecord.materialNote && (

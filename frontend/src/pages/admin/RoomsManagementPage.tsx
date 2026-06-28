@@ -34,7 +34,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 
 type RoomRecord = {
   id: string;
@@ -401,8 +401,19 @@ export function RoomsManagementPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner size={32} className="animate-spin text-primary" />
+      <div className="space-y-6 mx-auto max-w-7xl pb-10">
+        <PageHeader 
+          title="Phòng" 
+          description="Quản lý danh sách phòng và theo dõi tình trạng lưu trú."
+        />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+        <Card className="border-border/50">
+          <div className="p-5">
+            <SkeletonTable rows={10} cols={8} />
+          </div>
+        </Card>
       </div>
     );
   }

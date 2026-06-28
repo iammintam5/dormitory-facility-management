@@ -14,6 +14,7 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { SkeletonTable } from '../../components/ui/Skeleton';
 import { Pagination } from '../../components/ui/Pagination';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
@@ -142,8 +143,8 @@ export function AuditLogsPage() {
 
       <Card className="border-border/50 overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size={32} className="animate-spin text-primary" />
+          <div className="px-5 py-4">
+            <SkeletonTable rows={10} cols={6} />
           </div>
         ) : (
           <Table>
@@ -308,7 +309,7 @@ function AuditValueBlock({ label, value }: { label: string; value?: string | nul
   return (
     <div>
       <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
-      <pre className="max-h-64 overflow-auto rounded-lg border border-border/60 bg-slate-950 p-3 text-xs leading-relaxed text-slate-100">
+      <pre className="max-h-64 overflow-auto rounded-lg border border-border/60 bg-card p-3 text-xs leading-relaxed text-slate-100">
         {formatAuditValue(value)}
       </pre>
     </div>
