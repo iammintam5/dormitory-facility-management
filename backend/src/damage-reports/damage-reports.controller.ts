@@ -64,18 +64,6 @@ export class DamageReportsController {
     return this.service.transition(parseInt(id, 10), 'reject', userId);
   }
 
-  @Roles('MANAGER')
-  @Post(':id/start-processing')
-  async startProcessing(@Param('id') id: string, @CurrentUser('sub') userId: number) {
-    return this.service.transition(parseInt(id, 10), 'start-processing', userId);
-  }
-
-  @Roles('MANAGER')
-  @Post(':id/complete')
-  async complete(@Param('id') id: string, @CurrentUser('sub') userId: number) {
-    return this.service.transition(parseInt(id, 10), 'complete', userId);
-  }
-
   @Roles('STUDENT')
   @Patch(':id')
   async update(

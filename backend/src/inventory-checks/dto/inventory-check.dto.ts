@@ -1,5 +1,6 @@
-import { IsString, IsOptional, IsInt, IsArray, ValidateNested, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsInt, IsArray, ValidateNested, IsDateString, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
+import { DiscrepancyType } from '@prisma/client';
 
 export class CreateInventoryCheckDto {
   @IsInt()
@@ -36,6 +37,10 @@ export class InventoryCheckItemDto {
   @IsOptional()
   @IsString()
   actualCondition?: string;
+
+  @IsOptional()
+  @IsEnum(DiscrepancyType)
+  discrepancyType?: DiscrepancyType;
 
   @IsOptional()
   @IsString()

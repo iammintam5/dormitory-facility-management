@@ -6,18 +6,16 @@ import { AssetTransitionService } from '../assets/asset-transition.service';
 import { AssetStatus } from '@prisma/client';
 
 const WORKFLOW_MAP: Record<string, { newStatus: string; action: string }> = {
-  accept: { newStatus: 'REVIEWING', action: 'Tiếp nhận' },
+  accept: { newStatus: 'APPROVED', action: 'Tiếp nhận' },
   reject: { newStatus: 'REJECTED', action: 'Từ chối' },
-  'start-processing': { newStatus: 'IN_PROGRESS', action: 'Bắt đầu xử lý' },
-  complete: { newStatus: 'COMPLETED', action: 'Hoàn thành' },
   cancel: { newStatus: 'CANCELLED', action: 'Hủy phiếu' },
 };
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
   SUBMITTED: ['accept', 'reject', 'cancel'],
-  REVIEWING: ['start-processing', 'reject'],
-  IN_PROGRESS: ['complete'],
-  APPROVED: ['start-processing'],
+  REVIEWING: ['reject'],
+  APPROVED: ['reject'],
+  IN_PROGRESS: [],
   REJECTED: [],
   COMPLETED: [],
 };
@@ -58,6 +56,10 @@ export class DamageReportsService {
           damageReportLogs: {
             include: { createdByUser: { include: { role: true } } },
             orderBy: { createdAt: 'asc' },
+          },
+          maintenanceRecords: {
+            where: { status: 'IN_PROGRESS' },
+            select: { id: true, maintenanceCode: true }
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -129,6 +131,7 @@ export class DamageReportsService {
             }
           : undefined,
       })),
+      maintenanceRecords: r.maintenanceRecords || [],
     }));
 
     return {
@@ -152,6 +155,10 @@ export class DamageReportsService {
         damageReportLogs: {
           include: { createdByUser: { include: { role: true } } },
           orderBy: { createdAt: 'asc' },
+        },
+        maintenanceRecords: {
+          where: { status: 'IN_PROGRESS' },
+          select: { id: true, maintenanceCode: true }
         },
       },
     });
@@ -177,6 +184,7 @@ export class DamageReportsService {
       asset: report.asset,
       room: report.room,
       damageReportLogs: report.damageReportLogs,
+      maintenanceRecords: report.maintenanceRecords || [],
     };
   }
 
@@ -336,6 +344,10 @@ export class DamageReportsService {
           include: { createdByUser: { include: { role: true } } },
           orderBy: { createdAt: 'asc' },
         },
+        maintenanceRecords: {
+          where: { status: 'IN_PROGRESS' },
+          select: { id: true, maintenanceCode: true }
+        },
       },
     });
 
@@ -401,6 +413,10 @@ export class DamageReportsService {
             include: { createdByUser: { include: { role: true } } },
             orderBy: { createdAt: 'asc' as const },
           },
+          maintenanceRecords: {
+            where: { status: 'IN_PROGRESS' },
+            select: { id: true, maintenanceCode: true }
+          },
         },
       });
 
@@ -415,24 +431,6 @@ export class DamageReportsService {
           damageReportId: id,
         },
       });
-
-      // When processing starts, set asset to UNDER_MAINTENANCE
-      if (action === 'start-processing' && report.assetId) {
-        await this.assetTransitionService.transition(tx, report.assetId, AssetStatus.UNDER_MAINTENANCE, {
-          action: 'BẮT_ĐẦU_SỬA_CHỮA',
-          userId,
-          note: `Bắt đầu sửa chữa theo báo hỏng #${report.reportCode}`,
-        });
-      }
-
-      // When completed, set asset back to IN_USE
-      if (action === 'complete' && report.assetId) {
-        await this.assetTransitionService.transition(tx, report.assetId, AssetStatus.IN_USE, {
-          action: 'KẾT_THÚC_BÁO_HỎNG',
-          userId,
-          note: `Hoàn thành báo hỏng #${report.reportCode}`,
-        });
-      }
 
       // When rejected, just create history entry
       if (action === 'reject' && report.assetId) {
@@ -457,6 +455,19 @@ export class DamageReportsService {
         oldValue: report.status,
         newValue: workflow.newStatus,
       });
+
+      // Bắn Notification cho sinh viên (reporter)
+      if (report.reporterId) {
+        await tx.notification.create({
+          data: {
+            userId: report.reporterId,
+            title: `Cập nhật báo hỏng ${report.reportCode}`,
+            content: `Phiếu báo hỏng của bạn đã được ${workflow.action.toLowerCase()}. Trạng thái mới: ${workflow.newStatus}`,
+            relatedTable: 'damage_reports',
+            relatedId: id,
+          }
+        });
+      }
 
       return updatedReport;
     });
