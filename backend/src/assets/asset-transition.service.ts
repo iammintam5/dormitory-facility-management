@@ -13,15 +13,20 @@ export type TransitionContext = {
 export class AssetTransitionService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Centralized Matrix
+  // Centralized Matrix – LIQUIDATED chỉ đạt được qua COMPLETE_APPROVED_LIQUIDATION
   private readonly ALLOWED_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
-    [AssetStatus.AVAILABLE]: [AssetStatus.IN_USE, AssetStatus.PENDING_LIQUIDATION, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE, AssetStatus.LIQUIDATED],
+    [AssetStatus.AVAILABLE]: [AssetStatus.IN_USE, AssetStatus.PENDING_LIQUIDATION, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE],
     [AssetStatus.IN_USE]: [AssetStatus.AVAILABLE, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE],
     [AssetStatus.UNDER_MAINTENANCE]: [AssetStatus.AVAILABLE, AssetStatus.IN_USE, AssetStatus.DAMAGED, AssetStatus.PENDING_LIQUIDATION],
     [AssetStatus.DAMAGED]: [AssetStatus.AVAILABLE, AssetStatus.UNDER_MAINTENANCE, AssetStatus.PENDING_LIQUIDATION],
-    [AssetStatus.PENDING_LIQUIDATION]: [AssetStatus.LIQUIDATED, AssetStatus.AVAILABLE],
+    [AssetStatus.PENDING_LIQUIDATION]: [AssetStatus.LIQUIDATED, AssetStatus.AVAILABLE, AssetStatus.IN_USE, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE],
     [AssetStatus.LIQUIDATED]: [], // Terminal state
   };
+
+  // Restore paths chỉ dùng cho liquidation reject/cancel
+  private readonly RESTORE_ONLY_TARGETS = new Set<AssetStatus>([
+    AssetStatus.IN_USE, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE,
+  ]);
 
   async transition(
     tx: Prisma.TransactionClient,
@@ -37,6 +42,18 @@ export class AssetTransitionService {
     // Check matrix
     if (currentStatus !== newStatus && !this.ALLOWED_TRANSITIONS[currentStatus].includes(newStatus)) {
       throw new ConflictException(`Không thể chuyển trạng thái tài sản từ ${currentStatus} sang ${newStatus}.`);
+    }
+
+    // Restore paths (PENDING_LIQUIDATION → IN_USE/DAMAGED/UNDER_MAINTENANCE) chỉ cho phép qua liquidation reject/cancel
+    if (currentStatus === AssetStatus.PENDING_LIQUIDATION && this.RESTORE_ONLY_TARGETS.has(newStatus)) {
+      if (context.action !== 'RESTORE_FROM_LIQUIDATION') {
+        throw new ConflictException(`Chỉ có thể khôi phục trạng thái ${newStatus} từ PENDING_LIQUIDATION thông qua luồng thanh lý.`);
+      }
+    }
+
+    // LIQUIDATED chỉ đạt được qua complete approved liquidation
+    if (newStatus === AssetStatus.LIQUIDATED && context.action !== 'ĐÃ_THANH_LÝ') {
+      throw new ConflictException('Trạng thái LIQUIDATED chỉ có thể đạt được thông qua hoàn tất hồ sơ thanh lý đã được duyệt.');
     }
 
     // Check Location Integrity
@@ -78,7 +95,7 @@ export class AssetTransitionService {
 
     const updatedAsset = { ...asset, status: newStatus, roomId: targetRoomId };
 
-    // Write history
+    // Write history with actor
     if (currentStatus !== newStatus || asset.roomId !== targetRoomId) {
       await tx.assetHistory.create({
         data: {
@@ -89,6 +106,7 @@ export class AssetTransitionService {
           newRoomId: targetRoomId,
           note: context.note,
           assetId: asset.id,
+          performedById: context.userId || null,
         },
       });
     }

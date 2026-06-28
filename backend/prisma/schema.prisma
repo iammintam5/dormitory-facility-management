@@ -130,6 +130,7 @@ model User {
   councilMemberships          CouncilMember[]
   notifications               Notification[]
   auditLogs                   AuditLog[]
+  performedAssetHistories     AssetHistory[]
 
   @@map("users")
 }
@@ -179,6 +180,7 @@ model Floor {
 
   rooms Room[]
 
+  @@unique([buildingId, floorNumber], map: "floors_building_floor_unique")
   @@map("floors")
 }
 
@@ -264,6 +266,7 @@ model Asset {
   receiptItems        AssetReceiptItem[]
   normalizedSearch    NormalizedSearch?
 
+  @@index([status, roomId], map: "idx_assets_status_room_id")
   @@map("assets")
 }
 
@@ -280,6 +283,10 @@ model AssetHistory {
   assetId Int
   asset   Asset @relation(fields: [assetId], references: [id], onDelete: Restrict)
 
+  performedById Int?
+  performedBy   User? @relation(fields: [performedById], references: [id])
+
+  @@index([assetId, createdAt(sort: Desc)], map: "idx_asset_histories_asset_id")
   @@map("asset_histories")
 }
 
@@ -308,6 +315,7 @@ model DamageReport {
 
   damageReportLogs DamageReportLog[]
 
+  @@index([assetId, status], map: "idx_damage_reports_asset_status")
   @@map("damage_reports")
 }
 
@@ -406,6 +414,7 @@ model InventoryCheckItem {
   systemQuantity  Int     @default(1)
   actualQuantity  Int     @default(1)
   difference      Int     @default(0)
+  isChecked       Boolean @default(false)
   actualCondition String?
   note            String?
 
@@ -415,6 +424,8 @@ model InventoryCheckItem {
   assetId Int
   asset   Asset @relation(fields: [assetId], references: [id])
 
+  @@unique([inventoryCheckId, assetId], map: "inventory_check_items_unique")
+  @@index([assetId], map: "idx_inventory_check_items_asset")
   @@map("inventory_check_items")
 }
 
@@ -437,6 +448,7 @@ model LiquidationRecord {
   liquidationItems LiquidationItem[]
   councilMembers   CouncilMember[]
 
+  @@index([status], map: "idx_liquidation_records_status")
   @@map("liquidation_records")
 }
 
@@ -452,6 +464,8 @@ model LiquidationItem {
   assetId Int
   asset   Asset @relation(fields: [assetId], references: [id])
 
+  @@unique([liquidationRecordId, assetId], map: "liquidation_items_unique")
+  @@index([assetId], map: "idx_liquidation_items_asset_id")
   @@map("liquidation_items")
 }
 
@@ -491,6 +505,7 @@ model Notification {
   userId Int
   user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([userId, status], map: "idx_notifications_user_status")
   @@map("notifications")
 }
 
@@ -568,5 +583,7 @@ model AssetReceiptItem {
   assetId Int
   asset   Asset @relation(fields: [assetId], references: [id])
 
+  @@unique([receiptId, assetId], map: "asset_receipt_items_unique")
+  @@index([assetId], map: "idx_asset_receipt_items_asset")
   @@map("asset_receipt_items")
 }

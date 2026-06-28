@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ReceiptType, AssetStatus } from '@prisma/client';
+import { ReceiptType, AssetStatus, LiquidationStatus } from '@prisma/client';
 import { generateCode } from '../common/utils/code-generator';
 import { AssetTransitionService } from '../assets/asset-transition.service';
 
@@ -283,13 +283,30 @@ export class AssetReceiptsService {
 
       for (const item of uniqueItems) {
         const assetId = parseInt(item.id, 10);
-        
-        // Use Transition Service - PENDING_LIQUIDATION -> LIQUIDATED and AVAILABLE -> LIQUIDATED are allowed
+
+        // Verify asset has an approved liquidation record before allowing export
+        const approvedLiquidation = await prisma.liquidationItem.findFirst({
+          where: {
+            assetId,
+            liquidationRecord: {
+              status: LiquidationStatus.APPROVED,
+            },
+          },
+          include: { liquidationRecord: { select: { liquidationCode: true } } },
+        });
+
+        if (!approvedLiquidation) {
+          throw new BadRequestException(
+            `Tài sản ID ${assetId} chưa có hồ sơ thanh lý được duyệt. Không thể xuất kho trực tiếp.`
+          );
+        }
+
+        // Use Transition Service - only PENDING_LIQUIDATION -> LIQUIDATED via ĐÃ_THANH_LÝ action
         await this.assetTransitionService.transition(prisma, assetId, AssetStatus.LIQUIDATED, {
-          action: 'XUẤT_KHO',
+          action: 'ĐÃ_THANH_LÝ',
           userId,
           newRoomId: null,
-          note: `Xuất thiết bị theo phiếu ${receiptCode}. Lý do: ${reason}`,
+          note: `Xuất thiết bị theo phiếu ${receiptCode}, hồ sơ thanh lý #${approvedLiquidation.liquidationRecord.liquidationCode}. Lý do: ${reason}`,
         });
 
         // Create Receipt Item

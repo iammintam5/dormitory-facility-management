@@ -534,8 +534,8 @@ export function AssetsManagementPage() {
               </Select>
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-foreground">Tình trạng vật lý</label>
-              <Select {...form.register('condition')}>
+              <label className="mb-1.5 block text-sm font-medium text-foreground">Tình trạng vật lý <span className="text-muted-foreground text-xs font-normal ml-1">(chỉ xem)</span></label>
+              <Select {...form.register('condition')} disabled className="bg-muted">
                 <option value="GOOD">Tốt</option>
                 <option value="NEED_CHECK">Cần kiểm tra</option>
                 <option value="DAMAGED">Hỏng</option>

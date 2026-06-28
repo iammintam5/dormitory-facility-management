@@ -286,11 +286,13 @@ export class LiquidationRecordsService {
             orderBy: { createdAt: 'desc' },
           });
           const revertStatus = (lastHistory?.oldStatus ?? AssetStatus.AVAILABLE) as AssetStatus;
+          const revertRoomId = lastHistory?.oldRoomId ?? null;
 
           await this.assetTransitionService.transition(tx, li.assetId, revertStatus, {
-            action: 'HỦY_THANH_LÝ',
+            action: 'RESTORE_FROM_LIQUIDATION',
             userId,
-            note: `Hủy thanh lý theo hồ sơ #${updatedRecord.liquidationCode}`,
+            newRoomId: revertRoomId,
+            note: `Từ chối thanh lý theo hồ sơ #${updatedRecord.liquidationCode} - khôi phục trạng thái ${revertStatus}`,
           });
         }
 
@@ -340,11 +342,13 @@ export class LiquidationRecordsService {
               orderBy: { createdAt: 'desc' },
             });
             const revertStatus = (lastHistory?.oldStatus ?? AssetStatus.AVAILABLE) as AssetStatus;
+            const revertRoomId = lastHistory?.oldRoomId ?? null;
 
             await this.assetTransitionService.transition(tx, li.assetId, revertStatus, {
-              action: 'HỦY_THANH_LÝ',
+              action: 'RESTORE_FROM_LIQUIDATION',
               userId,
-              note: `Hủy hồ sơ thanh lý #${updatedRecord.liquidationCode}`,
+              newRoomId: revertRoomId,
+              note: `Hủy hồ sơ thanh lý #${updatedRecord.liquidationCode} - khôi phục trạng thái ${revertStatus}`,
             });
           }
         }

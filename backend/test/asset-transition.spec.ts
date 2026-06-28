@@ -61,18 +61,31 @@ describe('AssetTransitionService', () => {
       expect(result.roomId).toBe(5);
     });
 
-    it('should allow AVAILABLE -> LIQUIDATED for direct export/disposal', async () => {
+    it('should throw ConflictException for AVAILABLE -> LIQUIDATED direct transition', async () => {
       const { tx, setAsset } = createMockTx();
       setAsset(1, { id: 1, status: AssetStatus.AVAILABLE, roomId: null });
 
-      const result = await service.transition(tx, 1, AssetStatus.LIQUIDATED, {
-        action: 'XUẤT_KHO',
+      await expect(
+        service.transition(tx, 1, AssetStatus.LIQUIDATED, {
+          action: 'XUẤT_KHO',
+          userId: 1,
+          newRoomId: null,
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should allow PENDING_LIQUIDATION -> IN_USE via RESTORE_FROM_LIQUIDATION action', async () => {
+      const { tx, setAsset } = createMockTx();
+      setAsset(1, { id: 1, status: AssetStatus.PENDING_LIQUIDATION, roomId: null });
+
+      const result = await service.transition(tx, 1, AssetStatus.IN_USE, {
+        action: 'RESTORE_FROM_LIQUIDATION',
         userId: 1,
-        newRoomId: null,
+        newRoomId: 5,
       });
 
-      expect(result.status).toBe(AssetStatus.LIQUIDATED);
-      expect(result.roomId).toBeNull();
+      expect(result.status).toBe(AssetStatus.IN_USE);
+      expect(result.roomId).toBe(5);
     });
 
     it('should throw ConflictException for IN_USE room change without ĐIỀU_CHUYỂN action', async () => {
@@ -143,7 +156,7 @@ describe('AssetTransitionService', () => {
       // Second transition tries to update from old state (AVAILABLE) which no longer matches
       // This simulates what would happen in a concurrent scenario
       await expect(
-        service.transition(tx, 1, AssetStatus.LIQUIDATED, {
+        service.transition(tx, 1, AssetStatus.PENDING_LIQUIDATION, {
           action: 'THANH_LÝ',
           userId: 1,
           newRoomId: null,
