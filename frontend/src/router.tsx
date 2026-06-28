@@ -8,6 +8,8 @@ import { RoleRoute } from './routes/RoleRoute';
 // LoginPage is statically imported as it's the entry point
 import { LoginPage } from './pages/LoginPage';
 
+import { NotFoundPage } from './pages/NotFoundPage';
+
 // Lazy-loaded page components for code splitting
 const AdminDashboardPage = React.lazy(() => import('./pages/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
 const ChangePasswordPage = React.lazy(() => import('./pages/ChangePasswordPage').then(m => ({ default: m.ChangePasswordPage })));
@@ -100,5 +102,5 @@ export const router = createBrowserRouter([
           },
     ],
   },
-  { path: '*', element: <Navigate to="/" replace /> },
+  { path: '*', element: <NotFoundPage /> },
 ]);
