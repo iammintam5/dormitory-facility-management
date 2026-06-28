@@ -69,10 +69,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               'border-border'
             }`}
           >
-            {toast.tone === 'success' && <CheckCircle className="h-5 w-5 text-emerald-500 shrink-0" weight="fill" />}
-            {toast.tone === 'error' && <XCircle className="h-5 w-5 text-rose-500 shrink-0" weight="fill" />}
-            {toast.tone === 'warning' && <WarningCircle className="h-5 w-5 text-amber-500 shrink-0" weight="fill" />}
-            {toast.tone === 'info' && <Info className="h-5 w-5 text-blue-500 shrink-0" weight="fill" />}
+            {toast.tone === 'success' && <CheckCircle className="h-5 w-5 text-success shrink-0" weight="fill" />}
+            {toast.tone === 'error' && <XCircle className="h-5 w-5 text-destructive shrink-0" weight="fill" />}
+            {toast.tone === 'warning' && <WarningCircle className="h-5 w-5 text-warning shrink-0" weight="fill" />}
+            {toast.tone === 'info' && <Info className="h-5 w-5 text-info shrink-0" weight="fill" />}
             {toast.tone === 'loading' && <Spinner className="h-5 w-5 text-muted-foreground shrink-0 animate-spin" />}
             <p className="text-sm font-medium leading-relaxed">{toast.message}</p>
             <button

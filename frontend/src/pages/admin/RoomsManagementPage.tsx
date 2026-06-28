@@ -34,7 +34,15 @@ import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
-import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { SkeletonStatCard, SkeletonTable } from '../../components/ui/Skeleton';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SearchInput } from '../../components/ui/SearchInput';
+import { FilterBar } from '../../components/ui/FilterBar';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { AlertDialog } from '../../components/ui/AlertDialog';
+import { useDebounce } from '../../hooks/useDebounce';
 
 type RoomRecord = {
   id: string;
@@ -108,6 +116,7 @@ export function RoomsManagementPage() {
   const [isSearchingStudents, setIsSearchingStudents] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [assigningStudentId, setAssigningStudentId] = useState<number | null>(null);
+  const [removeStudentTarget, setRemoveStudentTarget] = useState<number | null>(null);
 
   // Transfer student states
   const [transferStudent, setTransferStudent] = useState<{
@@ -124,6 +133,7 @@ export function RoomsManagementPage() {
 
   // Filter states
   const [searchKeyword, setSearchKeyword] = useState('');
+  const debouncedKeyword = useDebounce(searchKeyword, 400);
   const [buildingFilter, setBuildingFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [studentFilter, setStudentFilter] = useState('');
@@ -185,8 +195,8 @@ export function RoomsManagementPage() {
   const filteredRooms = useMemo(() => {
     return rooms.filter(room => {
       // Search keyword
-      if (searchKeyword) {
-        const kw = searchKeyword.toLowerCase();
+      if (debouncedKeyword) {
+        const kw = debouncedKeyword.toLowerCase();
         const matchCode = room.roomCode.toLowerCase().includes(kw);
         const matchName = room.name?.toLowerCase().includes(kw);
         const matchBuilding = room.buildingName?.toLowerCase().includes(kw);
@@ -201,7 +211,7 @@ export function RoomsManagementPage() {
       if (studentFilter === 'Chưa đầy' && room.currentStudents >= room.capacity) return false;
       return true;
     });
-  }, [rooms, searchKeyword, buildingFilter, statusFilter, studentFilter]);
+  }, [rooms, debouncedKeyword, buildingFilter, statusFilter, studentFilter]);
 
   const openAddModal = () => {
     setSelectedRoom(null);
@@ -382,14 +392,17 @@ export function RoomsManagementPage() {
     }
   }
 
-  async function handleRemove(studentId: number) {
-    if (!detailRoom) return;
+  async function executeRemoveStudent() {
+    if (!detailRoom || !removeStudentTarget) return;
     try {
-      await removeStudentFromRoom(Number(detailRoom.id), studentId);
+      await removeStudentFromRoom(Number(detailRoom.id), removeStudentTarget);
       showToast('Đã xóa sinh viên khỏi phòng.', 'success');
       await loadStudents(detailRoom.id);
+      await loadRooms();
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Xóa sinh viên thất bại.'), 'error');
+    } finally {
+      setRemoveStudentTarget(null);
     }
   }
 
@@ -469,143 +482,155 @@ export function RoomsManagementPage() {
         />
       </div>
 
-      <Card className="border-border/50">
-        <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
-            <div className="relative">
-              <Input 
-                placeholder="Nhập mã phòng, tên phòng..."
-                className="pl-9"
-                value={searchKeyword}
-                onChange={(e) => setSearchKeyword(e.target.value)}
-              />
-              <MagnifyingGlass size={16} className="absolute left-3 top-2.5 text-muted-foreground" />
-            </div>
-          </div>
-          <div className="w-full md:w-[150px]">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Khu nhà</label>
-            <Select value={buildingFilter} onChange={(e) => setBuildingFilter(e.target.value)}>
-              <option value="">Tất cả</option>
+      <FilterBar 
+        searchNode={
+          <SearchInput
+            value={searchKeyword}
+            onChange={setSearchKeyword}
+            placeholder="Nhập mã phòng, tên phòng..."
+            aria-label="Tìm kiếm phòng"
+          />
+        }
+        filterNode={
+          <>
+            <Select value={buildingFilter} onChange={(e) => setBuildingFilter(e.target.value)} aria-label="Lọc theo khu nhà">
+              <option value="">Tất cả khu nhà</option>
               {buildings.map(b => (
                 <option key={b.id} value={b.code}>{b.name}</option>
               ))}
             </Select>
-          </div>
-          <div className="w-full md:w-[150px]">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Trạng thái sử dụng</label>
-            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-              <option value="">Tất cả</option>
-              <option>Đang sử dụng</option>
-              <option>Còn trống</option>
+
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Lọc theo trạng thái sử dụng">
+              <option value="">Tất cả trạng thái</option>
+              <option value="Đang sử dụng">Đang sử dụng</option>
+              <option value="Còn trống">Còn trống</option>
             </Select>
-          </div>
-          <div className="w-full md:w-[150px]">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Số sinh viên</label>
-            <Select value={studentFilter} onChange={(e) => setStudentFilter(e.target.value)}>
-              <option value="">Tất cả</option>
-              <option>Đầy</option>
-              <option>Chưa đầy</option>
+
+            <Select value={studentFilter} onChange={(e) => setStudentFilter(e.target.value)} aria-label="Lọc theo số sinh viên">
+              <option value="">Tất cả số sinh viên</option>
+              <option value="Đầy">Đầy</option>
+              <option value="Chưa đầy">Chưa đầy</option>
             </Select>
-          </div>
-          
-          <div className="flex w-full items-center gap-2 md:w-auto">
-            <Button className="flex-1 gap-2 md:flex-none" onClick={() => {
-              setSearchKeyword('');
-              setBuildingFilter('');
-              setStatusFilter('');
-              setStudentFilter('');
-            }}>
-              <ArrowsClockwise size={16} weight="bold" />
-              Làm mới
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+        appliedFilterCount={[
+          buildingFilter,
+          statusFilter,
+          studentFilter
+        ].filter(Boolean).length}
+        onResetFilters={() => {
+          setSearchKeyword('');
+          setBuildingFilter('');
+          setStatusFilter('');
+          setStudentFilter('');
+        }}
+        filterChips={[
+          ...(buildingFilter ? [{ id: 'building', label: `Khu: ${buildings.find(b => b.code === buildingFilter)?.name}`, onRemove: () => setBuildingFilter('') }] : []),
+          ...(statusFilter ? [{ id: 'status', label: `Trạng thái: ${statusFilter}`, onRemove: () => setStatusFilter('') }] : []),
+          ...(studentFilter ? [{ id: 'student', label: `Số SV: ${studentFilter}`, onRemove: () => setStudentFilter('') }] : []),
+        ]}
+      />
 
       <Card className="border-border/50 overflow-hidden">
         {isFetching ? (
           <div className="flex items-center justify-center py-16">
             <Spinner size={24} className="animate-spin text-primary" />
           </div>
-        ) : (
-          <>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-16 text-center">STT</TableHead>
-                  <TableHead>Mã phòng</TableHead>
-                  <TableHead>Tên phòng</TableHead>
-                  <TableHead className="text-center">Khu nhà</TableHead>
-                  <TableHead className="text-center">Tầng</TableHead>
-                  <TableHead className="text-center">Sức chứa</TableHead>
-                  <TableHead className="text-center">SV hiện tại</TableHead>
-                  <TableHead className="text-center">Trạng thái</TableHead>
-                  <TableHead>Tình trạng</TableHead>
-                  <TableHead className="w-32 text-center">Thao tác</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRooms.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">Không có dữ liệu phòng</TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRooms.map((room, idx) => (
-                    <TableRow key={room.id}>
-                      <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="font-bold text-foreground">{room.roomCode}</TableCell>
-                      <TableCell className="font-medium text-foreground">{room.name}</TableCell>
-                      <TableCell className="text-center text-muted-foreground">{room.buildingName}</TableCell>
-                      <TableCell className="text-center tabular-nums">{room.floorNumber}</TableCell>
-                      <TableCell className="text-center tabular-nums">{room.capacity}</TableCell>
-                      <TableCell className="text-center tabular-nums">{room.currentStudents}</TableCell>
-                      <TableCell className="text-center">
+        ) : filteredRooms.length === 0 ? (
+          <div className="p-10">
+                <EmptyState 
+                  title="Không tìm thấy phòng" 
+                  description="Chưa có phòng nào phù hợp với bộ lọc hiện tại."
+                />
+              </div>
+            ) : (
+              <>
+                <div className="hidden lg:block">
+                  <Table aria-label="Danh sách phòng">
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="w-16 text-center">STT</TableHead>
+                        <TableHead>Mã phòng</TableHead>
+                        <TableHead>Tên phòng</TableHead>
+                        <TableHead className="text-center">Khu nhà</TableHead>
+                        <TableHead className="text-center">Tầng</TableHead>
+                        <TableHead className="text-center">Sức chứa</TableHead>
+                        <TableHead className="text-center">SV hiện tại</TableHead>
+                        <TableHead className="text-center">Trạng thái</TableHead>
+                        <TableHead>Tình trạng</TableHead>
+                        <TableHead className="w-24 text-center">Thao tác</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredRooms.map((room, idx) => (
+                        <TableRow key={room.id}>
+                          <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
+                          <TableCell className="font-bold text-foreground">{room.roomCode}</TableCell>
+                          <TableCell className="font-medium text-foreground">{room.name}</TableCell>
+                          <TableCell className="text-center text-muted-foreground">{room.buildingName}</TableCell>
+                          <TableCell className="text-center tabular-nums">{room.floorNumber}</TableCell>
+                          <TableCell className="text-center tabular-nums">{room.capacity}</TableCell>
+                          <TableCell className="text-center tabular-nums">{room.currentStudents}</TableCell>
+                          <TableCell className="text-center">
+                            <span className={`inline-flex min-w-[90px] items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${
+                              room.status === 'Đang sử dụng' ? 'bg-success-muted text-success' :
+                              room.status === 'Còn trống' ? 'bg-blue-100 text-blue-700' :
+                              'bg-destructive-muted text-destructive'
+                            }`}>
+                              {room.status === 'Còn trống' ? 'Phòng trống' : room.status}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{room.conditionLabel || room.condition}</TableCell>
+                          <TableCell className="text-center">
+                            <RowActionsMenu
+                              ariaLabel={`Thao tác phòng ${room.roomCode}`}
+                              actions={[
+                                { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => { setDetailRoom(room); setIsDetailOpen(true); loadStudents(room.id); setStudentSearchQuery(''); setStudentSearchResults([]); } },
+                                { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(room) },
+                                { id: 'delete', label: 'Xóa', icon: <Trash size={16} />, variant: 'destructive', onClick: () => handleDelete(room) }
+                              ]}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+                <div className="lg:hidden flex flex-col gap-3 p-3">
+                  {filteredRooms.map((room) => (
+                    <MobileDataCard
+                      key={room.id}
+                      title={room.name || room.roomCode}
+                      subtitle={`Phòng ${room.roomCode}`}
+                      statusBadge={
                         <span className={`inline-flex min-w-[90px] items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${
-                          room.status === 'Đang sử dụng' ? 'bg-emerald-100 text-emerald-700' :
+                          room.status === 'Đang sử dụng' ? 'bg-success-muted text-success' :
                           room.status === 'Còn trống' ? 'bg-blue-100 text-blue-700' :
-                          'bg-rose-100 text-rose-700'
+                          'bg-destructive-muted text-destructive'
                         }`}>
                           {room.status === 'Còn trống' ? 'Phòng trống' : room.status}
                         </span>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{room.conditionLabel || room.condition}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => { setDetailRoom(room); setIsDetailOpen(true); loadStudents(room.id); setStudentSearchQuery(''); setStudentSearchResults([]); }} title="Xem chi tiết">
-                            <Eye size={16} className="text-muted-foreground" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => openEditModal(room)} title="Sửa">
-                            <PencilSimple size={16} className="text-muted-foreground" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(room)} title="Xóa">
-                            <Trash size={16} className="text-rose-500" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-            
-            <div className="flex items-center justify-between border-t border-border/50 bg-muted/30 px-6 py-4">
-              <div className="text-sm text-muted-foreground">
-                Hiển thị 1 - {filteredRooms.length} / {rooms.length} kết quả
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" disabled className="gap-1">
-                  <CaretLeft size={16} />
-                  Trước
-                </Button>
-                <Button variant="outline" size="sm" disabled className="gap-1">
-                  Sau
-                  <CaretRight size={16} />
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
+                      }
+                      actionMenu={
+                        <RowActionsMenu
+                          ariaLabel={`Thao tác phòng ${room.roomCode}`}
+                          actions={[
+                            { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => { setDetailRoom(room); setIsDetailOpen(true); loadStudents(room.id); setStudentSearchQuery(''); setStudentSearchResults([]); } },
+                            { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(room) },
+                            { id: 'delete', label: 'Xóa', icon: <Trash size={16} />, variant: 'destructive', onClick: () => handleDelete(room) }
+                          ]}
+                        />
+                      }
+                    >
+                      <DataLabel label="Khu nhà" value={room.buildingName || ''} />
+                      <DataLabel label="Tầng" value={String(room.floorNumber)} />
+                      <DataLabel label="Sinh viên" value={`${room.currentStudents} / ${room.capacity}`} />
+                      <DataLabel label="Tình trạng" value={room.conditionLabel || room.condition} />
+                    </MobileDataCard>
+                  ))}
+                </div>
+              </>
+            )}
       </Card>
 
       <Modal 
@@ -754,22 +779,14 @@ export function RoomsManagementPage() {
         </form>
       </Modal>
 
-      <Modal
+      <AlertDialog
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         title="Xác nhận xóa"
-        size="sm"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Hủy</Button>
-            <Button variant="destructive" onClick={() => void confirmDelete()}>Xóa phòng</Button>
-          </>
-        }
-      >
-        <p className="py-4 text-sm leading-6 text-muted-foreground">
-          {deleteTarget ? `Phòng ${deleteTarget.roomCode} sẽ bị xóa khỏi danh sách. Bạn có chắc chắn?` : ''}
-        </p>
-      </Modal>
+        description={deleteTarget ? `Phòng ${deleteTarget.roomCode} sẽ bị xóa khỏi danh sách. Hành động này không thể hoàn tác. Bạn có chắc chắn?` : ''}
+        confirmText="Xóa phòng"
+        onConfirm={() => void confirmDelete()}
+      />
 
       {/* Transfer Student Modal */}
       <Modal
@@ -954,7 +971,7 @@ export function RoomsManagementPage() {
                         <Button 
                           variant="ghost" 
                           size="icon"
-                          onClick={() => handleRemove(s.id)}
+                          onClick={() => setRemoveStudentTarget(s.id)}
                           title="Xóa khỏi phòng"
                           className="text-rose-500 hover:text-rose-600 hover:bg-rose-50"
                         >
@@ -1030,6 +1047,16 @@ export function RoomsManagementPage() {
           </div>
         )}
       </Modal>
+
+      {/* Remove Student Confirm Dialog */}
+      <AlertDialog
+        isOpen={!!removeStudentTarget}
+        onClose={() => setRemoveStudentTarget(null)}
+        title="Xác nhận xóa sinh viên"
+        description="Bạn có chắc chắn muốn xóa sinh viên này khỏi phòng? Hành động này không thể hoàn tác."
+        confirmText="Xóa sinh viên"
+        onConfirm={() => void executeRemoveStudent()}
+      />
     </div>
   );
 }

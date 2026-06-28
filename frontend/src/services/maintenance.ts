@@ -65,7 +65,7 @@ export async function createMaintenanceRecord(payload: {
   materialNote?: string;
   note?: string;
   damageReportId?: number;
-  inventoryItemId?: number;
+
 }) {
   const response = await apiClient.post('/maintenance/records', payload);
   return unwrapApiResponse<MaintenanceRecord>(response.data);

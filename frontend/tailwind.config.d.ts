@@ -20,6 +20,8 @@ declare const _default: {
                 destructive: {
                     DEFAULT: string;
                     foreground: string;
+                    muted: string;
+                    border: string;
                 };
                 muted: {
                     DEFAULT: string;
@@ -40,6 +42,43 @@ declare const _default: {
                 sidebar: {
                     bg: string;
                     border: string;
+                    active: string;
+                    'active-foreground': string;
+                    hover: string;
+                };
+                success: {
+                    DEFAULT: string;
+                    foreground: string;
+                    muted: string;
+                    border: string;
+                };
+                warning: {
+                    DEFAULT: string;
+                    foreground: string;
+                    muted: string;
+                    border: string;
+                };
+                info: {
+                    DEFAULT: string;
+                    foreground: string;
+                    muted: string;
+                    border: string;
+                };
+                surface: {
+                    DEFAULT: string;
+                    muted: string;
+                    elevated: string;
+                };
+                hover: string;
+                selected: string;
+                disabled: {
+                    DEFAULT: string;
+                    foreground: string;
+                };
+                focus: string;
+                table: {
+                    header: string;
+                    hover: string;
                 };
             };
             borderRadius: {

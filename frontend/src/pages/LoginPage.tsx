@@ -7,6 +7,7 @@ import { useToast } from '../toast/toast-context';
 import { Eye, EyeSlash } from '@phosphor-icons/react';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
+import { Field } from '../components/ui/Field';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -18,6 +19,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     document.documentElement.classList.remove('dark');
@@ -35,6 +37,7 @@ export function LoginPage() {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
+    setErrorMsg('');
 
     try {
       const loggedInUser = await login({ userCode, password });
@@ -45,7 +48,9 @@ export function LoginPage() {
       showToast('Đăng nhập thành công.', 'success');
       navigate(nextPath, { replace: true });
     } catch {
-      showToast('Đăng nhập thất bại. Vui lòng kiểm tra lại.', 'error');
+      setErrorMsg('Mã người dùng hoặc mật khẩu không chính xác.');
+      const userCodeInput = document.getElementById('username');
+      if (userCodeInput) userCodeInput.focus();
     } finally {
       setIsSubmitting(false);
     }
@@ -91,19 +96,26 @@ export function LoginPage() {
               <p className="text-muted-foreground text-sm">Vui lòng đăng nhập để tiếp tục.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Mã người dùng</label>
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              {errorMsg && (
+                <div className="bg-rose-500/10 text-rose-600 text-sm p-3 rounded-lg border border-rose-500/20 font-medium" role="alert" aria-live="assertive">
+                  {errorMsg}
+                </div>
+              )}
+              
+              <Field id="username" label="Mã người dùng" required>
                 <Input
                   value={userCode}
                   onChange={(event) => setUserCode(event.target.value)}
                   placeholder="Nhập mã người dùng"
                   disabled={isSubmitting}
+                  autoComplete="username"
+                  name="username"
+                  aria-invalid={!!errorMsg}
                 />
-              </div>
+              </Field>
 
-              <div className="space-y-1.5">
-                <label className="text-sm font-medium text-foreground">Mật khẩu</label>
+              <Field id="password" label="Mật khẩu" required>
                 <div className="relative">
                   <Input
                     type={showPassword ? 'text' : 'password'}
@@ -112,20 +124,25 @@ export function LoginPage() {
                     placeholder="Nhập mật khẩu"
                     disabled={isSubmitting}
                     className="pr-10"
+                    autoComplete="current-password"
+                    name="password"
+                    aria-invalid={!!errorMsg}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((current) => !current)}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground transition-colors"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-r-md"
+                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    aria-pressed={showPassword}
                   >
                     {showPassword ? (
-                      <EyeSlash size={18} weight="regular" />
+                      <EyeSlash size={18} weight="regular" aria-hidden="true" />
                     ) : (
-                      <Eye size={18} weight="regular" />
+                      <Eye size={18} weight="regular" aria-hidden="true" />
                     )}
                   </button>
                 </div>
-              </div>
+              </Field>
 
               <div className="pt-1">
                 <Button
@@ -138,24 +155,26 @@ export function LoginPage() {
               </div>
             </form>
 
-            <div className="mt-8 rounded-xl border border-border/50 bg-muted/30 p-4">
-              <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                Tài khoản dùng thử
-              </p>
-              <div className="space-y-2 text-sm">
-                {[
-                  { role: 'Admin', creds: 'ADMIN_HCM / 123456' },
-                  { role: 'Quản lý', creds: 'QL_MANTHIEN / 123456' },
-                  { role: 'Sinh viên', creds: 'N21DCCN001 / 123456' },
-                ].map(({ role, creds }) => (
-                  <div key={role} className="flex justify-between items-center bg-background rounded-lg px-3 py-2 border border-border/40">
-                    <span className="font-medium text-foreground text-[13px]">{role}</span>
-                    <code className="bg-muted px-2 py-0.5 rounded text-[11px] font-mono text-muted-foreground">{creds}</code>
-                  </div>
-                ))}
+            {import.meta.env.VITE_SHOW_DEMO_ACCOUNTS === 'true' && (
+              <div className="mt-8 rounded-xl border border-border/50 bg-muted/30 p-4">
+                <p className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  Tài khoản dùng thử
+                </p>
+                <div className="space-y-2 text-sm">
+                  {[
+                    { role: 'Admin', creds: 'ADMIN_HCM / 123456' },
+                    { role: 'Quản lý', creds: 'QL_MANTHIEN / 123456' },
+                    { role: 'Sinh viên', creds: 'N21DCCN001 / 123456' },
+                  ].map(({ role, creds }) => (
+                    <div key={role} className="flex justify-between items-center bg-background rounded-lg px-3 py-2 border border-border/40">
+                      <span className="font-medium text-foreground text-[13px]">{role}</span>
+                      <code className="bg-muted px-2 py-0.5 rounded text-[11px] font-mono text-muted-foreground">{creds}</code>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </section>
       </div>

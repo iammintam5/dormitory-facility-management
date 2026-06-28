@@ -33,6 +33,13 @@ import { Select } from '../../components/ui/Select';
 import { SkeletonStatCard, SkeletonTable } from '../../components/ui/Skeleton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SearchInput } from '../../components/ui/SearchInput';
+import { FilterBar } from '../../components/ui/FilterBar';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { AlertDialog } from '../../components/ui/AlertDialog';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const locationSchema = z.object({
   code: z.string().min(1, 'Nhập mã khu nhà.'),
@@ -64,6 +71,7 @@ export function LocationsManagementPage() {
   const [buildings, setBuildings] = useState<BuildingView[]>([]);
   const [rawBuildings, setRawBuildings] = useState<BuildingRecord[]>([]);
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebounce(keyword, 400);
   const [statusFilter, setStatusFilter] = useState('Tất cả');
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -247,14 +255,14 @@ export function LocationsManagementPage() {
     () =>
       buildings.filter((building) => {
         const matchKeyword =
-          !keyword ||
+          !debouncedKeyword ||
           `${building.code} ${building.name} ${building.description ?? ''}`
             .toLowerCase()
-            .includes(keyword.toLowerCase());
+            .includes(debouncedKeyword.toLowerCase());
         const matchStatus = statusFilter === 'Tất cả' || building.status === statusFilter;
         return matchKeyword && matchStatus;
       }),
-    [buildings, keyword, statusFilter],
+    [buildings, debouncedKeyword, statusFilter],
   );
 
   const totalBuildings = filteredBuildings.length;
@@ -312,30 +320,37 @@ export function LocationsManagementPage() {
         </div>
       )}
 
-      <Card className="border-border/50">
-        <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-end">
-          <div className="flex-1 w-full">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
-            <Input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Nhập tên hoặc mã khu nhà..."
-            />
-          </div>
-
-          <div className="w-full md:w-64">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Trạng thái</label>
-            <Select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-            >
-              <option>Tất cả</option>
-              <option>Đang hoạt động</option>
-              <option>Ngừng hoạt động</option>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      <FilterBar 
+        searchNode={
+          <SearchInput
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="Nhập tên hoặc mã khu nhà..."
+            aria-label="Tìm kiếm khu nhà"
+          />
+        }
+        filterNode={
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            aria-label="Lọc theo trạng thái"
+          >
+            <option value="Tất cả">Tất cả trạng thái</option>
+            <option value="Đang hoạt động">Đang hoạt động</option>
+            <option value="Ngừng hoạt động">Ngừng hoạt động</option>
+          </Select>
+        }
+        appliedFilterCount={[
+          statusFilter !== 'Tất cả' ? statusFilter : ''
+        ].filter(Boolean).length}
+        onResetFilters={() => {
+          setKeyword('');
+          setStatusFilter('Tất cả');
+        }}
+        filterChips={[
+          ...(statusFilter !== 'Tất cả' ? [{ id: 'status', label: `Trạng thái: ${statusFilter}`, onRemove: () => setStatusFilter('Tất cả') }] : []),
+        ]}
+      />
 
       <Card className="border-border/50 overflow-hidden">
         {isLoading ? (
@@ -343,59 +358,98 @@ export function LocationsManagementPage() {
             <SkeletonTable rows={5} cols={5} />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16 text-center">STT</TableHead>
-                <TableHead>Mã khu nhà</TableHead>
-                <TableHead>Tên khu nhà</TableHead>
-                <TableHead className="text-center">Số tầng</TableHead>
-                <TableHead className="text-center">Số phòng</TableHead>
-                <TableHead>Mô tả</TableHead>
-                <TableHead className="text-center">Trạng thái</TableHead>
-                <TableHead className="w-24 text-center">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <div className="flex flex-col">
               {filteredBuildings.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                    Không có dữ liệu khu nhà
-                  </TableCell>
-                </TableRow>
-              ) : filteredBuildings.map((building, idx) => (
-                <TableRow key={building.id}>
-                  <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
-                  <TableCell className="font-bold text-foreground">{building.code}</TableCell>
-                  <TableCell className="font-medium text-foreground">{building.name}</TableCell>
-                  <TableCell className="text-center tabular-nums">{building.floors}</TableCell>
-                  <TableCell className="text-center tabular-nums">{building.rooms}</TableCell>
-                  <TableCell className="text-muted-foreground">{building.description || '-'}</TableCell>
-                  <TableCell className="text-center">
-                    <span className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${building.status === 'Đang hoạt động' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                      {building.status}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => {
-                        const raw = rawBuildings.find(r => r.id === building.id);
-                        openRoomModal(building, raw?.rooms ?? []);
-                      }} title="Xem phòng">
-                        <Eye size={16} className="text-muted-foreground" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => openEditModal(building)}>
-                        <PencilSimple size={16} className="text-muted-foreground" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(building)}>
-                        <Trash size={16} className="text-rose-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                <div className="p-10">
+                  <EmptyState 
+                    title="Không tìm thấy khu nhà" 
+                    description="Chưa có khu nhà nào phù hợp với bộ lọc hiện tại."
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="hidden md:block">
+                    <Table aria-label="Danh sách khu nhà">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16 text-center">STT</TableHead>
+                          <TableHead>Mã khu nhà</TableHead>
+                          <TableHead>Tên khu nhà</TableHead>
+                          <TableHead className="text-center">Số tầng</TableHead>
+                          <TableHead className="text-center">Số phòng</TableHead>
+                          <TableHead>Mô tả</TableHead>
+                          <TableHead className="text-center">Trạng thái</TableHead>
+                          <TableHead className="w-24 text-center">Thao tác</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredBuildings.map((building, idx) => (
+                          <TableRow key={building.id}>
+                            <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
+                            <TableCell className="font-bold text-foreground">{building.code}</TableCell>
+                            <TableCell className="font-medium text-foreground">{building.name}</TableCell>
+                            <TableCell className="text-center tabular-nums">{building.floors}</TableCell>
+                            <TableCell className="text-center tabular-nums">{building.rooms}</TableCell>
+                            <TableCell className="text-muted-foreground">{building.description || '-'}</TableCell>
+                            <TableCell className="text-center">
+                              <span className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${building.status === 'Đang hoạt động' ? 'bg-success-muted text-success' : 'bg-destructive-muted text-destructive'}`}>
+                                {building.status}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <RowActionsMenu
+                                ariaLabel={`Thao tác khu nhà ${building.code}`}
+                                actions={[
+                                  { id: 'view', label: 'Xem phòng', icon: <Eye size={16} />, onClick: () => {
+                                      const raw = rawBuildings.find(r => r.id === building.id);
+                                      openRoomModal(building, raw?.rooms ?? []);
+                                    } 
+                                  },
+                                  { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(building) },
+                                  { id: 'delete', label: 'Xóa', icon: <Trash size={16} />, variant: 'destructive', onClick: () => setDeleteTarget(building) }
+                                ]}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden flex flex-col gap-3 p-3">
+                    {filteredBuildings.map((building) => (
+                      <MobileDataCard
+                        key={building.id}
+                        title={building.name}
+                        subtitle={building.code}
+                        statusBadge={
+                          <span className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${building.status === 'Đang hoạt động' ? 'bg-success-muted text-success' : 'bg-destructive-muted text-destructive'}`}>
+                            {building.status}
+                          </span>
+                        }
+                        actionMenu={
+                          <RowActionsMenu
+                            ariaLabel={`Thao tác khu nhà ${building.code}`}
+                            actions={[
+                              { id: 'view', label: 'Xem phòng', icon: <Eye size={16} />, onClick: () => {
+                                  const raw = rawBuildings.find(r => r.id === building.id);
+                                  openRoomModal(building, raw?.rooms ?? []);
+                                } 
+                              },
+                              { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(building) },
+                              { id: 'delete', label: 'Xóa', icon: <Trash size={16} />, variant: 'destructive', onClick: () => setDeleteTarget(building) }
+                            ]}
+                          />
+                        }
+                      >
+                        <DataLabel label="Số tầng" value={String(building.floors)} />
+                        <DataLabel label="Số phòng" value={String(building.rooms)} />
+                        <DataLabel label="Mô tả" value={building.description || '-'} />
+                      </MobileDataCard>
+                    ))}
+                  </div>
+                </>
+              )}
+          </div>
         )}
       </Card>
 
@@ -665,24 +719,18 @@ export function LocationsManagementPage() {
         </Modal>
       )}
 
-      <Modal
+      <AlertDialog
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         title="Xác nhận xóa"
-        size="sm"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Hủy</Button>
-            <Button variant="destructive" onClick={() => void confirmDelete()}>Xóa khu nhà</Button>
-          </>
+        description={
+          deleteTarget
+            ? `Khu nhà ${deleteTarget.code} - ${deleteTarget.name} sẽ bị xóa khỏi hệ thống. Hành động này không thể hoàn tác. Bạn có chắc chắn?`
+            : ''
         }
-      >
-        <p className="text-sm leading-6 text-muted-foreground py-4">
-          {deleteTarget
-            ? `Khu nhà ${deleteTarget.code} - ${deleteTarget.name} sẽ bị xóa khỏi hệ thống. Bạn có chắc chắn?`
-            : ''}
-        </p>
-      </Modal>
+        confirmText="Xóa khu nhà"
+        onConfirm={() => void confirmDelete()}
+      />
     </div>
   );
 }

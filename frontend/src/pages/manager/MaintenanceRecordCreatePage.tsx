@@ -21,10 +21,10 @@ import { FloppyDisk, CaretLeft } from '@phosphor-icons/react';
 const recordSchema = z.object({
   planId: z.coerce.number().optional(),
   damageReportId: z.coerce.number().optional(),
-  inventoryItemId: z.coerce.number().optional(),
+
   assetId: z.coerce.number().int().positive(),
   maintenanceDate: z.string().min(1, 'Vui lòng chọn ngày bảo trì.'),
-  maintenanceType: z.enum(['SCHEDULED', 'AD_HOC', 'AFTER_INVENTORY']),
+  maintenanceType: z.enum(['SCHEDULED', 'AD_HOC']),
   content: z.string().min(1, 'Nội dung không được để trống.'),
   resultStatus: z.enum(['GOOD', 'RECOMMEND_LIQUIDATION']),
   nextMaintenanceDate: z.string().optional(),
@@ -49,7 +49,7 @@ export function MaintenanceRecordCreatePage() {
 
   const [searchParams] = useSearchParams();
   const damageReportIdStr = searchParams.get('damageReportId');
-  const inventoryItemIdStr = searchParams.get('inventoryItemId');
+
   const assetIdStr = searchParams.get('assetId');
 
   const form = useForm<RecordFormValues>({
@@ -57,10 +57,10 @@ export function MaintenanceRecordCreatePage() {
     defaultValues: {
       planId: undefined,
       damageReportId: damageReportIdStr ? parseInt(damageReportIdStr) : undefined,
-      inventoryItemId: inventoryItemIdStr ? parseInt(inventoryItemIdStr) : undefined,
+
       assetId: assetIdStr ? parseInt(assetIdStr) : 0,
       maintenanceDate: new Date().toISOString().slice(0, 10),
-      maintenanceType: damageReportIdStr ? 'AD_HOC' : inventoryItemIdStr ? 'AFTER_INVENTORY' : 'SCHEDULED',
+      maintenanceType: damageReportIdStr ? 'AD_HOC' : 'SCHEDULED',
       content: '',
       resultStatus: 'GOOD',
       nextMaintenanceDate: '',
@@ -107,7 +107,7 @@ export function MaintenanceRecordCreatePage() {
         ...values,
         planId: values.planId || undefined,
         damageReportId: values.damageReportId || undefined,
-        inventoryItemId: values.inventoryItemId || undefined,
+
         nextMaintenanceDate: values.nextMaintenanceDate || undefined,
         cost: Number.isNaN(values.cost) ? undefined : values.cost,
         materialNote: values.materialNote?.trim() || undefined,
@@ -240,14 +240,14 @@ export function MaintenanceRecordCreatePage() {
   );
 }
 
-const maintenanceTypes: MaintenanceType[] = ['SCHEDULED', 'AD_HOC', 'AFTER_INVENTORY'];
+const maintenanceTypes: MaintenanceType[] = ['SCHEDULED', 'AD_HOC'];
 const resultStatuses: MaintenanceResultStatus[] = ['GOOD', 'RECOMMEND_LIQUIDATION'];
 
 function translateMaintenanceType(type: MaintenanceType) {
   switch (type) {
     case 'SCHEDULED': return 'Định kỳ';
     case 'AD_HOC': return 'Đột xuất';
-    case 'AFTER_INVENTORY': return 'Sau kiểm kê';
+
     default: return type;
   }
 }

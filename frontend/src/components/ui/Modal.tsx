@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useId } from 'react';
 import { X } from '@phosphor-icons/react';
 
 interface ModalProps {
@@ -11,11 +11,30 @@ interface ModalProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full';
   className?: string;
   preventCloseOnOverlayClick?: boolean;
+  role?: 'dialog' | 'alertdialog';
+  'aria-describedby'?: string;
+  initialFocusRef?: React.RefObject<HTMLElement>;
 }
 
-export function Modal({ isOpen, onClose, title, footer, children, size = 'md', className = '', preventCloseOnOverlayClick = false }: ModalProps) {
+export function Modal({ 
+  isOpen, 
+  onClose, 
+  title, 
+  footer, 
+  children, 
+  size = 'md', 
+  className = '', 
+  preventCloseOnOverlayClick = false,
+  role = 'dialog',
+  'aria-describedby': ariaDescribedBy,
+  initialFocusRef,
+}: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+  
+  // Create unique IDs for accessibility
+  const internalId = useId();
+  const titleId = title ? `modal-title-${internalId}` : undefined;
 
   // Close on Escape & Focus Management
   useEffect(() => {
@@ -24,25 +43,44 @@ export function Modal({ isOpen, onClose, title, footer, children, size = 'md', c
     // Store previously focused element
     previouslyFocusedElement.current = document.activeElement as HTMLElement;
     
-    // Focus the dialog when opened
-    dialogRef.current?.focus();
+    // Focus the initial element or dialog when opened
+    // Use setTimeout to ensure the DOM is painted
+    const focusTimeout = setTimeout(() => {
+      if (initialFocusRef && initialFocusRef.current) {
+        initialFocusRef.current.focus();
+      } else {
+        dialogRef.current?.focus();
+      }
+    }, 10);
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        if (!preventCloseOnOverlayClick) {
+          onClose();
+        }
         return;
       }
       
       // Basic Focus Trap
       if (e.key === 'Tab') {
         const focusableElements = dialogRef.current?.querySelectorAll(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+          'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
         ) as NodeListOf<HTMLElement>;
         
-        if (!focusableElements || focusableElements.length === 0) return;
+        if (!focusableElements || focusableElements.length === 0) {
+          e.preventDefault();
+          return;
+        }
         
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
+        // Filter out hidden elements
+        const visibleFocusable = Array.from(focusableElements).filter(el => {
+          return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length) && window.getComputedStyle(el).visibility !== 'hidden';
+        });
+
+        if (visibleFocusable.length === 0) return;
+
+        const firstElement = visibleFocusable[0];
+        const lastElement = visibleFocusable[visibleFocusable.length - 1];
 
         if (e.shiftKey) {
           if (document.activeElement === firstElement || document.activeElement === dialogRef.current) {
@@ -60,18 +98,28 @@ export function Modal({ isOpen, onClose, title, footer, children, size = 'md', c
     
     document.addEventListener('keydown', handleKeyDown);
     return () => {
+      clearTimeout(focusTimeout);
       document.removeEventListener('keydown', handleKeyDown);
       // Restore focus
-      previouslyFocusedElement.current?.focus();
+      if (previouslyFocusedElement.current && document.body.contains(previouslyFocusedElement.current)) {
+        previouslyFocusedElement.current.focus();
+      } else {
+        // Fallback if previous element is removed
+        const mainContent = document.getElementById('main-content');
+        if (mainContent) {
+          mainContent.focus();
+        }
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, preventCloseOnOverlayClick, initialFocusRef]);
 
   // Lock body scroll
   useEffect(() => {
     if (isOpen) {
+      const originalStyle = window.getComputedStyle(document.body).overflow;  
       document.body.style.overflow = 'hidden';
+      return () => { document.body.style.overflow = originalStyle; };
     }
-    return () => { document.body.style.overflow = ''; };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -98,23 +146,23 @@ export function Modal({ isOpen, onClose, title, footer, children, size = 'md', c
       {/* Dialog */}
       <div
         ref={dialogRef}
-        role="dialog"
+        role={role}
         aria-modal="true"
-        aria-labelledby={title ? 'modal-title' : undefined}
+        aria-labelledby={titleId}
+        aria-describedby={ariaDescribedBy}
         tabIndex={-1}
-        className={`relative z-50 w-full ${sizeClasses[size]} rounded-xl border border-border/50 bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-scale-in outline-none ${className}`}
+        className={`relative z-50 w-full ${sizeClasses[size]} rounded-xl border border-border/50 bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-scale-in outline-none focus-visible:ring-2 focus-visible:ring-primary ${className}`}
       >
         {title && (
-          <ModalHeader onClose={onClose}>
-            <ModalTitle id="modal-title">{title}</ModalTitle>
+          <ModalHeader onClose={preventCloseOnOverlayClick ? undefined : onClose}>
+            <ModalTitle id={titleId}>{title}</ModalTitle>
           </ModalHeader>
         )}
         {title || footer ? (
           <ModalBody>
             {React.Children.map(children, (child) => {
               if (React.isValidElement(child)) {
-                // @ts-ignore
-                return React.cloneElement(child, { onClose });
+                return React.cloneElement(child as React.ReactElement<{ onClose?: () => void }>, { onClose });
               }
               return child;
             })}
@@ -122,8 +170,7 @@ export function Modal({ isOpen, onClose, title, footer, children, size = 'md', c
         ) : (
           React.Children.map(children, (child) => {
             if (React.isValidElement(child)) {
-              // @ts-ignore
-              return React.cloneElement(child, { onClose });
+              return React.cloneElement(child as React.ReactElement<{ onClose?: () => void }>, { onClose });
             }
             return child;
           })
@@ -142,7 +189,7 @@ export function ModalHeader({ children, className = '', onClose }: { children: R
         <button 
           onClick={onClose}
           aria-label="Đóng hộp thoại"
-          className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-all duration-150 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-all duration-150 active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <X size={18} weight="bold" aria-hidden="true" />
         </button>
@@ -153,9 +200,9 @@ export function ModalHeader({ children, className = '', onClose }: { children: R
 
 export function ModalTitle({ children, className = '', id }: { children: React.ReactNode, className?: string, id?: string }) {
   return (
-    <h3 id={id} className={`text-lg font-semibold text-foreground ${className}`}>
+    <h2 id={id} className={`text-lg font-semibold text-foreground ${className}`}>
       {children}
-    </h3>
+    </h2>
   );
 }
 

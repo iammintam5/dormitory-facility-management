@@ -42,6 +42,41 @@
     --sidebar-bg: 0 0% 100%;
     --sidebar-border: 220 13% 91%;
     --header-bg: 217 79% 21%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-muted: 149 80% 90%;
+    --success-border: 147 50% 80%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --warning-muted: 48 96% 89%;
+    --warning-border: 45 80% 80%;
+
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 100%;
+    --info-muted: 214 93% 89%;
+    --info-border: 215 80% 80%;
+
+    --destructive-muted: 0 100% 95%;
+    --destructive-border: 0 90% 85%;
+
+    --surface: 0 0% 100%;
+    --surface-muted: 220 14% 96%;
+    --surface-elevated: 0 0% 100%;
+    --surface-overlay: 0 0% 0% / 0.5;
+
+    --hover: 220 14% 96%;
+    --selected: 214 93% 89%;
+    --disabled: 220 13% 91%;
+    --disabled-foreground: 220 9% 46%;
+    --focus: 217 79% 21%;
+    
+    --table-header: 220 14% 96%;
+    --table-row-hover: 220 14% 98%;
+    --sidebar-active: 217 79% 21%;
+    --sidebar-active-foreground: 210 40% 98%;
+    --sidebar-hover: 220 14% 96%;
   }
 
   .dark {
@@ -76,6 +111,41 @@
     --sidebar-bg: 224 71% 5%;
     --sidebar-border: 215 28% 14%;
     --header-bg: 224 71% 6%;
+
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-muted: 142 71% 15%;
+    --success-border: 142 71% 25%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --warning-muted: 38 92% 15%;
+    --warning-border: 38 92% 25%;
+
+    --info: 221 83% 53%;
+    --info-foreground: 0 0% 100%;
+    --info-muted: 221 83% 15%;
+    --info-border: 221 83% 25%;
+
+    --destructive-muted: 0 62% 15%;
+    --destructive-border: 0 62% 25%;
+
+    --surface: 224 71% 6%;
+    --surface-muted: 215 28% 12%;
+    --surface-elevated: 215 28% 17%;
+    --surface-overlay: 0 0% 0% / 0.8;
+
+    --hover: 215 28% 12%;
+    --selected: 221 83% 20%;
+    --disabled: 215 28% 17%;
+    --disabled-foreground: 218 11% 55%;
+    --focus: 213 94% 58%;
+
+    --table-header: 215 28% 12%;
+    --table-row-hover: 215 28% 15%;
+    --sidebar-active: 213 94% 58%;
+    --sidebar-active-foreground: 224 71% 4%;
+    --sidebar-hover: 215 28% 12%;
   }
 }
 

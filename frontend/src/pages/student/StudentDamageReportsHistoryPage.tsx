@@ -11,17 +11,25 @@ import { studentsApi } from '../../services/students';
 
 import { Card, CardContent } from '../../components/ui/Card';
 import { SkeletonStatCard, SkeletonTable } from '../../components/ui/Skeleton';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select as UISelect } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Pagination } from '../../components/ui/Pagination';
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { AlertDialog } from '../../components/ui/AlertDialog';
 import { 
   Plus, 
   WarningCircle, 
   Clock, 
-  CheckCircle, 
+  CalendarBlank,
+  CheckCircle,
+  Ticket,
+  Wrench,
   Eye, 
   ArrowsClockwise
 } from '@phosphor-icons/react';
@@ -45,6 +53,28 @@ export function StudentDamageReportsHistoryPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  const [cancelConfirm, setCancelConfirm] = useState<{ isOpen: boolean; reportId: number | null }>({
+    isOpen: false,
+    reportId: null,
+  });
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const handleConfirmCancel = async () => {
+    if (!cancelConfirm.reportId) return;
+    setIsCancelling(true);
+    try {
+      await import('../../services/damage-reports').then(m => m.cancelReport(cancelConfirm.reportId!));
+      showToast('Đã hủy phiếu báo hỏng.', 'success');
+      setSelectedReportId(null);
+      setCancelConfirm({ isOpen: false, reportId: null });
+      loadReports();
+    } catch (err: any) {
+      showToast(err?.response?.data?.message || 'Lỗi khi hủy báo hỏng', 'error');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [activeReportDetail, setActiveReportDetail] = useState<DamageReport | null>(null);
   const [detailTab, setDetailTab] = useState<'detail' | 'history'>('detail');
@@ -114,12 +144,12 @@ export function StudentDamageReportsHistoryPage() {
     }
   };
 
-  const renderPriorityBadge = (priority: string) => {
+  const getPriorityBadge = (priority: string) => {
     switch (priority) {
-      case 'URGENT': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-700">Khẩn cấp</span>;
-      case 'HIGH': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-orange-100 text-orange-700">Cao</span>;
-      case 'MEDIUM': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-700">Trung bình</span>;
-      case 'LOW': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-700">Thấp</span>;
+      case 'URGENT': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-destructive-muted text-destructive">Khẩn cấp</span>;
+      case 'HIGH': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-warning-muted text-warning">Cao</span>;
+      case 'MEDIUM': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-warning-muted text-warning">Trung bình</span>;
+      case 'LOW': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-success-muted text-success">Thấp</span>;
       default: return null;
     }
   };
@@ -161,9 +191,9 @@ export function StudentDamageReportsHistoryPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="border-border/50">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
-                <WarningCircle size={24} weight="duotone" />
+            <CardContent className="flex gap-4 p-5 hover:bg-muted/30 transition-colors border-b border-border/50">
+              <div className="w-12 h-12 rounded-full bg-info-muted flex items-center justify-center text-info shrink-0">
+                <Ticket size={24} weight="duotone" />
               </div>
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tổng số phiếu</p>
@@ -176,9 +206,9 @@ export function StudentDamageReportsHistoryPage() {
           </Card>
           
           <Card className="border-border/50">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
-                <Clock size={24} weight="duotone" />
+            <CardContent className="flex gap-4 p-5 hover:bg-muted/30 transition-colors border-b border-border/50 opacity-75">
+              <div className="w-12 h-12 rounded-full bg-warning-muted flex items-center justify-center text-warning shrink-0">
+                <Wrench size={24} weight="duotone" />
               </div>
               <div>
                 <p className="text-xs font-semibold text-muted-foreground mb-0.5">Đang xử lý</p>
@@ -193,8 +223,8 @@ export function StudentDamageReportsHistoryPage() {
           </Card>
 
           <Card className="border-border/50">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
+            <CardContent className="flex gap-4 p-5 hover:bg-muted/30 transition-colors opacity-60 grayscale-[0.5]">
+              <div className="w-12 h-12 rounded-full bg-success-muted flex items-center justify-center text-success shrink-0">
                 <CheckCircle size={24} weight="duotone" />
               </div>
               <div>
@@ -212,57 +242,86 @@ export function StudentDamageReportsHistoryPage() {
       )}
 
       <Card className="border-border/50 overflow-hidden">
-        <div className="overflow-x-auto py-6">
+        <div className="flex flex-col py-6">
           {isFetching ? (
             <div className="p-5">
               <SkeletonTable rows={5} cols={7} />
             </div>
+          ) : reports.length === 0 ? (
+            <div className="p-10">
+              <EmptyState 
+                title="Không có báo hỏng nào" 
+                description="Bạn chưa có báo hỏng nào."
+              />
+            </div>
           ) : (
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted/30 text-muted-foreground border-b border-border/50">
-                <tr>
-                  <th className="px-6 py-4 font-semibold text-center w-16">STT</th>
-                  <th className="px-6 py-4 font-semibold">Mã phiếu</th>
-                  <th className="px-6 py-4 font-semibold">Thiết bị</th>
-                  <th className="px-6 py-4 font-semibold">Mô tả</th>
-                  <th className="px-6 py-4 font-semibold text-center">Mức độ</th>
-                  <th className="px-6 py-4 font-semibold text-center">Ngày gửi</th>
-                  <th className="px-6 py-4 font-semibold text-center">Trạng thái</th>
-                  <th className="px-6 py-4 font-semibold text-center w-24">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50 text-foreground">
-                {reports.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center py-10 text-muted-foreground">Không có dữ liệu báo hỏng</td>
-                  </tr>
-                ) : reports.map((report, idx) => (
-                  <tr key={report.id} className="hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => setSelectedReportId(report.id)}>
-                    <td className="px-6 py-4 text-center text-muted-foreground font-medium">
-                      {(pagination.page - 1) * pagination.pageSize + idx + 1}
-                    </td>
-                    <td className="px-6 py-4 font-bold">{report.reportCode}</td>
-                    <td className="px-6 py-4 font-medium">{report.asset?.assetName || '-'}</td>
-                    <td className="px-6 py-4 truncate max-w-[200px]" title={report.description}>{report.description}</td>
-                    <td className="px-6 py-4 text-center">{renderPriorityBadge(report.priority)}</td>
-                    <td className="px-6 py-4 text-center tabular-nums">{new Date(report.createdAt).toLocaleDateString('vi-VN')}</td>
-                    <td className="px-6 py-4 text-center">{renderStatusBadge(report.status)}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={(e) => { e.stopPropagation(); setSelectedReportId(report.id); }}
-                          title="Xem chi tiết"
-                        >
-                          <Eye size={16} className="text-primary" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
+            <>
+              <div className="hidden lg:block overflow-x-auto">
+                <Table aria-label="Danh sách phiếu báo hỏng">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-center w-16">STT</TableHead>
+                      <TableHead>Mã phiếu</TableHead>
+                      <TableHead>Thiết bị</TableHead>
+                      <TableHead>Mô tả</TableHead>
+                      <TableHead className="text-center">Mức độ</TableHead>
+                      <TableHead className="text-center">Ngày gửi</TableHead>
+                      <TableHead className="text-center">Trạng thái</TableHead>
+                      <TableHead className="text-center w-24">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {reports.map((report, idx) => (
+                      <TableRow key={report.id} className="cursor-pointer" onClick={() => setSelectedReportId(report.id)}>
+                        <TableCell className="text-center text-muted-foreground font-medium">
+                          {(pagination.page - 1) * pagination.pageSize + idx + 1}
+                        </TableCell>
+                        <TableCell className="font-bold">{report.reportCode}</TableCell>
+                        <TableCell className="font-medium">
+                          <span className="font-semibold text-foreground text-sm truncate max-w-[200px]" title={report.asset?.assetName}>
+                            {report.asset?.assetName || '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="truncate max-w-[200px]" title={report.description}>{report.description}</TableCell>
+                        <TableCell className="text-center">{getPriorityBadge(report.priority)}</TableCell>
+                        <TableCell className="text-center tabular-nums">{new Date(report.createdAt).toLocaleDateString('vi-VN')}</TableCell>
+                        <TableCell className="text-center">{renderStatusBadge(report.status)}</TableCell>
+                        <TableCell>
+                          <RowActionsMenu
+                            ariaLabel={`Thao tác ${report.reportCode}`}
+                            actions={[
+                              { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => setSelectedReportId(report.id) },
+                            ]}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="lg:hidden flex flex-col gap-3 p-3">
+                {reports.map((report) => (
+                  <MobileDataCard
+                    key={report.id}
+                    title={report.reportCode}
+                    subtitle={new Date(report.createdAt).toLocaleDateString('vi-VN')}
+                    statusBadge={renderStatusBadge(report.status)}
+                    actionMenu={
+                      <RowActionsMenu
+                        ariaLabel={`Thao tác ${report.reportCode}`}
+                        actions={[
+                          { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => setSelectedReportId(report.id) },
+                        ]}
+                      />
+                    }
+                  >
+                    <DataLabel label="Thiết bị" value={report.asset?.assetName || '-'} />
+                    <DataLabel label="Mô tả" value={report.description} />
+                    <DataLabel label="Mức độ" value={getPriorityBadge(report.priority)} />
+                  </MobileDataCard>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
         
@@ -319,7 +378,7 @@ export function StudentDamageReportsHistoryPage() {
                     </div>
                     <div className="flex items-start gap-4 pb-3 border-b border-border/50">
                       <span className="text-sm font-semibold text-muted-foreground w-28 shrink-0">Mức độ ưu tiên</span>
-                      {renderPriorityBadge(activeReportDetail.priority)}
+                      {getPriorityBadge(activeReportDetail.priority)}
                     </div>
                     <div className="flex items-start gap-4 pb-3 border-b border-border/50">
                       <span className="text-sm font-semibold text-muted-foreground w-28 shrink-0">Mô tả sự cố</span>
@@ -360,17 +419,8 @@ export function StudentDamageReportsHistoryPage() {
                 {activeReportDetail.status === 'SUBMITTED' && (
                   <Button 
                     variant="destructive" 
-                    onClick={async () => {
-                      if (window.confirm('Bạn có chắc chắn muốn hủy báo hỏng này?')) {
-                        try {
-                          await import('../../services/damage-reports').then(m => m.cancelReport(activeReportDetail.id));
-                          alert('Hủy thành công');
-                          setSelectedReportId(null);
-                          loadReports();
-                        } catch (err: any) {
-                          alert(err?.response?.data?.message || 'Lỗi khi hủy báo hỏng');
-                        }
-                      }
+                    onClick={() => {
+                      setCancelConfirm({ isOpen: true, reportId: activeReportDetail.id });
                     }}
                   >
                     Hủy báo hỏng
@@ -437,9 +487,7 @@ export function StudentDamageReportsHistoryPage() {
             <div className="space-y-1.5">
               <label className="block text-xs font-semibold text-muted-foreground">Hình ảnh (nếu có)</label>
               <div className="border-2 border-dashed border-border/50 rounded-xl px-8 py-10 flex flex-col items-center justify-center text-center bg-muted/10">
-                <div className="text-sm text-muted-foreground font-medium">
-                  Chức năng upload ảnh đang phát triển
-                </div>
+
               </div>
             </div>
           </ModalBody>

@@ -1,10 +1,16 @@
 import * as React from 'react';
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  ({ className = '', ...props }, ref) => (
+interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
+  interactive?: boolean;
+}
+
+const Card = React.forwardRef<HTMLDivElement, CardProps>(
+  ({ className = '', interactive = false, ...props }, ref) => (
     <div
       ref={ref}
-      className={`h-fit self-start rounded-lg border border-border/60 bg-card text-card-foreground shadow-card transition-shadow duration-200 hover:shadow-card-hover ${className}`}
+      className={`h-fit self-start rounded-lg border border-border/60 bg-card text-card-foreground shadow-card transition-shadow duration-200 ${
+        interactive ? 'hover:shadow-card-hover cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring' : ''
+      } ${className}`}
       {...props}
     />
   )

@@ -6,6 +6,7 @@ import { getDashboardSummary, type StudentDashboardSummary } from '../services/r
 import { useToast } from '../toast/toast-context';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { Skeleton } from '../components/ui/Skeleton';
+import { PageHeader } from '../components/ui/PageHeader';
 import { 
   Door, 
   Desktop, 
@@ -49,12 +50,9 @@ export function StudentDashboardPage() {
   return (
     <div className="space-y-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Trang chủ Sinh viên
-          </h1>
-        </div>
+        <PageHeader 
+          title="Trang chủ Sinh viên"
+        />
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Hero Section */}
@@ -82,14 +80,14 @@ export function StudentDashboardPage() {
 
           {/* Stats Section */}
           <div className="lg:col-span-7 grid grid-cols-2 md:grid-cols-4 gap-4">
-            <StatCard label="Phòng hiện tại" value={roomCode} caption={buildingName} icon={Door} color="text-blue-600 dark:text-blue-400" bg="bg-blue-50 dark:bg-blue-500/10" isLoading={isLoading} />
+            <StatCard label="Phòng hiện tại" value={roomCode} caption={buildingName} icon={Door} color="text-info" bg="bg-info-muted" isLoading={isLoading} />
             <StatCard
               label="Thiết bị trong phòng"
               value={isLoading ? '--' : String(summary?.assetCount ?? 0)}
               caption="thiết bị"
               icon={Desktop}
-              color="text-violet-600 dark:text-violet-400"
-              bg="bg-violet-50 dark:bg-violet-500/10"
+              color="text-primary"
+              bg="bg-primary/10"
               isLoading={isLoading}
             />
             <StatCard
@@ -97,11 +95,11 @@ export function StudentDashboardPage() {
               value={isLoading ? '--' : String(summary?.damageReportProcessing ?? 0)}
               caption="phiếu"
               icon={WarningOctagon}
-              color="text-amber-600 dark:text-amber-400"
-              bg="bg-amber-50 dark:bg-amber-500/10"
+              color="text-warning"
+              bg="bg-warning-muted"
               isLoading={isLoading}
             />
-            <StatCard label="Trạng thái phòng" value={isLoading ? '...' : roomCode} caption={isLoading ? '' : floorLabel} icon={Database} color="text-emerald-600 dark:text-emerald-400" bg="bg-emerald-50 dark:bg-emerald-500/10" isLoading={isLoading} />
+            <StatCard label="Trạng thái phòng" value={isLoading ? '...' : roomCode} caption={isLoading ? '' : floorLabel} icon={Database} color="text-success" bg="bg-success-muted" isLoading={isLoading} />
           </div>
         </div>
 

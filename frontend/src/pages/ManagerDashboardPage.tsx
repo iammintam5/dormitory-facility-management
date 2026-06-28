@@ -4,6 +4,8 @@ import { Skeleton, SkeletonStatCard } from '../components/ui/Skeleton';
 import { getApiErrorMessage } from '../lib/api-client';
 import { getDashboardSummary, type ManagerDashboardSummary } from '../services/reports';
 import { useToast } from '../toast/toast-context';
+import { PageError, NetworkError, ForbiddenState } from '../components/ui/ErrorStates';
+import axios from 'axios';
 import { 
   Buildings, 
   Door, 
@@ -13,13 +15,16 @@ import {
   Trash,
   ArrowRight,
   TrendUp,
+  ClockCounterClockwise,
 } from '@phosphor-icons/react';
 import { Link } from 'react-router-dom';
+import { PageHeader } from '../components/ui/PageHeader';
 
 export function ManagerDashboardPage() {
   const { showToast } = useToast();
   const [summary, setSummary] = useState<ManagerDashboardSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorState, setErrorState] = useState<{ type: 'network' | 'forbidden' | 'server' | null; message: string }>({ type: null, message: '' });
 
   useEffect(() => {
     async function loadSummary() {
@@ -29,34 +34,57 @@ export function ManagerDashboardPage() {
           setSummary(data);
         }
       } catch (error) {
-        showToast(getApiErrorMessage(error, 'Không thể tải dữ liệu dashboard.'), 'error');
+        if (axios.isAxiosError(error) && !error.response) {
+          setErrorState({ type: 'network', message: 'Không thể kết nối đến máy chủ.' });
+        } else if (axios.isAxiosError(error) && error.response?.status === 403) {
+          setErrorState({ type: 'forbidden', message: 'Bạn không có quyền xem thông tin này.' });
+        } else {
+          setErrorState({ type: 'server', message: getApiErrorMessage(error, 'Không thể tải dữ liệu dashboard.') });
+        }
       } finally {
         setIsLoading(false);
       }
     }
 
-    void loadSummary();
+    const load = () => {
+      setIsLoading(true);
+      setErrorState({ type: null, message: '' });
+      void loadSummary();
+    };
+
+    load();
   }, [showToast]);
 
   const stats = [
-    { label: 'Tổng khu nhà', value: summary?.totalBuildings ?? 0, unit: 'khu', icon: Buildings, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
-    { label: 'Tổng số phòng', value: summary?.totalRooms ?? 0, unit: 'phòng', icon: Door, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
-    { label: 'Tổng số thiết bị', value: summary?.totalAssets ?? 0, unit: 'thiết bị', icon: Desktop, color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-500/10' },
-    { label: 'Thiết bị hư hỏng', value: summary?.damagedAssets ?? 0, unit: 'thiết bị', icon: WarningOctagon, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-500/10' },
+    { label: 'Tổng khu nhà', value: summary?.totalBuildings ?? 0, unit: 'khu', icon: Buildings, color: 'text-info', bg: 'bg-info-muted' },
+    { label: 'Tổng số phòng', value: summary?.totalRooms ?? 0, unit: 'phòng', icon: Door, color: 'text-success', bg: 'bg-success-muted' },
+    { label: 'Tổng số thiết bị', value: summary?.totalAssets ?? 0, unit: 'thiết bị', icon: Desktop, color: 'text-primary', bg: 'bg-primary/10' },
+    { label: 'Thiết bị hư hỏng', value: summary?.damagedAssets ?? 0, unit: 'thiết bị', icon: WarningOctagon, color: 'text-destructive', bg: 'bg-destructive-muted' },
   ] as const;
+
+  if (errorState.type === 'network') {
+    return <NetworkError onRetry={() => window.location.reload()} />;
+  }
+
+  if (errorState.type === 'forbidden') {
+    return <ForbiddenState description={errorState.message} />;
+  }
+
+  if (errorState.type === 'server') {
+    return <PageError description={errorState.message} onRetry={() => window.location.reload()} />;
+  }
 
   return (
     <div className="space-y-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Bảng điều khiển vận hành
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Tổng quan dữ liệu và hoạt động cơ sở vật chất.
-          </p>
-        </div>
+        <PageHeader 
+          title="Bảng điều khiển vận hành"
+          description="Tổng quan dữ liệu và hoạt động cơ sở vật chất."
+          breadcrumbs={[
+            { label: 'Trang chủ', href: '/manager/dashboard' },
+            { label: 'Bảng điều khiển' }
+          ]}
+        />
 
         {/* Stats Row */}
         {isLoading ? (
@@ -98,7 +126,7 @@ export function ManagerDashboardPage() {
               <CardTitle className="text-base font-semibold text-foreground">
                 Tình hình vận hành
               </CardTitle>
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-success">
                 <TrendUp size={14} weight="bold" />
                 Trực tiếp
               </div>
@@ -108,24 +136,24 @@ export function ManagerDashboardPage() {
                 label="Đang bảo trì"
                 value={summary?.maintenanceProcessing ?? 0}
                 icon={Wrench}
-                color="text-amber-600 dark:text-amber-400"
-                bg="bg-amber-50 dark:bg-amber-500/10"
+                color="text-warning"
+                bg="bg-warning-muted"
                 isLoading={isLoading}
               />
               <MetricBox
                 label="Chờ thanh lý"
                 value={summary?.liquidationPending ?? 0}
                 icon={Trash}
-                color="text-rose-600 dark:text-rose-400"
-                bg="bg-rose-50 dark:bg-rose-500/10"
+                color="text-destructive"
+                bg="bg-destructive-muted"
                 isLoading={isLoading}
               />
               <MetricBox
                 label="Thiết bị hư hỏng"
                 value={summary?.damagedAssets ?? 0}
                 icon={WarningOctagon}
-                color="text-blue-600 dark:text-blue-400"
-                bg="bg-blue-50 dark:bg-blue-500/10"
+                color="text-info"
+                bg="bg-info-muted"
                 isLoading={isLoading}
               />
             </CardContent>
@@ -139,10 +167,9 @@ export function ManagerDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 p-4 pt-5">
-              <QuickAction to="/manager/damage-reports" label="Xử lý báo hỏng" icon={WarningOctagon} />
-              <QuickAction to="/manager/maintenance" label="Bảo trì thiết bị" icon={Wrench} />
-              <QuickAction to="/manager/inventory-checks" label="Kiểm kê thiết bị" icon={Desktop} />
-              <QuickAction to="/manager/asset-transactions/export" label="Xuất/Thanh lý thiết bị" icon={Trash} />
+              <QuickAction to="/manager/damage-reports" label="Phiếu báo hỏng" icon={Wrench} />
+              <QuickAction to="/manager/maintenance" label="Lịch bảo trì" icon={ClockCounterClockwise} />
+              <QuickAction to="/manager/asset-transactions/export" label="Thanh lý / Xuất" icon={Trash} />
             </CardContent>
           </Card>
         </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
@@ -22,9 +23,20 @@ import { studentsApi } from '../../services/students';
 import { Room } from '../../types/locations';
 import { User } from '../../types/users';
 
+interface Roommate {
+  id: number;
+  fullName: string;
+  studentCode: string;
+  email: string | null;
+  phone: string | null;
+  avatarUrl: string | null;
+  faculty: string | null;
+  className: string | null;
+}
+
 export function StudentRoomPage() {
   const [room, setRoom] = useState<Room | null>(null);
-  const [roommates, setRoommates] = useState<User[]>([]);
+  const [roommates, setRoommates] = useState<Roommate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -163,34 +175,30 @@ export function StudentRoomPage() {
             <div className="text-center py-8 text-muted-foreground text-sm">Chưa có sinh viên nào trong phòng này.</div>
           ) : (
             <>
-              <table className="w-full text-sm text-left mb-6">
-                <thead className="text-muted-foreground font-semibold border-b border-border/50">
-                  <tr>
-                    <th className="py-3 px-4">STT</th>
-                    <th className="py-3 px-4">Mã sinh viên</th>
-                    <th className="py-3 px-4">Họ và tên</th>
-                    <th className="py-3 px-4">Email</th>
-                    <th className="py-3 px-4">Vai trò</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/50 text-foreground">
+              <Table aria-label="Danh sách bạn cùng phòng" className="mb-6">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16 text-center">STT</TableHead>
+                    <TableHead>Mã sinh viên</TableHead>
+                    <TableHead>Họ và tên</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Vai trò</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {roommates.map((student, idx) => (
-                    <tr key={student.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="py-3.5 px-4">{idx + 1}</td>
-                      <td className="py-3.5 px-4 font-medium">{student.userCode}</td>
-                      <td className="py-3.5 px-4 font-semibold">{student.fullName}</td>
-                      <td className="py-3.5 px-4 text-muted-foreground">{student.email || '-'}</td>
-                      <td className="py-3.5 px-4">
-                        {idx === 0 ? (
-                          <Badge variant="success">Trưởng phòng</Badge>
-                        ) : (
-                          <Badge variant="secondary">Thành viên</Badge>
-                        )}
-                      </td>
-                    </tr>
+                    <TableRow key={student.id}>
+                      <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
+                      <TableCell className="font-medium text-foreground">{student.studentCode}</TableCell>
+                      <TableCell className="font-semibold text-foreground">{student.fullName}</TableCell>
+                      <TableCell className="text-muted-foreground">{student.email || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">Thành viên</Badge>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
 
               <div className="bg-primary/5 rounded-lg p-4 flex items-start gap-3 border border-primary/20">
                 <ShieldCheck size={20} className="text-primary shrink-0 mt-0.5" weight="fill" />

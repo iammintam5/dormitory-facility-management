@@ -39,7 +39,7 @@ export function PageHeader({ title, description, actions, breadcrumbs }: PageHea
                     )}
                     
                     {!isLast && (
-                      <CaretRight size={12} weight="bold" className="text-muted-foreground/50 shrink-0" />
+                      <CaretRight size={12} weight="bold" className="text-muted-foreground/50 shrink-0" aria-hidden="true" />
                     )}
                   </li>
                 );

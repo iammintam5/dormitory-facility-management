@@ -19,6 +19,12 @@ import { Input } from '../../components/ui/Input';
 import { Select as UISelect } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Pagination } from '../../components/ui/Pagination';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SearchInput } from '../../components/ui/SearchInput';
+import { FilterBar } from '../../components/ui/FilterBar';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { useDebounce } from '../../hooks/useDebounce';
 import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { 
@@ -67,6 +73,7 @@ export function DamageReportsManagementPage() {
   
   // Filters
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebounce(keyword, 400);
   const [filterBuilding, setFilterBuilding] = useState('');
   const [filterRoom, setFilterRoom] = useState('');
   const [filterPriority, setFilterPriority] = useState('');
@@ -103,7 +110,7 @@ export function DamageReportsManagementPage() {
       const res = await getDamageReports({
         page: pagination.page,
         pageSize: pagination.pageSize,
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
         buildingId: filterBuilding || undefined,
         roomId: filterRoom || undefined,
         priority: filterPriority || undefined,
@@ -116,7 +123,7 @@ export function DamageReportsManagementPage() {
     } finally {
       setIsFetching(false);
     }
-  }, [pagination.page, pagination.pageSize, keyword, filterBuilding, filterRoom, filterPriority, filterStatus, showToast]);
+  }, [pagination.page, pagination.pageSize, debouncedKeyword, filterBuilding, filterRoom, filterPriority, filterStatus, showToast]);
 
   useEffect(() => {
     loadReports();
@@ -292,57 +299,45 @@ export function DamageReportsManagementPage() {
         </div>
       )}
 
-      <Card className="border-border/50">
-        <CardContent className="p-5 flex flex-wrap gap-4 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Tìm kiếm</label>
-            <div className="relative">
-              <Input 
-                placeholder="Mã BH, người báo..." 
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                className="pl-9"
-              />
-              <MagnifyingGlass size={16} className="absolute left-3 top-2.5 text-muted-foreground" />
-            </div>
-          </div>
-          <div className="w-full md:w-32">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Khu nhà</label>
+      <FilterBar 
+        searchNode={
+          <SearchInput
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="Mã BH, người báo..."
+            aria-label="Tìm kiếm báo hỏng"
+          />
+        }
+        filterNode={
+          <>
             <UISelect 
               value={filterBuilding}
               onChange={(e) => {
                 setFilterBuilding(e.target.value);
                 setFilterRoom('');
               }}
+              aria-label="Lọc theo khu nhà"
             >
-              <option value="">Tất cả</option>
+              <option value="">Tất cả khu nhà</option>
               {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </UISelect>
-          </div>
-          <div className="w-full md:w-32">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Phòng</label>
             <UISelect 
               value={filterRoom}
               onChange={(e) => setFilterRoom(e.target.value)}
+              aria-label="Lọc theo phòng"
             >
-              <option value="">Tất cả</option>
+              <option value="">Tất cả phòng</option>
               {rooms.filter(r => !filterBuilding || r.buildingId === filterBuilding).map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
             </UISelect>
-          </div>
-          <div className="w-full md:w-36">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Mức độ</label>
-            <UISelect value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)}>
-              <option value="">Tất cả</option>
+            <UISelect value={filterPriority} onChange={(e) => setFilterPriority(e.target.value)} aria-label="Lọc theo mức độ">
+              <option value="">Tất cả mức độ</option>
               <option value="LOW">Thấp</option>
               <option value="MEDIUM">Trung bình</option>
               <option value="HIGH">Cao</option>
               <option value="URGENT">Khẩn cấp</option>
             </UISelect>
-          </div>
-          <div className="w-full md:w-40">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Trạng thái</label>
-            <UISelect value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-              <option value="">Tất cả</option>
+            <UISelect value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} aria-label="Lọc theo trạng thái">
+              <option value="">Tất cả trạng thái</option>
               <option value="SUBMITTED">Đã gửi</option>
               <option value="REVIEWING">Chờ xử lý</option>
               <option value="APPROVED">Đã duyệt</option>
@@ -350,128 +345,134 @@ export function DamageReportsManagementPage() {
               <option value="COMPLETED">Hoàn thành</option>
               <option value="REJECTED">Từ chối/Hủy</option>
             </UISelect>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button onClick={loadReports} className="gap-2">
-              <Funnel size={16} weight="bold" />
-              Lọc
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => {
-                setKeyword('');
-                setFilterBuilding('');
-                setFilterRoom('');
-                setFilterPriority('');
-                setFilterStatus('');
-                setPagination(p => ({ ...p, page: 1 }));
-              }} 
-              className="gap-2"
-            >
-              <ArrowsClockwise size={16} weight="bold" />
-              Làm mới
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+        appliedFilterCount={[
+          filterBuilding,
+          filterRoom,
+          filterPriority,
+          filterStatus
+        ].filter(Boolean).length}
+        onResetFilters={() => {
+          setKeyword('');
+          setFilterBuilding('');
+          setFilterRoom('');
+          setFilterPriority('');
+          setFilterStatus('');
+          setPagination(p => ({ ...p, page: 1 }));
+        }}
+        filterChips={[
+          ...(filterBuilding ? [{ id: 'building', label: `Khu: ${buildings.find(b => b.id === filterBuilding)?.name}`, onRemove: () => setFilterBuilding('') }] : []),
+          ...(filterRoom ? [{ id: 'room', label: `Phòng: ${rooms.find(r => r.id === filterRoom)?.roomCode}`, onRemove: () => setFilterRoom('') }] : []),
+          ...(filterPriority ? [{ id: 'priority', label: `Mức độ: ${filterPriority}`, onRemove: () => setFilterPriority('') }] : []),
+          ...(filterStatus ? [{ id: 'status', label: `Trạng thái: ${filterStatus}`, onRemove: () => setFilterStatus('') }] : []),
+        ]}
+      />
 
       <Card className="border-border/50 overflow-hidden">
-        <div className="overflow-x-auto py-6">
+        <div className="flex flex-col py-6">
           {isFetching ? (
             <div className="px-5">
               <SkeletonTable rows={10} cols={8} />
             </div>
+          ) : reports.length === 0 ? (
+            <div className="p-10">
+              <EmptyState 
+                title="Không có dữ liệu báo hỏng" 
+                description="Chưa có báo hỏng nào phù hợp với bộ lọc hiện tại."
+              />
+            </div>
           ) : (
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted/30 text-muted-foreground border-b border-border/50">
-                <tr>
-                  <th className="px-4 py-4 text-center font-semibold w-12">STT</th>
-                  <th className="px-4 py-4 text-center font-semibold">Mã báo hỏng</th>
-                  <th className="px-4 py-4 text-center font-semibold">Ngày tạo</th>
-                  <th className="px-4 py-4 text-center font-semibold">Phòng</th>
-                  <th className="px-4 py-4 text-center font-semibold">Người báo</th>
-                  <th className="px-4 py-4 text-center font-semibold">Thiết bị</th>
-                  <th className="px-4 py-4 text-center font-semibold">Mức độ</th>
-                  <th className="px-4 py-4 text-center font-semibold">Trạng thái</th>
-                  <th className="px-4 py-4 text-center font-semibold w-24">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50 text-foreground">
-                {reports.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} className="text-center py-10 text-muted-foreground">Không có dữ liệu báo hỏng</td>
-                  </tr>
-                ) : reports.map((report, idx) => (
-                  <tr key={report.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3.5 text-center font-medium text-muted-foreground">
-                      {(pagination.page - 1) * pagination.pageSize + idx + 1}
-                    </td>
-                    <td className="px-4 py-3.5 text-center font-bold">{report.reportCode}</td>
-                    <td className="px-4 py-3.5 text-center tabular-nums">{new Date(report.createdAt).toLocaleDateString('vi-VN')}</td>
-                    <td className="px-4 py-3.5 text-center font-medium">{report.room?.roomCode || '-'}</td>
-                    <td className="px-4 py-3.5 text-center font-semibold text-primary">
-                      {report.reporter?.fullName || report.reporterId}
-                    </td>
-                    <td className="px-4 py-3.5 text-center">{report.asset?.assetName || '-'}</td>
-                    <td className="px-4 py-3.5 text-center">{renderPriorityBadge(report.priority)}</td>
-                    <td className="px-4 py-3.5 text-center">{renderStatusBadge(report.status)}</td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => setActiveReportDetail(report)}
-                          title="Xem chi tiết"
-                        >
-                          <Eye size={16} className="text-blue-600" />
-                        </Button>
-                        {report.status === 'SUBMITTED' && (
-                          <>
-                            <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'accept')} title="Duyệt">
-                              <Check size={16} className="text-primary" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'reject')} title="Từ chối">
-                              <X size={16} className="text-destructive" />
-                            </Button>
-                          </>
-                        )}
-                        {(report.status === 'APPROVED' || report.status === 'REVIEWING') && (
-                          <>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => {
-                                navigate(`/manager/maintenance/records/new?damageReportId=${report.id}&assetId=${report.assetId}`);
-                              }} 
-                              title="Tạo lệnh bảo trì"
-                            >
-                              <Wrench size={16} className="text-amber-600" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'reject')} title="Từ chối">
-                              <X size={16} className="text-destructive" />
-                            </Button>
-                          </>
-                        )}
-                        {report.status === 'IN_PROGRESS' && (
-                          <div className="flex flex-col items-center gap-1">
-                            {report.maintenanceRecords && report.maintenanceRecords.length > 0 && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => navigate(`/manager/maintenance?search=${report.maintenanceRecords![0].maintenanceCode}`)}
-                                title="Xem phiếu bảo trì"
-                              >
-                                <ArrowRight size={16} className="text-emerald-600" />
-                              </Button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+            <>
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/30 text-muted-foreground border-b border-border/50">
+                    <tr>
+                      <th className="px-4 py-4 text-center font-semibold w-12">STT</th>
+                      <th className="px-4 py-4 text-center font-semibold">Mã báo hỏng</th>
+                      <th className="px-4 py-4 text-center font-semibold">Ngày tạo</th>
+                      <th className="px-4 py-4 text-center font-semibold">Phòng</th>
+                      <th className="px-4 py-4 text-center font-semibold">Người báo</th>
+                      <th className="px-4 py-4 text-center font-semibold">Thiết bị</th>
+                      <th className="px-4 py-4 text-center font-semibold">Mức độ</th>
+                      <th className="px-4 py-4 text-center font-semibold">Trạng thái</th>
+                      <th className="px-4 py-4 text-center font-semibold w-24">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50 text-foreground">
+                    {reports.map((report, idx) => (
+                      <tr key={report.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3.5 text-center font-medium text-muted-foreground">
+                          {(pagination.page - 1) * pagination.pageSize + idx + 1}
+                        </td>
+                        <td className="px-4 py-3.5 text-center font-bold">{report.reportCode}</td>
+                        <td className="px-4 py-3.5 text-center tabular-nums">{new Date(report.createdAt).toLocaleDateString('vi-VN')}</td>
+                        <td className="px-4 py-3.5 text-center font-medium">{report.room?.roomCode || '-'}</td>
+                        <td className="px-4 py-3.5 text-center font-semibold text-primary">
+                          {report.reporter?.fullName || report.reporterId}
+                        </td>
+                        <td className="px-4 py-3.5 text-center">{report.asset?.assetName || '-'}</td>
+                        <td className="px-4 py-3.5 text-center">{renderPriorityBadge(report.priority)}</td>
+                        <td className="px-4 py-3.5 text-center">{renderStatusBadge(report.status)}</td>
+                        <td className="px-4 py-3.5">
+                          <RowActionsMenu
+                            ariaLabel={`Thao tác báo hỏng ${report.reportCode}`}
+                            actions={[
+                              { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => setActiveReportDetail(report) },
+                              ...(report.status === 'SUBMITTED' ? [
+                                { id: 'accept', label: 'Duyệt', icon: <Check size={16} />, onClick: () => handleAction(report.id, 'accept') },
+                                { id: 'reject', label: 'Từ chối', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'reject') },
+                              ] : []),
+                              ...((report.status === 'APPROVED' || report.status === 'REVIEWING') ? [
+                                { id: 'start', label: 'Tạo lệnh bảo trì', icon: <Wrench size={16} />, onClick: () => navigate(`/manager/maintenance/records/new?damageReportId=${report.id}&assetId=${report.assetId}`) },
+                                { id: 'reject', label: 'Từ chối', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'reject') },
+                              ] : []),
+                              ...(report.status === 'IN_PROGRESS' && report.maintenanceRecords && report.maintenanceRecords.length > 0 ? [
+                                { id: 'view-maint', label: 'Xem phiếu bảo trì', icon: <ArrowRight size={16} />, onClick: () => navigate(`/manager/maintenance?search=${report.maintenanceRecords![0].maintenanceCode}`) },
+                              ] : [])
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="lg:hidden flex flex-col gap-3 p-3">
+                {reports.map((report) => (
+                  <MobileDataCard
+                    key={report.id}
+                    title={report.reportCode}
+                    subtitle={new Date(report.createdAt).toLocaleDateString('vi-VN')}
+                    statusBadge={renderStatusBadge(report.status)}
+                    actionMenu={
+                      <RowActionsMenu
+                        ariaLabel={`Thao tác báo hỏng ${report.reportCode}`}
+                        actions={[
+                          { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => setActiveReportDetail(report) },
+                          ...(report.status === 'SUBMITTED' ? [
+                            { id: 'accept', label: 'Duyệt', icon: <Check size={16} />, onClick: () => handleAction(report.id, 'accept') },
+                            { id: 'reject', label: 'Từ chối', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'reject') },
+                          ] : []),
+                          ...((report.status === 'APPROVED' || report.status === 'REVIEWING') ? [
+                            { id: 'start', label: 'Tạo lệnh bảo trì', icon: <Wrench size={16} />, onClick: () => navigate(`/manager/maintenance/records/new?damageReportId=${report.id}&assetId=${report.assetId}`) },
+                            { id: 'reject', label: 'Từ chối', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'reject') },
+                          ] : []),
+                          ...(report.status === 'IN_PROGRESS' && report.maintenanceRecords && report.maintenanceRecords.length > 0 ? [
+                            { id: 'view-maint', label: 'Xem phiếu bảo trì', icon: <ArrowRight size={16} />, onClick: () => navigate(`/manager/maintenance?search=${report.maintenanceRecords![0].maintenanceCode}`) },
+                          ] : [])
+                        ]}
+                      />
+                    }
+                  >
+                    <DataLabel label="Người báo" value={report.reporter?.fullName || report.reporterId || '-'} />
+                    <DataLabel label="Phòng" value={report.room?.roomCode || '-'} />
+                    <DataLabel label="Thiết bị" value={report.asset?.assetName || '-'} />
+                    <DataLabel label="Mức độ" value={renderPriorityBadge(report.priority)} />
+                  </MobileDataCard>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
         

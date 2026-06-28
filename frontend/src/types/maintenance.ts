@@ -1,7 +1,7 @@
 import { Asset } from './assets';
 import { User } from './users';
 
-export type MaintenanceType = 'SCHEDULED' | 'AD_HOC' | 'AFTER_INVENTORY';
+export type MaintenanceType = 'SCHEDULED' | 'AD_HOC';
 export type MaintenanceResultStatus =
   | 'GOOD'
   | 'RECOMMEND_LIQUIDATION';

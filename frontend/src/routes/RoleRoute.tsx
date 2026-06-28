@@ -1,6 +1,7 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/auth-context';
 import { UserRole } from '../types/auth';
+import { ForbiddenPage } from '../pages/ForbiddenPage';
 
 type RoleRouteProps = {
   allowedRoles: UserRole[];
@@ -8,25 +9,16 @@ type RoleRouteProps = {
 
 export function RoleRoute({ allowedRoles }: RoleRouteProps) {
   const { user } = useAuth();
+  const location = useLocation();
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
   if (!allowedRoles.includes(user.role)) {
-    return <Navigate to={getDashboardPath(user.role)} replace />;
+    return <ForbiddenPage />;
   }
 
   return <Outlet />;
 }
 
-function getDashboardPath(role: UserRole) {
-  switch (role) {
-    case 'ADMIN':
-      return '/admin/dashboard';
-    case 'MANAGER':
-      return '/manager/dashboard';
-    case 'STUDENT':
-      return '/student/dashboard';
-  }
-}

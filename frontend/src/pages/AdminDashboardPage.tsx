@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { getApiErrorMessage } from '../lib/api-client';
 import { getDashboardSummary, type AdminDashboardSummary } from '../services/reports';
 import { useToast } from '../toast/toast-context';
+import { PageHeader } from '../components/ui/PageHeader';
 import { 
   Users, 
   GraduationCap, 
@@ -22,7 +23,7 @@ import { Skeleton, SkeletonStatCard } from '../components/ui/Skeleton';
 
 const recentActions = [
   { label: 'Đồng bộ người dùng và phân quyền', icon: Users, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-500/10' },
-  { label: 'Theo dõi kiểm kê, thanh lý và bảo trì', icon: Checks, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
+  { label: 'Theo dõi thanh lý và bảo trì', icon: Checks, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
   { label: 'Rà soát báo hỏng phát sinh gần đây', icon: WarningCircle, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-500/10' },
 ] as const;
 
@@ -59,19 +60,13 @@ export function AdminDashboardPage() {
   return (
     <div className="space-y-6">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Bảng điều khiển quản trị
-          </h1>
-          <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
-            <Link to="/admin/dashboard" className="transition-colors hover:text-primary">
-              Trang chủ
-            </Link>
-            <span className="text-muted-foreground/40">/</span>
-            <span className="text-foreground font-medium">Bảng điều khiển</span>
-          </div>
-        </div>
+        <PageHeader 
+          title="Bảng điều khiển quản trị"
+          breadcrumbs={[
+            { label: 'Trang chủ', href: '/admin/dashboard' },
+            { label: 'Bảng điều khiển' }
+          ]}
+        />
 
         {/* Stats Row */}
         {isLoading ? (

@@ -449,14 +449,7 @@ export function ExportEquipmentPage() {
             </Link>
           </Button>
           <div className="flex items-center gap-2 w-full md:w-auto flex-wrap md:flex-nowrap">
-            <Button 
-              variant="outline" 
-              className="flex-1 md:flex-none gap-2 text-primary hover:text-primary"
-              onClick={() => showToast('Đã lưu nháp (chức năng đang phát triển)', 'success')}
-            >
-              <ArrowsClockwise size={16} weight="bold" />
-              Lưu nháp
-            </Button>
+
             <Button 
               className="w-full md:w-auto gap-2"
               onClick={handleConfirmExport}

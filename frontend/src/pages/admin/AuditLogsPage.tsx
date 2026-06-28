@@ -18,6 +18,12 @@ import { SkeletonTable } from '../../components/ui/Skeleton';
 import { Pagination } from '../../components/ui/Pagination';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 import { Modal } from '../../components/ui/Modal';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SearchInput } from '../../components/ui/SearchInput';
+import { FilterBar } from '../../components/ui/FilterBar';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { useDebounce } from '../../hooks/useDebounce';
 
 type AuditLogRow = AuditLogItem & {
   actorLabel: string;
@@ -28,6 +34,7 @@ type AuditLogRow = AuditLogItem & {
 export function AuditLogsPage() {
   const { showToast } = useToast();
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebounce(keyword, 400);
   const [action, setAction] = useState('ALL');
   const [logs, setLogs] = useState<AuditLogRow[]>([]);
   const [page, setPage] = useState(1);
@@ -46,10 +53,10 @@ export function AuditLogsPage() {
       setIsLoading(true);
       try {
         const response = await getAuditLogs({
-          keyword: keyword || undefined,
+          keyword: debouncedKeyword || undefined,
           action: action === 'ALL' ? undefined : action,
-          page,
-          pageSize: 10,
+          page: pagination.page,
+          pageSize: pagination.pageSize,
         });
 
         setLogs(response.items.map(mapAuditLog));
@@ -62,7 +69,7 @@ export function AuditLogsPage() {
     }
 
     void loadLogs();
-  }, [action, keyword, page, showToast]);
+  }, [action, debouncedKeyword, pagination.page, pagination.pageSize, showToast]);
 
   const totalLabel = useMemo(() => {
     if (pagination.total === 0) return 'Không có kết quả';
@@ -92,54 +99,43 @@ export function AuditLogsPage() {
         description="Theo dõi các hoạt động, thay đổi trong hệ thống của người dùng."
       />
 
-      <Card className="border-border/50">
-        <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-end">
-          <div className="flex-1 min-w-[220px]">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
-            <Input
-              value={keyword}
-              onChange={(e) => {
-                setPage(1);
-                setKeyword(e.target.value);
-              }}
-              placeholder="Tìm theo entity hoặc nội dung..."
-            />
-          </div>
-
-          <div className="w-full md:w-[200px]">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Hành động</label>
-            <Select
-              value={action}
-              onChange={(e) => {
-                setPage(1);
-                setAction(e.target.value);
-              }}
-            >
-              <option value="ALL">Tất cả</option>
-              {auditActionOptions.map((option) => (
-                <option key={option} value={option}>
-                  {actionLabel[option] ?? option}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          <div className="flex w-full md:w-auto">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setKeyword('');
-                setAction('ALL');
-                setPage(1);
-              }}
-              className="gap-2 w-full md:w-auto"
-            >
-              <ArrowsClockwise size={16} weight="bold" />
-              Làm mới
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <FilterBar 
+        searchNode={
+          <SearchInput
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="Tìm theo entity hoặc nội dung..."
+            aria-label="Tìm kiếm nhật ký"
+          />
+        }
+        filterNode={
+          <Select
+            value={action}
+            onChange={(e) => {
+              setPagination(p => ({ ...p, page: 1 }));
+              setAction(e.target.value);
+            }}
+            aria-label="Lọc theo hành động"
+          >
+            <option value="ALL">Tất cả hành động</option>
+            {auditActionOptions.map((option) => (
+              <option key={option} value={option}>
+                {actionLabel[option] ?? option}
+              </option>
+            ))}
+          </Select>
+        }
+        appliedFilterCount={[
+          action !== 'ALL' ? action : ''
+        ].filter(Boolean).length}
+        onResetFilters={() => {
+          setKeyword('');
+          setAction('ALL');
+        }}
+        filterChips={[
+          ...(action !== 'ALL' ? [{ id: 'action', label: `Hành động: ${actionLabel[action] ?? action}`, onRemove: () => setAction('ALL') }] : []),
+        ]}
+      />
 
       <Card className="border-border/50 overflow-hidden">
         {isLoading ? (
@@ -147,72 +143,98 @@ export function AuditLogsPage() {
             <SkeletonTable rows={10} cols={6} />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16 text-center">STT</TableHead>
-                <TableHead>Thời gian</TableHead>
-                <TableHead>Người thực hiện</TableHead>
-                <TableHead>Vai trò</TableHead>
-                <TableHead>Hành động</TableHead>
-                <TableHead>Đối tượng</TableHead>
-                <TableHead>Nội dung</TableHead>
-                <TableHead>IP</TableHead>
-                <TableHead className="text-center">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <div className="flex flex-col">
               {logs.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
-                    Chưa có dữ liệu audit log.
-                  </TableCell>
-                </TableRow>
+                <div className="p-10">
+                  <EmptyState 
+                    title="Không tìm thấy nhật ký" 
+                    description="Chưa có bản ghi nhật ký nào phù hợp với bộ lọc hiện tại."
+                  />
+                </div>
               ) : (
-                logs.map((log, index) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="text-center font-medium text-muted-foreground">
-                      {(pagination.page - 1) * pagination.pageSize + index + 1}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatDateTime(log.createdAt)}
-                    </TableCell>
-                    <TableCell className="font-semibold text-foreground">{log.actorLabel}</TableCell>
-                    <TableCell className="text-muted-foreground">{log.roleLabel}</TableCell>
-                    <TableCell>
-                      <span className="inline-flex rounded px-2 py-1 text-[11px] font-bold bg-blue-50 text-blue-600">
-                        {log.actionLabel}
-                      </span>
-                    </TableCell>
-                    <TableCell className="font-medium text-foreground whitespace-nowrap">
-                      {log.entityType}
-                    </TableCell>
-                    <TableCell className="max-w-[250px] truncate text-muted-foreground">
-                      {log.content || '--'}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                      {formatIp(log.ipAddress)}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => void openDetail(log.id)}
-                        disabled={isDetailLoading}
-                        title="Xem chi tiết"
+                <>
+                  <div className="hidden md:block">
+                    <Table aria-label="Danh sách nhật ký">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16 text-center">STT</TableHead>
+                          <TableHead>Thời gian</TableHead>
+                          <TableHead>Người thực hiện</TableHead>
+                          <TableHead>Vai trò</TableHead>
+                          <TableHead>Hành động</TableHead>
+                          <TableHead>Đối tượng</TableHead>
+                          <TableHead>Nội dung</TableHead>
+                          <TableHead>IP</TableHead>
+                          <TableHead className="text-center w-24">Thao tác</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {logs.map((log, idx) => (
+                          <TableRow key={log.id}>
+                            <TableCell className="text-center font-medium text-muted-foreground">
+                              {(pagination.page - 1) * pagination.pageSize + idx + 1}
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap text-muted-foreground">
+                              {formatDateTime(log.createdAt)}
+                            </TableCell>
+                            <TableCell className="font-semibold text-foreground">{log.actorLabel}</TableCell>
+                            <TableCell className="text-muted-foreground">{log.roleLabel}</TableCell>
+                            <TableCell>
+                              <span className="inline-flex rounded px-2.5 py-0.5 text-[11px] font-semibold bg-blue-50 text-blue-600">
+                                {log.actionLabel}
+                              </span>
+                            </TableCell>
+                            <TableCell className="font-medium text-foreground whitespace-nowrap">
+                              {log.entityType}
+                            </TableCell>
+                            <TableCell className="max-w-[250px] truncate text-muted-foreground">
+                              {log.content || '--'}
+                            </TableCell>
+                            <TableCell className="font-mono text-xs text-muted-foreground whitespace-nowrap">
+                              {formatIp(log.ipAddress)}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <RowActionsMenu
+                                ariaLabel={`Xem nhật ký`}
+                                actions={[
+                                  { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetail(log.id) }
+                                ]}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden flex flex-col gap-3 p-3">
+                    {logs.map((log) => (
+                      <MobileDataCard
+                        key={log.id}
+                        title={log.actorLabel}
+                        subtitle={formatDateTime(log.createdAt)}
+                        statusBadge={
+                          <span className="inline-flex rounded px-2 py-1 text-[11px] font-bold bg-blue-50 text-blue-600">
+                            {log.actionLabel}
+                          </span>
+                        }
+                        actionMenu={
+                          <RowActionsMenu
+                            ariaLabel={`Xem nhật ký`}
+                            actions={[
+                              { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetail(log.id) }
+                            ]}
+                          />
+                        }
                       >
-                        {isDetailLoading ? (
-                          <Spinner size={16} className="animate-spin text-muted-foreground" />
-                        ) : (
-                          <Eye size={16} className="text-muted-foreground" />
-                        )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                        <DataLabel label="Vai trò" value={log.roleLabel} />
+                        <DataLabel label="Đối tượng" value={log.entityType} />
+                        <DataLabel label="IP" value={formatIp(log.ipAddress)} />
+                      </MobileDataCard>
+                    ))}
+                  </div>
+                </>
               )}
-            </TableBody>
-          </Table>
+          </div>
         )}
 
         <Pagination
@@ -220,7 +242,8 @@ export function AuditLogsPage() {
           totalPages={pagination.totalPages}
           total={pagination.total}
           pageSize={pagination.pageSize}
-          onPageChange={(p) => { setPage(p); }}
+          onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+          onPageSizeChange={(s) => setPagination(prev => ({ ...prev, pageSize: s, page: 1 }))}
           label={totalLabel}
         />
       </Card>
