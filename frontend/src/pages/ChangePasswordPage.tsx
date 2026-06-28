@@ -7,6 +7,7 @@ import { useToast } from '../toast/toast-context';
 import { Card, CardContent } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { Field } from '../components/ui/Field';
 import { PageHeader } from '../components/ui/PageHeader';
 import { 
   LockKey, 
@@ -30,6 +31,7 @@ export function ChangePasswordPage() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const strength = useMemo(() => {
     if (!newPassword) return { level: 0, label: '', color: '' };
@@ -47,20 +49,30 @@ export function ChangePasswordPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      showToast('Vui lòng điền đầy đủ tất cả các trường.', 'error');
-      return;
+    setErrors({});
+    let newErrors: Record<string, string> = {};
+
+    if (!currentPassword) newErrors.currentPassword = 'Vui lòng nhập mật khẩu hiện tại.';
+    if (!newPassword) newErrors.newPassword = 'Vui lòng nhập mật khẩu mới.';
+    if (!confirmPassword) newErrors.confirmPassword = 'Vui lòng xác nhận mật khẩu mới.';
+    
+    if (newPassword && confirmPassword && newPassword !== confirmPassword) {
+      newErrors.confirmPassword = 'Mật khẩu mới và xác nhận không khớp.';
     }
-    if (newPassword !== confirmPassword) {
-      showToast('Mật khẩu mới và xác nhận không khớp.', 'error');
-      return;
+    if (newPassword && newPassword.length < 6) {
+      newErrors.newPassword = 'Mật khẩu mới phải có ít nhất 6 ký tự.';
     }
-    if (newPassword.length < 6) {
-      showToast('Mật khẩu mới phải có ít nhất 6 ký tự.', 'error');
-      return;
+    if (newPassword && newPassword === currentPassword) {
+      newErrors.newPassword = 'Mật khẩu mới phải khác mật khẩu hiện tại.';
     }
-    if (newPassword === currentPassword) {
-      showToast('Mật khẩu mới phải khác mật khẩu hiện tại.', 'error');
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      // Focus on first error
+      setTimeout(() => {
+        const firstErrorId = Object.keys(newErrors)[0];
+        document.getElementById(firstErrorId)?.focus();
+      }, 0);
       return;
     }
 
@@ -85,6 +97,7 @@ export function ChangePasswordPage() {
     setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
+    setErrors({});
   };
 
   return (
@@ -115,22 +128,28 @@ export function ChangePasswordPage() {
             </div>
 
             <div className="flex-1 w-full max-w-xl">
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6" noValidate>
                 <PasswordField
+                  id="currentPassword"
                   label="Mật khẩu hiện tại"
                   value={currentPassword}
                   onChange={setCurrentPassword}
                   show={showCurrent}
                   onToggle={() => setShowCurrent((current) => !current)}
+                  error={errors.currentPassword}
+                  autoComplete="current-password"
                 />
                 
                 <div className="space-y-2">
                   <PasswordField
+                    id="newPassword"
                     label="Mật khẩu mới"
                     value={newPassword}
                     onChange={setNewPassword}
                     show={showNew}
                     onToggle={() => setShowNew((current) => !current)}
+                    error={errors.newPassword}
+                    autoComplete="new-password"
                   />
                   
                   {newPassword && (
@@ -159,24 +178,26 @@ export function ChangePasswordPage() {
                           ))}
                         </div>
                       </div>
+                      <ul className="text-xs text-muted-foreground space-y-1 pl-4 list-disc marker:text-muted-foreground/50">
+                        <li>Ít nhất 8 ký tự</li>
+                        <li>Có chữ hoa, chữ thường và số</li>
+                        <li>Có ký tự đặc biệt</li>
+                      </ul>
                     </div>
                   )}
                 </div>
 
                 <div className="space-y-2">
                   <PasswordField
+                    id="confirmPassword"
                     label="Xác nhận mật khẩu mới"
                     value={confirmPassword}
                     onChange={setConfirmPassword}
                     show={showConfirm}
                     onToggle={() => setShowConfirm((current) => !current)}
+                    error={errors.confirmPassword}
+                    autoComplete="new-password"
                   />
-                  
-                  {confirmPassword && newPassword !== confirmPassword && (
-                    <p className="text-xs text-destructive font-medium">
-                      Mật khẩu xác nhận không khớp.
-                    </p>
-                  )}
                 </div>
 
                 <div className="pt-6 flex justify-end gap-3 border-t border-border/50">
@@ -208,23 +229,26 @@ export function ChangePasswordPage() {
 }
 
 function PasswordField({
+  id,
   label,
   value,
   onChange,
   show,
   onToggle,
+  error,
+  autoComplete,
 }: {
+  id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
   show: boolean;
   onToggle: () => void;
+  error?: string;
+  autoComplete: string;
 }) {
   return (
-    <div className="space-y-1.5">
-      <label className="block text-xs font-semibold text-muted-foreground">
-        {label} <span className="text-destructive">*</span>
-      </label>
+    <Field id={id} label={label} error={error} required>
       <div className="relative">
         <Input
           type={show ? 'text' : 'password'}
@@ -232,17 +256,20 @@ function PasswordField({
           onChange={(event) => onChange(event.target.value)}
           placeholder={`Nhập ${label.toLowerCase()}`}
           className="pr-10"
+          autoComplete={autoComplete}
+          name={id}
         />
         <button
           type="button"
           onClick={onToggle}
-          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-1"
-          tabIndex={-1}
+          className="absolute right-0 top-0 h-full px-3 text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-r-md"
+          aria-label={show ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+          aria-pressed={show}
         >
-          {show ? <EyeSlash size={18} /> : <Eye size={18} />}
+          {show ? <EyeSlash size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
         </button>
       </div>
-    </div>
+    </Field>
   );
 }
 

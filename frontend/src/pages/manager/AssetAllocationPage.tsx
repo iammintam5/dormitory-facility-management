@@ -102,10 +102,10 @@ export function AssetAllocationPage() {
   };
 
   const getConditionBadge = (label: string) => {
-    if (label === 'Tốt') return <span className="px-2 py-1 bg-green-100 text-green-700 rounded-md text-xs font-medium">{label}</span>;
-    if (label === 'Khá') return <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-medium">{label}</span>;
-    if (label === 'Kém') return <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded-md text-xs font-medium">{label}</span>;
-    return <span className="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-medium">{label}</span>;
+    if (label === 'Tốt') return <span className="px-2 py-1 bg-success-muted text-success rounded-md text-xs font-medium">{label}</span>;
+    if (label === 'Khá') return <span className="px-2 py-1 bg-info-muted text-info rounded-md text-xs font-medium">{label}</span>;
+    if (label === 'Kém') return <span className="px-2 py-1 bg-warning-muted text-warning rounded-md text-xs font-medium">{label}</span>;
+    return <span className="px-2 py-1 bg-destructive-muted text-destructive rounded-md text-xs font-medium">{label}</span>;
   };
 
   const getStatusBadge = (label: string) => {
@@ -396,7 +396,7 @@ export function AssetAllocationPage() {
                       </TableCell>
                       <TableCell className="font-medium">{asset.assetCode}</TableCell>
                       <TableCell>{asset.assetName}</TableCell>
-                      <TableCell><span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium">{asset.categoryName}</span></TableCell>
+                      <TableCell><span className="px-2 py-1 bg-muted text-muted-foreground rounded-md text-xs font-medium">{asset.categoryName}</span></TableCell>
                       <TableCell>{getConditionBadge(asset.conditionLabel)}</TableCell>
                     </TableRow>
                   ))
@@ -450,7 +450,7 @@ export function AssetAllocationPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Ghi chú thu hồi</label>
-              <Input value={reclaimNote} onChange={(e) => setReclaimNote(e.target.value)} placeholder="VD: Thu hồi khi trả phòng / kiểm kê cuối kỳ" />
+              <Input value={reclaimNote} onChange={(e) => setReclaimNote(e.target.value)} placeholder="VD: Thu hồi khi trả phòng / hỏng hóc" />
             </div>
           </div>
 
@@ -510,7 +510,7 @@ export function AssetAllocationPage() {
                       </TableCell>
                       <TableCell className="font-medium">{asset.assetCode}</TableCell>
                       <TableCell>{asset.assetName}</TableCell>
-                      <TableCell><span className="px-2 py-1 bg-slate-100 text-slate-700 rounded-md text-xs font-medium">{asset.categoryName}</span></TableCell>
+                      <TableCell><span className="px-2 py-1 bg-muted text-muted-foreground rounded-md text-xs font-medium">{asset.categoryName}</span></TableCell>
                       <TableCell>{getStatusBadge(asset.statusLabel)}</TableCell>
                     </TableRow>
                   ))
@@ -555,7 +555,7 @@ export function AssetAllocationPage() {
               {printData?.type === 'RECLAIM' ? 'BIÊN BẢN THU HỒI TÀI SẢN' : 'BIÊN BẢN BÀN GIAO TÀI SẢN'}
             </h1>
             <p>Số phiếu: {printData?.receiptCode}</p>
-            <p className="mt-2 text-xs italic text-slate-600">
+            <p className="mt-2 text-xs italic text-muted-foreground">
               Biên bản được in từ dữ liệu hệ thống. Có thể đối chiếu mẫu PDF {printTemplate.code} khi cần in mẫu trắng.
             </p>
           </div>

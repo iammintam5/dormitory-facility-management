@@ -29,6 +29,13 @@ import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { Pagination } from '../../components/ui/Pagination';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SearchInput } from '../../components/ui/SearchInput';
+import { FilterBar } from '../../components/ui/FilterBar';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { useDebounce } from '../../hooks/useDebounce';
 import { getAllRoomsWithAssignments, assignStudentToRoom, transferStudentToRoom } from '../../services/locations';
 import { getUsers } from '../../services/users';
 
@@ -116,6 +123,7 @@ export function RoomStudentsManagementPage() {
     faculty: '',
     course: '',
   });
+  const debouncedSearch = useDebounce(filterValues.search, 400);
 
   // === Pagination state ===
   const [currentPage, setCurrentPage] = useState(1);
@@ -123,8 +131,8 @@ export function RoomStudentsManagementPage() {
 
   // === Derived: filtered + paginated data ===
   const filteredStudents = students.filter(s => {
-    if (filterValues.search) {
-      const q = filterValues.search.toLowerCase();
+    if (debouncedSearch) {
+      const q = debouncedSearch.toLowerCase();
       if (!s.studentId.toLowerCase().includes(q) && !s.fullName.toLowerCase().includes(q)) return false;
     }
     if (filterValues.buildingCode && s.buildingCode !== filterValues.buildingCode) return false;
@@ -368,81 +376,69 @@ export function RoomStudentsManagementPage() {
         </div>
       )}
 
-      <Card className="border-border/50">
-        <CardContent className="flex flex-col gap-4 p-5">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-            <div className="lg:col-span-1">
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
-              <div className="relative">
-                <Input
-                  placeholder="Mã SV, họ tên..."
-                  className="pl-9"
-                  value={filterValues.search}
-                  onChange={e => setFilterValues(prev => ({ ...prev, search: e.target.value }))}
-                />
-                <MagnifyingGlass size={16} className="absolute left-3 top-2.5 text-muted-foreground" />
-              </div>
-            </div>
-            
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Khu nhà</label>
-              <Select value={filterValues.buildingCode} onChange={e => updateFilter('buildingCode', e.target.value)}>
-                <option value="">Tất cả</option>
-                {filterOptions.buildings.map(b => (
-                  <option key={b} value={b}>{b}</option>
-                ))}
-              </Select>
-            </div>
-            
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Phòng</label>
-              <Select value={filterValues.roomCode} onChange={e => setFilterValues(prev => ({ ...prev, roomCode: e.target.value }))}>
-                <option value="">Tất cả</option>
-                {filterOptions.rooms.map(r => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
-              </Select>
-            </div>
-            
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Trạng thái</label>
-              <Select value={filterValues.status} onChange={e => setFilterValues(prev => ({ ...prev, status: e.target.value }))}>
-                <option value="">Tất cả</option>
-                {filterOptions.statuses.map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </Select>
-            </div>
-            
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Khoa</label>
-              <Select value={filterValues.faculty} onChange={e => setFilterValues(prev => ({ ...prev, faculty: e.target.value }))}>
-                <option value="">Tất cả</option>
-                {filterOptions.faculties.map(f => (
-                  <option key={f} value={f}>{f}</option>
-                ))}
-              </Select>
-            </div>
-            
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Khóa</label>
-              <Select value={filterValues.course} onChange={e => setFilterValues(prev => ({ ...prev, course: e.target.value }))}>
-                <option value="">Tất cả</option>
-                {filterOptions.courses.map(c => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </Select>
-            </div>
-          </div>
-          
-          <div className="flex w-full items-center justify-end pt-2">
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1.5 text-muted-foreground hover:text-foreground">
-              <ArrowsClockwise size={14} weight="bold" />
-              Làm mới bộ lọc
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <FilterBar 
+        searchNode={
+          <SearchInput
+            value={filterValues.search}
+            onChange={v => setFilterValues(prev => ({ ...prev, search: v }))}
+            placeholder="Mã SV, họ tên..."
+            aria-label="Tìm kiếm sinh viên"
+          />
+        }
+        filterNode={
+          <>
+            <Select value={filterValues.buildingCode} onChange={e => updateFilter('buildingCode', e.target.value)} aria-label="Lọc theo khu nhà">
+              <option value="">Tất cả khu nhà</option>
+              {filterOptions.buildings.map(b => (
+                <option key={b} value={b}>{b}</option>
+              ))}
+            </Select>
+
+            <Select value={filterValues.roomCode} onChange={e => updateFilter('roomCode', e.target.value)} aria-label="Lọc theo phòng">
+              <option value="">Tất cả phòng</option>
+              {filterOptions.rooms.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </Select>
+
+            <Select value={filterValues.status} onChange={e => updateFilter('status', e.target.value)} aria-label="Lọc theo trạng thái">
+              <option value="">Tất cả trạng thái</option>
+              {filterOptions.statuses.map(s => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </Select>
+
+            <Select value={filterValues.faculty} onChange={e => updateFilter('faculty', e.target.value)} aria-label="Lọc theo khoa">
+              <option value="">Tất cả khoa</option>
+              {filterOptions.faculties.map(f => (
+                <option key={f} value={f}>{f}</option>
+              ))}
+            </Select>
+
+            <Select value={filterValues.course} onChange={e => updateFilter('course', e.target.value)} aria-label="Lọc theo khóa">
+              <option value="">Tất cả khóa</option>
+              {filterOptions.courses.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </Select>
+          </>
+        }
+        appliedFilterCount={[
+          filterValues.buildingCode,
+          filterValues.roomCode,
+          filterValues.status,
+          filterValues.faculty,
+          filterValues.course
+        ].filter(Boolean).length}
+        onResetFilters={clearFilters}
+        filterChips={[
+          ...(filterValues.buildingCode ? [{ id: 'building', label: `Khu: ${filterValues.buildingCode}`, onRemove: () => updateFilter('buildingCode', '') }] : []),
+          ...(filterValues.roomCode ? [{ id: 'room', label: `Phòng: ${filterValues.roomCode}`, onRemove: () => updateFilter('roomCode', '') }] : []),
+          ...(filterValues.status ? [{ id: 'status', label: `Trạng thái: ${filterValues.status}`, onRemove: () => updateFilter('status', '') }] : []),
+          ...(filterValues.faculty ? [{ id: 'faculty', label: `Khoa: ${filterValues.faculty}`, onRemove: () => updateFilter('faculty', '') }] : []),
+          ...(filterValues.course ? [{ id: 'course', label: `Khóa: ${filterValues.course}`, onRemove: () => updateFilter('course', '') }] : []),
+        ]}
+      />
 
       <Card className="border-border/50 overflow-hidden">
         {isLoading ? (
@@ -450,90 +446,109 @@ export function RoomStudentsManagementPage() {
             <SkeletonTable rows={5} cols={11} />
           </div>
         ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16 text-center">STT</TableHead>
-                <TableHead>Mã SV</TableHead>
-                <TableHead>Họ và tên</TableHead>
-                <TableHead className="text-center">Khoa</TableHead>
-                <TableHead className="text-center">Khóa</TableHead>
-                <TableHead className="text-center">Khu nhà</TableHead>
-                <TableHead className="text-center">Phòng</TableHead>
-                <TableHead className="text-center">Ngày vào ở</TableHead>
-                <TableHead className="text-center">Trạng thái</TableHead>
-                <TableHead className="text-center">SĐT</TableHead>
-                <TableHead className="w-32 text-center">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredStudents.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={11} className="h-24 text-center text-muted-foreground">
-                    {students.length === 0 ? 'Không có dữ liệu sinh viên' : 'Không tìm thấy kết quả phù hợp'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                paginatedStudents.map((student, idx) => (
-                  <TableRow key={student.id}>
-                    <TableCell className="text-center font-medium text-muted-foreground">{(safePage - 1) * pageSize + idx + 1}</TableCell>
-                    <TableCell className="font-bold text-foreground whitespace-nowrap"><span title={student.studentId}>{student.studentId}</span></TableCell>
-                    <TableCell className="font-medium text-foreground whitespace-nowrap"><span title={student.fullName}>{student.fullName}</span></TableCell>
-                    <TableCell className="text-center text-muted-foreground whitespace-nowrap"><span title={student.faculty}>{student.faculty}</span></TableCell>
-                    <TableCell className="text-center text-muted-foreground">{student.course}</TableCell>
-                    <TableCell className="text-center font-medium text-foreground whitespace-nowrap"><span title={student.buildingCode}>{student.buildingCode}</span></TableCell>
-                    <TableCell className="text-center font-medium text-foreground">{student.roomCode}</TableCell>
-                    <TableCell className="text-center text-muted-foreground tabular-nums whitespace-nowrap">{student.moveInDate}</TableCell>
-                    <TableCell className="text-center whitespace-nowrap">
-                      <span className={`inline-flex min-w-[90px] items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${
-                        student.status === 'Đang ở' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+        <div className="flex flex-col">
+          {filteredStudents.length === 0 ? (
+            <div className="p-10">
+              <EmptyState 
+                title="Không tìm thấy sinh viên" 
+                description={students.length === 0 ? 'Không có dữ liệu sinh viên.' : 'Không tìm thấy kết quả phù hợp.'}
+              />
+            </div>
+          ) : (
+            <>
+              <div className="hidden lg:block overflow-x-auto">
+                <Table aria-label="Danh sách sinh viên">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16 text-center">STT</TableHead>
+                      <TableHead>Mã SV</TableHead>
+                      <TableHead>Họ và tên</TableHead>
+                      <TableHead className="text-center">Khoa</TableHead>
+                      <TableHead className="text-center">Khóa</TableHead>
+                      <TableHead className="text-center">Khu nhà</TableHead>
+                      <TableHead className="text-center">Phòng</TableHead>
+                      <TableHead className="text-center">Ngày vào ở</TableHead>
+                      <TableHead className="text-center">Trạng thái</TableHead>
+                      <TableHead className="text-center">SĐT</TableHead>
+                      <TableHead className="w-24 text-center">Thao tác</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paginatedStudents.map((student, idx) => (
+                      <TableRow key={student.id}>
+                        <TableCell className="text-center font-medium text-muted-foreground">{(safePage - 1) * pageSize + idx + 1}</TableCell>
+                        <TableCell className="font-bold text-foreground whitespace-nowrap"><span title={student.studentId}>{student.studentId}</span></TableCell>
+                        <TableCell className="font-medium text-foreground whitespace-nowrap"><span title={student.fullName}>{student.fullName}</span></TableCell>
+                        <TableCell className="text-center text-muted-foreground whitespace-nowrap"><span title={student.faculty}>{student.faculty}</span></TableCell>
+                        <TableCell className="text-center text-muted-foreground">{student.course}</TableCell>
+                        <TableCell className="text-center font-medium text-foreground whitespace-nowrap"><span title={student.buildingCode}>{student.buildingCode}</span></TableCell>
+                        <TableCell className="text-center font-medium text-foreground">{student.roomCode}</TableCell>
+                        <TableCell className="text-center text-muted-foreground tabular-nums whitespace-nowrap">{student.moveInDate}</TableCell>
+                        <TableCell className="text-center whitespace-nowrap">
+                          <span className={`inline-flex min-w-[90px] items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${
+                            student.status === 'Đang ở' ? 'bg-success-muted text-success' : 'bg-warning-muted text-warning'
+                          }`}>
+                            {student.status}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-center text-muted-foreground tabular-nums whitespace-nowrap">{student.phone}</TableCell>
+                        <TableCell className="text-center">
+                          <RowActionsMenu
+                            ariaLabel={`Thao tác sinh viên ${student.fullName}`}
+                            actions={[
+                              { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(student) },
+                              { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(student) },
+                              { id: 'transfer', label: 'Chuyển phòng', icon: <ArrowsLeftRight size={16} />, onClick: () => openTransferModal(student) }
+                            ]}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <div className="lg:hidden flex flex-col gap-3 p-3">
+                {paginatedStudents.map((student) => (
+                  <MobileDataCard
+                    key={student.id}
+                    title={student.fullName}
+                    subtitle={student.studentId}
+                    statusBadge={
+                      <span className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${
+                        student.status === 'Đang ở' ? 'bg-success-muted text-success' : 'bg-warning-muted text-warning'
                       }`}>
                         {student.status}
                       </span>
-                    </TableCell>
-                    <TableCell className="text-center text-muted-foreground tabular-nums whitespace-nowrap">{student.phone}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => openDetailModal(student)} title="Xem chi tiết">
-                          <Eye size={16} className="text-muted-foreground" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEditModal(student)} title="Sửa">
-                          <PencilSimple size={16} className="text-muted-foreground" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openTransferModal(student)} title="Chuyển phòng">
-                          <ArrowsLeftRight size={16} className="text-primary" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                    }
+                    actionMenu={
+                      <RowActionsMenu
+                        ariaLabel={`Thao tác sinh viên ${student.fullName}`}
+                        actions={[
+                          { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(student) },
+                          { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(student) },
+                          { id: 'transfer', label: 'Chuyển phòng', icon: <ArrowsLeftRight size={16} />, onClick: () => openTransferModal(student) }
+                        ]}
+                      />
+                    }
+                  >
+                    <DataLabel label="Phòng" value={`${student.buildingCode} - ${student.roomCode}`} />
+                    <DataLabel label="Khoa/Khóa" value={`${student.faculty || '-'} / ${student.course || '-'}`} />
+                    <DataLabel label="SĐT" value={student.phone || '-'} />
+                    <DataLabel label="Ngày vào ở" value={student.moveInDate} />
+                  </MobileDataCard>
+                ))}
+              </div>
+              <Pagination
+                page={safePage}
+                totalPages={totalPages}
+                total={filteredStudents.length}
+                pageSize={pageSize}
+                onPageChange={(p) => setCurrentPage(p)}
+              />
+            </>
+          )}
         </div>
         )}
-        
-        <div className="flex items-center justify-between border-t border-border/50 bg-muted/30 px-6 py-4">
-          <div className="text-sm text-muted-foreground">
-            {filteredStudents.length > 0 ? (
-              <>Hiển thị {(safePage - 1) * pageSize + 1} đến {Math.min(safePage * pageSize, filteredStudents.length)} của {filteredStudents.length} kết quả</>
-            ) : (
-              <>0 kết quả</>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled={safePage <= 1} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} className="gap-1">
-              <CaretLeft size={16} /> Trước
-            </Button>
-            <span className="text-xs text-muted-foreground px-2 tabular-nums">
-              Trang {safePage}/{totalPages}
-            </span>
-            <Button variant="outline" size="sm" disabled={safePage >= totalPages} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} className="gap-1">
-              Sau <CaretRight size={16} />
-            </Button>
-          </div>
-        </div>
       </Card>
 
       <Modal 

@@ -33,6 +33,13 @@ import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Pagination } from '../../components/ui/Pagination';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SearchInput } from '../../components/ui/SearchInput';
+import { FilterBar } from '../../components/ui/FilterBar';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { AlertDialog } from '../../components/ui/AlertDialog';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const assetSchema = z.object({
   assetCode: z.string().min(1, 'Nhập mã thiết bị (hoặc tiền tố nếu thêm nhiều).'),
@@ -68,10 +75,16 @@ export function AssetsManagementPage() {
   const [rooms, setRooms] = useState<RoomRecord[]>([]);
   
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebounce(keyword, 400);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterBuilding, setFilterBuilding] = useState('');
   const [filterRoom, setFilterRoom] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPagination(p => ({ ...p, page: 1 }));
+  }, [debouncedKeyword, filterCategory, filterBuilding, filterRoom, filterStatus]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
@@ -124,7 +137,7 @@ export function AssetsManagementPage() {
       const res = await getAssets({
         page: pagination.page,
         pageSize: pagination.pageSize,
-        keyword: keyword || undefined,
+        keyword: debouncedKeyword || undefined,
         categoryId: filterCategory || undefined,
         buildingId: filterBuilding || undefined,
         roomId: filterRoom || undefined,
@@ -137,7 +150,7 @@ export function AssetsManagementPage() {
     } finally {
       setIsFetching(false);
     }
-  }, [pagination.page, pagination.pageSize, keyword, filterCategory, filterBuilding, filterRoom, filterStatus]);
+  }, [pagination.page, pagination.pageSize, debouncedKeyword, filterCategory, filterBuilding, filterRoom, filterStatus]);
 
   useEffect(() => {
     loadData();
@@ -304,51 +317,41 @@ export function AssetsManagementPage() {
       )}
 
       {/* Filter Section */}
-      <Card className="border-border/50">
-        <CardContent className="flex flex-col gap-4 p-5 lg:flex-row lg:items-end">
-          <div className="flex-1 w-full lg:w-auto">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
-            <Input 
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Nhập tên thiết bị, mã thiết bị..." 
-            />
-          </div>
-          
-          <div className="w-full lg:w-40">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Loại thiết bị</label>
-            <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-              <option value="">Tất cả</option>
+      <FilterBar 
+        searchNode={
+          <SearchInput 
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="Nhập tên thiết bị, mã thiết bị..." 
+            aria-label="Tìm kiếm thiết bị"
+          />
+        }
+        filterNode={
+          <>
+            <Select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} aria-label="Lọc theo loại thiết bị">
+              <option value="">Loại thiết bị</option>
               {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
-          </div>
 
-          <div className="w-full lg:w-32">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Khu nhà</label>
             <Select 
               value={filterBuilding}
               onChange={(e) => {
                 setFilterBuilding(e.target.value);
                 setFilterRoom('');
               }}
+              aria-label="Lọc theo khu nhà"
             >
-              <option value="">Tất cả</option>
+              <option value="">Khu nhà</option>
               {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </Select>
-          </div>
 
-          <div className="w-full lg:w-32">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Phòng</label>
-            <Select value={filterRoom} onChange={(e) => setFilterRoom(e.target.value)}>
-              <option value="">Tất cả</option>
+            <Select value={filterRoom} onChange={(e) => setFilterRoom(e.target.value)} aria-label="Lọc theo phòng">
+              <option value="">Phòng</option>
               {rooms.filter(r => !filterBuilding || r.buildingId === filterBuilding).map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
             </Select>
-          </div>
 
-          <div className="w-full lg:w-40">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Trạng thái</label>
-            <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-              <option value="">Tất cả</option>
+            <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} aria-label="Lọc theo trạng thái">
+              <option value="">Trạng thái</option>
               <option value="AVAILABLE">Sẵn sàng</option>
               <option value="IN_USE">Đang sử dụng</option>
               <option value="UNDER_MAINTENANCE">Đang bảo trì</option>
@@ -356,92 +359,110 @@ export function AssetsManagementPage() {
               <option value="PENDING_LIQUIDATION">Chờ thanh lý</option>
               <option value="LIQUIDATED">Đã thanh lý</option>
             </Select>
-          </div>
-          
-          <div className="flex w-full items-center gap-2 lg:w-auto">
-            <Button 
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setKeyword('');
-                setFilterCategory('');
-                setFilterBuilding('');
-                setFilterRoom('');
-                setFilterStatus('');
-                setPagination(p => ({ ...p, page: 1 }));
-              }}
-              className="gap-1.5 text-muted-foreground hover:text-foreground"
-            >
-              <ArrowsClockwise size={14} weight="bold" />
-              Làm mới bộ lọc
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+        appliedFilterCount={[filterCategory, filterBuilding, filterRoom, filterStatus].filter(Boolean).length}
+        onResetFilters={() => {
+          setKeyword('');
+          setFilterCategory('');
+          setFilterBuilding('');
+          setFilterRoom('');
+          setFilterStatus('');
+        }}
+        filterChips={[
+          ...(filterCategory ? [{ id: 'cat', label: `Loại: ${categories.find(c => c.id === filterCategory)?.name}`, onRemove: () => setFilterCategory('') }] : []),
+          ...(filterBuilding ? [{ id: 'bld', label: `Khu: ${buildings.find(b => b.id === filterBuilding)?.name}`, onRemove: () => { setFilterBuilding(''); setFilterRoom(''); } }] : []),
+          ...(filterRoom ? [{ id: 'rm', label: `Phòng: ${rooms.find(r => r.id === filterRoom)?.roomCode}`, onRemove: () => setFilterRoom('') }] : []),
+          ...(filterStatus ? [{ id: 'stt', label: `Trạng thái: ${filterStatus}`, onRemove: () => setFilterStatus('') }] : []),
+        ]}
+      />
 
       {/* Table Section */}
       <Card className="border-border/50 overflow-hidden">
         {isFetching ? (
           <div className="p-5 bg-card">
-            <SkeletonTable rows={5} cols={5} />
+            <SkeletonTable rows={5} cols={7} />
           </div>
+        ) : assets.length === 0 ? (
+          <EmptyState 
+            title="Không có dữ liệu thiết bị" 
+            description={keyword || filterCategory || filterBuilding || filterRoom || filterStatus ? "Thử xóa bộ lọc để xem các thiết bị khác." : "Hệ thống chưa có dữ liệu thiết bị."}
+          />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16 text-center">STT</TableHead>
-                <TableHead>Mã thiết bị</TableHead>
-                <TableHead>Tên thiết bị</TableHead>
-                <TableHead>Loại thiết bị</TableHead>
-                <TableHead>Khu nhà</TableHead>
-                <TableHead>Phòng</TableHead>
-                <TableHead>Trạng thái</TableHead>
-                <TableHead className="w-20 text-center">Mã QR</TableHead>
-                <TableHead className="w-20 text-center">Sửa</TableHead>
-                <TableHead className="w-20 text-center">Xóa</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {assets.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
-                    Không có dữ liệu thiết bị
-                  </TableCell>
-                </TableRow>
-              ) : assets.map((asset, idx) => (
-                <TableRow key={asset.id}>
-                  <TableCell className="text-center font-medium">
-                    {(pagination.page - 1) * pagination.pageSize + idx + 1}
-                  </TableCell>
-                  <TableCell className="font-semibold text-foreground">{asset.assetCode}</TableCell>
-                  <TableCell>{asset.assetName}</TableCell>
-                  <TableCell>{asset.categoryName}</TableCell>
-                  <TableCell>{asset.buildingCode || '-'}</TableCell>
-                  <TableCell>{asset.roomCode || '-'}</TableCell>
-                  <TableCell>
+          <>
+            <div className="hidden md:block">
+              <Table aria-label="Danh sách thiết bị">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16 text-center">STT</TableHead>
+                    <TableHead>Mã thiết bị</TableHead>
+                    <TableHead>Tên thiết bị</TableHead>
+                    <TableHead>Loại thiết bị</TableHead>
+                    <TableHead>Vị trí</TableHead>
+                    <TableHead>Trạng thái</TableHead>
+                    <TableHead className="w-20 text-center">Thao tác</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {assets.map((asset, idx) => (
+                    <TableRow key={asset.id}>
+                      <TableCell className="text-center font-medium">
+                        {(pagination.page - 1) * pagination.pageSize + idx + 1}
+                      </TableCell>
+                      <TableCell className="font-semibold text-foreground">{asset.assetCode}</TableCell>
+                      <TableCell>{asset.assetName}</TableCell>
+                      <TableCell>{asset.categoryName}</TableCell>
+                      <TableCell>
+                        {asset.buildingCode ? `${asset.buildingCode} - P.${asset.roomCode}` : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${statusBadgeColor(asset.status)}`}>
+                          {asset.statusLabel}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <RowActionsMenu
+                          ariaLabel={`Thao tác thiết bị ${asset.assetCode}`}
+                          actions={[
+                            { id: 'qr', label: 'Mã QR', icon: <QrCode size={16} />, onClick: () => openQrModal(asset) },
+                            { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(asset) },
+                            { id: 'delete', label: 'Xóa', icon: <Trash size={16} />, variant: 'destructive', onClick: () => setDeleteTarget(asset) }
+                          ]}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <div className="md:hidden flex flex-col gap-3 p-3">
+              {assets.map((asset) => (
+                <MobileDataCard
+                  key={asset.id}
+                  title={asset.assetName}
+                  subtitle={asset.assetCode}
+                  statusBadge={
                     <span className={`inline-flex items-center justify-center rounded px-2.5 py-0.5 text-[11px] font-semibold ${statusBadgeColor(asset.status)}`}>
                       {asset.statusLabel}
                     </span>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Button variant="ghost" size="icon" onClick={() => openQrModal(asset)}>
-                      <QrCode size={16} />
-                    </Button>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Button variant="ghost" size="icon" onClick={() => openEditModal(asset)}>
-                      <PencilSimple size={16} className="text-muted-foreground" />
-                    </Button>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Button variant="ghost" size="icon" onClick={() => setDeleteTarget(asset)}>
-                      <Trash size={16} className="text-rose-500" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                  }
+                  actionMenu={
+                    <RowActionsMenu
+                      ariaLabel={`Thao tác thiết bị ${asset.assetCode}`}
+                      actions={[
+                        { id: 'qr', label: 'Mã QR', icon: <QrCode size={16} />, onClick: () => openQrModal(asset) },
+                        { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(asset) },
+                        { id: 'delete', label: 'Xóa', icon: <Trash size={16} />, variant: 'destructive', onClick: () => setDeleteTarget(asset) }
+                      ]}
+                    />
+                  }
+                >
+                  <DataLabel label="Loại" value={asset.categoryName} />
+                  <DataLabel label="Vị trí" value={asset.buildingCode ? `${asset.buildingCode} - P.${asset.roomCode}` : '-'} />
+                </MobileDataCard>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          </>
         )}
         
         <Pagination
@@ -450,6 +471,7 @@ export function AssetsManagementPage() {
           total={pagination.total}
           pageSize={pagination.pageSize}
           onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
+          onPageSizeChange={(s) => setPagination(prev => ({ ...prev, pageSize: s, page: 1 }))}
         />
       </Card>
 
@@ -553,41 +575,28 @@ export function AssetsManagementPage() {
       </Modal>
 
       {/* Delete Confirm Modal */}
-      <Modal
+      <AlertDialog
         isOpen={!!deleteTarget}
         onClose={() => setDeleteTarget(null)}
         title="Xác nhận xóa"
-        size="sm"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setDeleteTarget(null)}>Hủy</Button>
-            <Button 
-              variant="destructive" 
-              disabled={isDeleting}
-              onClick={async () => {
-                if (!deleteTarget) return;
-                setIsDeleting(true);
-                try {
-                  await deleteAsset(deleteTarget.id);
-                  showToast('Xóa thiết bị thành công.', 'success');
-                  setDeleteTarget(null);
-                  loadData();
-                } catch (error) {
-                  showToast(getApiErrorMessage(error, 'Xóa thiết bị thất bại.'), 'error');
-                } finally {
-                  setIsDeleting(false);
-                }
-              }}
-            >
-              {isDeleting ? 'Đang xóa...' : 'Xóa thiết bị'}
-            </Button>
-          </>
-        }
-      >
-        <p className="py-4 text-sm leading-6 text-muted-foreground">
-          {deleteTarget ? `Thiết bị ${deleteTarget.assetCode} - ${deleteTarget.assetName} sẽ bị xóa khỏi hệ thống. Bạn có chắc chắn?` : ''}
-        </p>
-      </Modal>
+        description={deleteTarget ? `Thiết bị ${deleteTarget.assetCode} - ${deleteTarget.assetName} sẽ bị xóa khỏi hệ thống. Hành động này không thể hoàn tác. Bạn có chắc chắn?` : ''}
+        confirmText="Xóa thiết bị"
+        isLoading={isDeleting}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          setIsDeleting(true);
+          try {
+            await deleteAsset(deleteTarget.id);
+            showToast('Xóa thiết bị thành công.', 'success');
+            setDeleteTarget(null);
+            loadData();
+          } catch (error) {
+            showToast(getApiErrorMessage(error, 'Xóa thiết bị thất bại.'), 'error');
+          } finally {
+            setIsDeleting(false);
+          }
+        }}
+      />
       <Modal 
         isOpen={showQrModal} 
         onClose={() => setShowQrModal(false)} 

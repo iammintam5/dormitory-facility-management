@@ -28,6 +28,13 @@ import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SearchInput } from '../../components/ui/SearchInput';
+import { FilterBar } from '../../components/ui/FilterBar';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { AlertDialog } from '../../components/ui/AlertDialog';
+import { useDebounce } from '../../hooks/useDebounce';
 
 const categorySchema = z.object({
   code: z.string().min(1, 'Nhập mã loại thiết bị.'),
@@ -48,9 +55,11 @@ export function AssetCategoriesManagementPage() {
   const { showToast } = useToast();
   const [categories, setCategories] = useState<AssetCategoryView[]>([]);
   const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebounce(keyword, 400);
   const [isLoading, setIsLoading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<AssetCategoryView | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
@@ -128,20 +137,22 @@ export function AssetCategoriesManagementPage() {
     () =>
       categories.filter((category) => {
         const matchKeyword =
-          !keyword ||
-          `${category.code} ${category.name} ${category.description}`.toLowerCase().includes(keyword.toLowerCase());
+          !debouncedKeyword ||
+          `${category.code} ${category.name} ${category.description}`.toLowerCase().includes(debouncedKeyword.toLowerCase());
         return matchKeyword;
       }),
-    [categories, keyword],
+    [categories, debouncedKeyword],
   );
 
   const totalCategories = filteredCategories.length;
   const totalAssets = categories.reduce((sum, item) => sum + item.quantity, 0).toLocaleString('vi-VN');
 
-  const handleDelete = async (id: string) => {
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteAssetCategory(id);
+      await deleteAssetCategory(deleteTarget);
       showToast('Xóa loại thiết bị thành công.', 'success');
+      setDeleteTarget(null);
       await loadCategories();
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Xóa loại thiết bị thất bại.'), 'error');
@@ -185,18 +196,16 @@ export function AssetCategoriesManagementPage() {
         </div>
       )}
 
-      <Card className="border-border/50">
-        <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-end">
-          <div className="flex-1 w-full">
-            <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Tìm kiếm</label>
-            <Input
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Nhập tên loại thiết bị..."
-            />
-          </div>
-        </CardContent>
-      </Card>
+      <FilterBar 
+        searchNode={
+          <SearchInput
+            value={keyword}
+            onChange={setKeyword}
+            placeholder="Nhập mã, tên loại thiết bị..."
+            aria-label="Tìm kiếm loại thiết bị"
+          />
+        }
+      />
 
       <Card className="border-border/50 overflow-hidden">
         {isLoading ? (
@@ -204,45 +213,74 @@ export function AssetCategoriesManagementPage() {
             <SkeletonTable rows={5} cols={5} />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-16 text-center">STT</TableHead>
-                <TableHead>Mã loại</TableHead>
-                <TableHead>Tên loại thiết bị</TableHead>
-                <TableHead>Mô tả</TableHead>
-                <TableHead className="text-center">Số lượng TB</TableHead>
-                <TableHead className="w-24 text-center">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <div className="flex flex-col">
               {filteredCategories.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    Chưa có danh mục thiết bị.
-                  </TableCell>
-                </TableRow>
-              ) : filteredCategories.map((cat, idx) => (
-                <TableRow key={cat.id}>
-                  <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
-                  <TableCell className="font-bold text-foreground">{cat.code}</TableCell>
-                  <TableCell className="font-medium text-foreground">{cat.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{cat.description || '-'}</TableCell>
-                  <TableCell className="text-center tabular-nums font-medium">{cat.quantity}</TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <Button variant="ghost" size="icon" onClick={() => openEditModal(cat)}>
-                        <PencilSimple size={16} className="text-muted-foreground" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => void handleDelete(cat.id)}>
-                        <Trash size={16} className="text-rose-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                <div className="p-10">
+                  <EmptyState 
+                    title="Không tìm thấy loại thiết bị" 
+                    description="Chưa có loại thiết bị nào phù hợp với bộ lọc hiện tại."
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="hidden md:block">
+                    <Table aria-label="Danh sách loại thiết bị">
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-16 text-center">STT</TableHead>
+                          <TableHead>Mã loại</TableHead>
+                          <TableHead>Tên loại thiết bị</TableHead>
+                          <TableHead>Mô tả</TableHead>
+                          <TableHead className="text-center">Số lượng TB</TableHead>
+                          <TableHead className="w-24 text-center">Thao tác</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredCategories.map((cat, idx) => (
+                          <TableRow key={cat.id}>
+                            <TableCell className="text-center font-medium text-muted-foreground">{idx + 1}</TableCell>
+                            <TableCell className="font-bold text-foreground">{cat.code}</TableCell>
+                            <TableCell className="font-medium text-foreground">{cat.name}</TableCell>
+                            <TableCell className="text-muted-foreground">{cat.description || '-'}</TableCell>
+                            <TableCell className="text-center tabular-nums font-medium">{cat.quantity}</TableCell>
+                            <TableCell className="text-center">
+                              <RowActionsMenu
+                                ariaLabel={`Thao tác loại thiết bị ${cat.code}`}
+                                actions={[
+                                  { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(cat) },
+                                  { id: 'delete', label: 'Xóa', icon: <Trash size={16} />, variant: 'destructive', onClick: () => setDeleteTarget(cat.id) }
+                                ]}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="md:hidden flex flex-col gap-3 p-3">
+                    {filteredCategories.map((cat) => (
+                      <MobileDataCard
+                        key={cat.id}
+                        title={cat.name}
+                        subtitle={cat.code}
+                        actionMenu={
+                          <RowActionsMenu
+                            ariaLabel={`Thao tác loại thiết bị ${cat.code}`}
+                            actions={[
+                              { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(cat) },
+                              { id: 'delete', label: 'Xóa', icon: <Trash size={16} />, variant: 'destructive', onClick: () => setDeleteTarget(cat.id) }
+                            ]}
+                          />
+                        }
+                      >
+                        <DataLabel label="Mô tả" value={cat.description || '-'} />
+                        <DataLabel label="Số lượng TB" value={String(cat.quantity)} />
+                      </MobileDataCard>
+                    ))}
+                  </div>
+                </>
+              )}
+          </div>
         )}
       </Card>
 
@@ -299,6 +337,15 @@ export function AssetCategoriesManagementPage() {
           </div>
         </form>
       </Modal>
+
+      <AlertDialog
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Xác nhận xóa"
+        description="Bạn có chắc chắn muốn xóa loại thiết bị này? Hành động này không thể hoàn tác."
+        confirmText="Xóa"
+        onConfirm={() => void confirmDelete()}
+      />
     </div>
   );
 }

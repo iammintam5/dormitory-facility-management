@@ -305,7 +305,7 @@ function InfoRow({
   return (
     <div className="flex items-center justify-between py-1.5">
       <span className="text-muted-foreground font-medium">{label}</span>
-      <span className={`font-bold ${active ? 'text-emerald-600' : 'text-foreground'}`}>{value}</span>
+      <span className={`font-bold ${active ? 'text-success' : 'text-foreground'}`}>{value}</span>
     </div>
   );
 }

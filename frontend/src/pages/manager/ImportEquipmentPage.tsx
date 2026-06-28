@@ -187,9 +187,7 @@ export function ImportEquipmentPage() {
   };
 
   // Save draft (just show success for now)
-  const handleSaveDraft = () => {
-    showToast('Đã lưu nháp (chức năng đang phát triển)', 'success');
-  };
+
 
   // Computed
   const totalQty = importItems.reduce((sum, i) => sum + i.qty, 0);
@@ -255,7 +253,7 @@ export function ImportEquipmentPage() {
               <Select defaultValue="Mua sắm mới">
                 <option>Mua sắm mới</option>
                 <option>Trường cấp phát / Tài trợ</option>
-                <option>Nhập bù dữ liệu kiểm kê</option>
+
               </Select>
             </div>
             <div>
@@ -276,7 +274,7 @@ export function ImportEquipmentPage() {
             </div>
           </div>
 
-          <div className="mb-6 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          <div className="mb-6 rounded-md border border-success-border bg-success-muted px-4 py-3 text-sm text-success">
             Phiếu nhập sẽ tạo tài sản mới trong kho trung tâm. Trước khi lưu có thể thêm, xoá hoặc chỉnh số lượng/đơn giá; sau khi lưu, phiếu được khóa để bảo toàn lịch sử.
           </div>
 
@@ -430,30 +428,15 @@ export function ImportEquipmentPage() {
             </Link>
           </Button>
           <div className="flex items-center gap-2 w-full md:w-auto flex-wrap md:flex-nowrap">
-            <Button 
-              variant="outline" 
-              className="flex-1 md:flex-none gap-2 text-primary hover:text-primary"
-              onClick={handleSaveDraft}
-            >
-              <ArrowsClockwise size={16} weight="bold" />
-              Lưu nháp
-            </Button>
+
             <Button 
               className="w-full md:w-auto gap-2" 
               onClick={handleSave}
-              disabled={saving || importItems.length === 0}
+              disabled={importItems.length === 0}
+              isLoading={saving}
             >
-              {saving ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                  Đang lưu...
-                </>
-              ) : (
-                <>
-                  <Check size={16} weight="bold" />
-                  Lưu và hoàn tất
-                </>
-              )}
+              <Check size={16} weight="bold" />
+              {saving ? 'Đang lưu...' : 'Lưu và hoàn tất'}
             </Button>
           </div>
         </div>

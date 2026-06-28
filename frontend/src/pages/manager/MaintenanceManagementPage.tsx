@@ -10,6 +10,12 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Pagination } from '../../components/ui/Pagination';
+import { EmptyState } from '../../components/ui/EmptyState';
+import { SearchInput } from '../../components/ui/SearchInput';
+import { FilterBar } from '../../components/ui/FilterBar';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { useDebounce } from '../../hooks/useDebounce';
 import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { 
@@ -37,7 +43,7 @@ const recordSchema = z.object({
   planId: z.coerce.number().optional(),
   assetId: z.coerce.number().int().positive('Chọn tài sản.'),
   maintenanceDate: z.string().min(1, 'Chọn ngày bảo trì.'),
-  maintenanceType: z.enum(['SCHEDULED', 'AD_HOC', 'AFTER_INVENTORY']),
+  maintenanceType: z.enum(['SCHEDULED', 'AD_HOC']),
   content: z.string().min(1, 'Nhập nội dung thực hiện.'),
   resultStatus: z.enum(['GOOD', 'RECOMMEND_LIQUIDATION']).optional(),
   nextMaintenanceDate: z.string().optional(),
@@ -71,6 +77,7 @@ export function MaintenanceManagementPage() {
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
   const [searchKeyword, setSearchKeyword] = useState(initialSearch);
+  const debouncedKeyword = useDebounce(searchKeyword, 400);
   const [statusFilter, setStatusFilter] = useState('Tất cả');
   const [typeFilter, setTypeFilter] = useState('Tất cả');
 
@@ -150,8 +157,8 @@ export function MaintenanceManagementPage() {
       }
       
       // Search keyword
-      if (searchKeyword) {
-        const kw = searchKeyword.toLowerCase();
+      if (debouncedKeyword) {
+        const kw = debouncedKeyword.toLowerCase();
         const matchCode = record.maintenanceCode.toLowerCase().includes(kw);
         const matchAsset = record.asset?.assetName?.toLowerCase().includes(kw);
         const matchRoom = record.asset?.room?.roomCode?.toLowerCase().includes(kw);
@@ -162,7 +169,7 @@ export function MaintenanceManagementPage() {
       
       return true;
     });
-  }, [records, activeTab, searchKeyword, statusFilter, typeFilter]);
+  }, [records, activeTab, debouncedKeyword, statusFilter, typeFilter]);
 
   const summaryCounts = useMemo(() => {
     return {
@@ -279,7 +286,7 @@ export function MaintenanceManagementPage() {
     switch (type) {
       case 'SCHEDULED': return 'Định kỳ';
       case 'AD_HOC': return 'Đột xuất';
-      case 'AFTER_INVENTORY': return 'Sau kiểm kê';
+
       default: return type;
     }
   }
@@ -304,7 +311,7 @@ export function MaintenanceManagementPage() {
     switch (type) {
       case 'SCHEDULED': return <span className="text-xs font-semibold text-emerald-600">Định kỳ</span>;
       case 'AD_HOC': return <span className="text-xs font-semibold text-amber-600">Đột xuất</span>;
-      case 'AFTER_INVENTORY': return <span className="text-xs font-semibold text-blue-600">Sau kiểm kê</span>;
+
       default: return <span className="text-xs">{type}</span>;
     }
   };
@@ -371,125 +378,133 @@ export function MaintenanceManagementPage() {
         </div>
       )}
 
-      <Card className="border-border/50">
-        <CardContent className="p-5 flex flex-wrap gap-4 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Tìm kiếm</label>
-            <div className="relative">
-              <Input 
-                placeholder="Mã phiếu, thiết bị, phòng..."
-                className="pl-9"
-                value={searchKeyword}
-                onChange={e => setSearchKeyword(e.target.value)}
-              />
-              <MagnifyingGlass size={16} className="absolute left-3 top-2.5 text-muted-foreground" />
-            </div>
-          </div>
-          <div className="w-full md:w-40">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Kết quả</label>
-            <Select className="w-[160px] bg-background border-border/50 text-foreground" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+      <FilterBar 
+        searchNode={
+          <SearchInput
+            value={searchKeyword}
+            onChange={setSearchKeyword}
+            placeholder="Mã phiếu, thiết bị, phòng..."
+            aria-label="Tìm kiếm bảo trì"
+          />
+        }
+        filterNode={
+          <>
+            <Select className="w-full bg-background border-border/50 text-foreground" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Lọc theo kết quả">
               {['Tất cả', 'Tốt', 'Đề nghị thanh lý'].map(s => <option key={s} value={s === 'Tất cả' ? 'Tất cả' : (s === 'Tốt' ? 'GOOD' : 'RECOMMEND_LIQUIDATION')}>{s}</option>)}
             </Select>
-          </div>
-          <div className="w-full md:w-36">
-            <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Loại bảo trì</label>
-            <Select value={typeFilter} onChange={e => setTypeFilter(e.target.value)}>
+            <Select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} aria-label="Lọc theo loại bảo trì">
               <option>Tất cả</option>
               <option value="SCHEDULED">Định kỳ</option>
               <option value="AD_HOC">Đột xuất</option>
-              <option value="AFTER_INVENTORY">Sau kiểm kê</option>
             </Select>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button className="gap-2" onClick={() => loadRecords()}>
-              <Funnel size={16} weight="bold" />
-              Lọc
-            </Button>
-            <Button variant="outline" className="gap-2" onClick={handleResetFilters}>
-              <ArrowsClockwise size={16} weight="bold" />
-              Làm mới
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+        appliedFilterCount={[
+          statusFilter !== 'Tất cả' ? statusFilter : '',
+          typeFilter !== 'Tất cả' ? typeFilter : ''
+        ].filter(Boolean).length}
+        onResetFilters={handleResetFilters}
+        filterChips={[
+          ...(statusFilter !== 'Tất cả' ? [{ id: 'status', label: `Kết quả: ${statusFilter === 'GOOD' ? 'Tốt' : 'Đề nghị thanh lý'}`, onRemove: () => setStatusFilter('Tất cả') }] : []),
+          ...(typeFilter !== 'Tất cả' ? [{ id: 'type', label: `Loại: ${typeFilter === 'SCHEDULED' ? 'Định kỳ' : 'Đột xuất'}`, onRemove: () => setTypeFilter('Tất cả') }] : []),
+        ]}
+      />
 
       <Card className="border-border/50 overflow-hidden">
-        <div className="flex items-center gap-6 border-b border-border/50 px-6 bg-muted/20 overflow-x-auto">
-          {['Tất cả', 'Tốt', 'Đề nghị thanh lý'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`py-4 text-sm font-bold tracking-wider transition-colors border-b-2 whitespace-nowrap ${
-                activeTab === tab ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {tab}
-            </button>
-          ))}
-        </div>
 
-        <div className="overflow-x-auto">
+        <div className="flex flex-col">
           {isFetching ? (
             <div className="px-5 py-4">
               <SkeletonTable rows={10} cols={8} />
             </div>
+          ) : filteredRecords.length === 0 ? (
+            <div className="p-10">
+              <EmptyState 
+                title="Không tìm thấy phiếu bảo trì" 
+                description="Chưa có phiếu bảo trì nào phù hợp với bộ lọc hiện tại."
+              />
+            </div>
           ) : (
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted/30 text-muted-foreground border-b border-border/50">
-                <tr>
-                  <th className="px-4 py-4 text-center font-semibold w-12">STT</th>
-                  <th className="px-4 py-4 text-center font-semibold">Mã phiếu</th>
-                  <th className="px-4 py-4 font-semibold text-left">Thiết bị</th>
-                  <th className="px-4 py-4 text-center font-semibold">Phòng</th>
-                  <th className="px-4 py-4 text-center font-semibold">Khu nhà</th>
-                  <th className="px-4 py-4 text-center font-semibold">Loại</th>
-                  <th className="px-4 py-4 text-center font-semibold">Kết quả</th>
-                  <th className="px-4 py-4 text-center font-semibold">Người thực hiện</th>
-                  <th className="px-4 py-4 text-center font-semibold">Ngày bảo trì</th>
-                  <th className="px-4 py-4 text-center font-semibold w-24">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50 text-foreground">
-                {filteredRecords.length === 0 ? (
-                  <tr>
-                    <td colSpan={10} className="text-center py-10 text-muted-foreground">Không có dữ liệu bảo trì</td>
-                  </tr>
-                ) : filteredRecords.map((record, idx) => (
-                  <tr key={record.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-4 py-3.5 text-center font-medium text-muted-foreground">
-                      {(pagination.page - 1) * pagination.pageSize + idx + 1}
-                    </td>
-                    <td className="px-4 py-3.5 text-center font-bold">{record.maintenanceCode}</td>
-                    <td className="px-4 py-3.5">{record.asset?.assetName ?? '--'}</td>
-                    <td className="px-4 py-3.5 text-center">{record.asset?.room?.roomCode ?? '--'}</td>
-                    <td className="px-4 py-3.5 text-center">{record.asset?.room?.floor?.building?.name ?? '--'}</td>
-                    <td className="px-4 py-3.5 text-center">{renderTypeBadge(record.maintenanceType)}</td>
-                    <td className="px-4 py-3.5 text-center">{renderStatusBadge(record.resultStatus)}</td>
-                    <td className="px-4 py-3.5 text-center font-medium">
-                      {record.performedByUser?.fullName ?? `#${record.performedBy}`}
-                    </td>
-                    <td className="px-4 py-3.5 text-center tabular-nums">
-                      {new Date(record.maintenanceDate).toLocaleDateString('vi-VN')}
-                    </td>
-                    <td className="px-4 py-3.5">
-                      <div className="flex items-center justify-center gap-1.5">
-                        <Button variant="ghost" size="icon" onClick={() => openDetailModal(record)} title="Xem chi tiết">
-                          <Eye size={16} className="text-primary" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => openEditModal(record)} title="Sửa">
-                          <PencilSimple size={16} className="text-primary" />
-                        </Button>
-                        {record.status === 'IN_PROGRESS' && (
-                          <Button variant="ghost" size="icon" onClick={() => { setSelectedRecord(record); setIsCompleteModalOpen(true); }} title="Hoàn tất">
-                            <CheckCircle size={16} className="text-emerald-600" />
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+            <>
+              <div className="hidden lg:block overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-muted/30 text-muted-foreground border-b border-border/50">
+                    <tr>
+                      <th className="px-4 py-4 text-center font-semibold w-12">STT</th>
+                      <th className="px-4 py-4 text-center font-semibold">Mã phiếu</th>
+                      <th className="px-4 py-4 font-semibold text-left">Thiết bị</th>
+                      <th className="px-4 py-4 text-center font-semibold">Phòng</th>
+                      <th className="px-4 py-4 text-center font-semibold">Khu nhà</th>
+                      <th className="px-4 py-4 text-center font-semibold">Loại</th>
+                      <th className="px-4 py-4 text-center font-semibold">Kết quả</th>
+                      <th className="px-4 py-4 text-center font-semibold">Người thực hiện</th>
+                      <th className="px-4 py-4 text-center font-semibold">Ngày bảo trì</th>
+                      <th className="px-4 py-4 text-center font-semibold w-24">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50 text-foreground">
+                    {filteredRecords.map((record, idx) => (
+                      <tr key={record.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3.5 text-center font-medium text-muted-foreground">
+                          {(pagination.page - 1) * pagination.pageSize + idx + 1}
+                        </td>
+                        <td className="px-4 py-3.5 text-center font-bold">{record.maintenanceCode}</td>
+                        <td className="px-4 py-3.5">{record.asset?.assetName ?? '--'}</td>
+                        <td className="px-4 py-3.5 text-center">{record.asset?.room?.roomCode ?? '--'}</td>
+                        <td className="px-4 py-3.5 text-center">{record.asset?.room?.floor?.building?.name ?? '--'}</td>
+                        <td className="px-4 py-3.5 text-center">{renderTypeBadge(record.maintenanceType)}</td>
+                        <td className="px-4 py-3.5 text-center">{renderStatusBadge(record.resultStatus)}</td>
+                        <td className="px-4 py-3.5 text-center font-medium">
+                          {record.performedByUser?.fullName ?? `#${record.performedBy}`}
+                        </td>
+                        <td className="px-4 py-3.5 text-center tabular-nums">
+                          {new Date(record.maintenanceDate).toLocaleDateString('vi-VN')}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <RowActionsMenu
+                            ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
+                            actions={[
+                              { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
+                              { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
+                              ...(record.status === 'IN_PROGRESS' ? [
+                                { id: 'complete', label: 'Hoàn tất', icon: <CheckCircle size={16} />, onClick: () => { setSelectedRecord(record); setIsCompleteModalOpen(true); } }
+                              ] : [])
+                            ]}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="lg:hidden flex flex-col gap-3 p-3">
+                {filteredRecords.map((record) => (
+                  <MobileDataCard
+                    key={record.id}
+                    title={record.maintenanceCode}
+                    subtitle={record.asset?.assetName ?? '--'}
+                    statusBadge={renderStatusBadge(record.resultStatus)}
+                    actionMenu={
+                      <RowActionsMenu
+                        ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
+                        actions={[
+                          { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
+                          { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
+                          ...(record.status === 'IN_PROGRESS' ? [
+                            { id: 'complete', label: 'Hoàn tất', icon: <CheckCircle size={16} />, onClick: () => { setSelectedRecord(record); setIsCompleteModalOpen(true); } }
+                          ] : [])
+                        ]}
+                      />
+                    }
+                  >
+                    <DataLabel label="Phòng/Khu" value={`${record.asset?.room?.roomCode ?? '--'} / ${record.asset?.room?.floor?.building?.name ?? '--'}`} />
+                    <DataLabel label="Loại" value={renderTypeBadge(record.maintenanceType)} />
+                    <DataLabel label="Người thực hiện" value={record.performedByUser?.fullName ?? `#${record.performedBy}`} />
+                    <DataLabel label="Ngày bảo trì" value={new Date(record.maintenanceDate).toLocaleDateString('vi-VN')} />
+                  </MobileDataCard>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </>
           )}
         </div>
 
@@ -548,7 +563,7 @@ export function MaintenanceManagementPage() {
                   <Select {...form.register('maintenanceType')} disabled={isEditMode}>
                     <option value="SCHEDULED">Định kỳ</option>
                     <option value="AD_HOC">Đột xuất</option>
-                    <option value="AFTER_INVENTORY">Sau kiểm kê</option>
+
                   </Select>
                 </div>
                 {!isEditMode && (
