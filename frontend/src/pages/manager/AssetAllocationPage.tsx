@@ -13,7 +13,20 @@ import { getAssets, AssetRecord } from '../../services/assets';
 import { createHandoverReceipt, createReclaimReceipt } from '../../services/asset-receipts';
 import { getApiErrorMessage } from '../../lib/api-client';
 import { useReactToPrint } from 'react-to-print';
-import { MagnifyingGlass } from '@phosphor-icons/react';
+import { FilePdf, MagnifyingGlass } from '@phosphor-icons/react';
+
+const receiptTemplates = {
+  HANDOVER: {
+    code: 'QL_BM1',
+    label: 'Mẫu bàn giao CSVC',
+    href: '/templates/asset-receipts/QL_BM1_BIEN_BAN_BAN_GIAO_CSVC.pdf',
+  },
+  RECLAIM: {
+    code: 'QL_BM2',
+    label: 'Mẫu thu hồi CSVC',
+    href: '/templates/asset-receipts/QL_BM2_BIEN_BAN_THU_HOI_CSVC.pdf',
+  },
+};
 
 export function AssetAllocationPage() {
   const { showToast } = useToast();
@@ -140,6 +153,25 @@ export function AssetAllocationPage() {
     }
   };
 
+  const switchTab = (tab: 'handover' | 'reclaim') => {
+    setActiveTab(tab);
+    setRooms([]);
+    setSearchQuery('');
+    setSelectedCategory('');
+
+    if (tab === 'handover') {
+      setFromBuildingId('');
+      setFromRoomId('');
+      setRoomAssets([]);
+      setSelectedReclaimAssets(new Set());
+      return;
+    }
+
+    setTargetBuildingId('');
+    setTargetRoomId('');
+    setSelectedHandoverAssets(new Set());
+  };
+
   const submitHandover = async () => {
     if (!targetRoomId) return showToast('Vui lòng chọn phòng nhận', 'error');
     if (selectedHandoverAssets.size === 0) return showToast('Vui lòng chọn ít nhất 1 thiết bị', 'error');
@@ -155,7 +187,7 @@ export function AssetAllocationPage() {
       const roomName = rooms.find(r => r.id === targetRoomId)?.roomCode || '';
       const assetsData = availableAssets.filter(a => selectedHandoverAssets.has(a.id));
       
-      showToast('Cấp phát thành công', 'success');
+      showToast('Đã lập biên bản cấp phát thành công', 'success');
       
       // Reset form
       setSelectedHandoverAssets(new Set());
@@ -188,7 +220,7 @@ export function AssetAllocationPage() {
         note: reclaimNote,
       };
       const receipt = await createReclaimReceipt(payload);
-      showToast('Thu hồi thành công', 'success');
+      showToast('Đã lập biên bản thu hồi thành công', 'success');
       
       const roomName = rooms.find(r => r.id === fromRoomId)?.roomCode || '';
       const assetsData = roomAssets.filter(a => selectedReclaimAssets.has(a.id));
@@ -221,32 +253,45 @@ export function AssetAllocationPage() {
     setter(newSet);
   };
 
+  const printTemplate = printData?.type === 'RECLAIM' ? receiptTemplates.RECLAIM : receiptTemplates.HANDOVER;
+
   return (
     <div className="space-y-6">
       <PageHeader 
-        title="Cấp phát & Thu hồi" 
-        description="Quản lý luân chuyển tài sản giữa Kho và Phòng KTX"
+        title="Cấp phát - Thu hồi tài sản" 
+        description="Lập biên bản bàn giao và thu hồi tài sản theo phòng KTX"
       />
+
+      <Card className="border-sky-500 bg-sky-600 p-5 text-white shadow-sm dark:border-sky-700 dark:bg-sky-800">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="font-semibold text-white">Biên bản cấp phát/thu hồi</h3>
+          </div>
+          <div className="flex flex-row flex-wrap gap-2 sm:justify-end">
+            {Object.values(receiptTemplates).map((template) => (
+              <Button key={template.code} variant="outline" className="border-white/50 bg-white/10 text-white hover:bg-white/20 hover:text-white" asChild>
+                <a href={template.href} target="_blank" rel="noreferrer">
+                  <FilePdf className="mr-2 h-4 w-4" />
+                  {template.code}
+                </a>
+              </Button>
+            ))}
+          </div>
+        </div>
+      </Card>
 
       <div className="flex border-b border-border">
         <button
           className={`px-6 py-3 font-medium text-sm transition-colors ${activeTab === 'handover' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-          onClick={() => setActiveTab('handover')}
+          onClick={() => switchTab('handover')}
         >
-          Cấp phát thiết bị
+          Lập biên bản cấp phát
         </button>
         <button
           className={`px-6 py-3 font-medium text-sm transition-colors ${activeTab === 'reclaim' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-          onClick={() => {
-            setActiveTab('reclaim');
-            setRooms([]); // reset rooms when switching tabs
-            setTargetBuildingId('');
-            setFromBuildingId('');
-            setSearchQuery('');
-            setSelectedCategory('');
-          }}
+          onClick={() => switchTab('reclaim')}
         >
-          Thu hồi thiết bị
+          Lập biên bản thu hồi
         </button>
       </div>
 
@@ -259,6 +304,7 @@ export function AssetAllocationPage() {
                 value={targetBuildingId} 
                 onChange={(e) => {
                   setTargetBuildingId(e.target.value);
+                  setSelectedHandoverAssets(new Set());
                   handleBuildingChange(e.target.value, setTargetRoomId);
                 }}
               >
@@ -268,21 +314,27 @@ export function AssetAllocationPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Phòng nhận</label>
-              <Select value={targetRoomId} onChange={(e) => setTargetRoomId(e.target.value)}>
+              <Select 
+                value={targetRoomId} 
+                onChange={(e) => {
+                  setTargetRoomId(e.target.value);
+                  setSelectedHandoverAssets(new Set());
+                }}
+              >
                 <option value="">Chọn phòng</option>
                 {rooms.map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
               </Select>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Ghi chú cấp phát</label>
-              <Input value={handoverNote} onChange={(e) => setHandoverNote(e.target.value)} placeholder="VD: Cấp mới đầu năm học" />
+              <Input value={handoverNote} onChange={(e) => setHandoverNote(e.target.value)} placeholder="VD: Bàn giao đầu năm học / bổ sung thiết bị cho phòng" />
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
             <div>
               <h3 className="font-semibold text-lg">Thiết bị sẵn sàng trong Kho ({filteredAvailableAssets.length}/{availableAssets.length})</h3>
-              <p className="text-sm text-muted-foreground">Chọn các thiết bị bên dưới để cấp phát cho phòng đã chọn.</p>
+              <p className="text-sm text-muted-foreground">Chọn tài sản trong kho để lập biên bản bàn giao cho phòng đã chọn.</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -341,7 +393,7 @@ export function AssetAllocationPage() {
 
           <div className="flex justify-end">
             <Button onClick={submitHandover} disabled={selectedHandoverAssets.size === 0 || !targetRoomId}>
-              Cấp phát ({selectedHandoverAssets.size}) thiết bị
+              Lập biên bản cấp phát ({selectedHandoverAssets.size})
             </Button>
           </div>
         </Card>
@@ -356,6 +408,7 @@ export function AssetAllocationPage() {
                 value={fromBuildingId} 
                 onChange={(e) => {
                   setFromBuildingId(e.target.value);
+                  setSelectedReclaimAssets(new Set());
                   handleBuildingChange(e.target.value, (val) => {
                     setFromRoomId(val);
                     setRoomAssets([]);
@@ -372,6 +425,7 @@ export function AssetAllocationPage() {
                 value={fromRoomId} 
                 onChange={(e) => {
                   setFromRoomId(e.target.value);
+                  setSelectedReclaimAssets(new Set());
                   loadRoomAssets(e.target.value);
                 }}
               >
@@ -381,14 +435,14 @@ export function AssetAllocationPage() {
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Ghi chú thu hồi</label>
-              <Input value={reclaimNote} onChange={(e) => setReclaimNote(e.target.value)} placeholder="VD: Thu hồi do hỏng/trả phòng" />
+              <Input value={reclaimNote} onChange={(e) => setReclaimNote(e.target.value)} placeholder="VD: Thu hồi khi trả phòng / kiểm kê cuối kỳ" />
             </div>
           </div>
 
           <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
             <div>
               <h3 className="font-semibold text-lg">Thiết bị hiện có trong phòng ({filteredRoomAssets.length}/{roomAssets.length})</h3>
-              <p className="text-sm text-muted-foreground">Chọn các thiết bị bên dưới để thu hồi về Kho.</p>
+              <p className="text-sm text-muted-foreground">Chọn tài sản trong phòng để lập biên bản thu hồi về kho trung tâm.</p>
             </div>
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -447,7 +501,7 @@ export function AssetAllocationPage() {
 
           <div className="flex justify-end">
             <Button onClick={submitReclaim} variant="destructive" disabled={selectedReclaimAssets.size === 0 || !fromRoomId}>
-              Thu hồi ({selectedReclaimAssets.size}) thiết bị về kho
+              Lập biên bản thu hồi ({selectedReclaimAssets.size})
             </Button>
           </div>
         </Card>
@@ -457,11 +511,17 @@ export function AssetAllocationPage() {
         isOpen={showPrintModal} 
         onClose={() => setShowPrintModal(false)} 
         size="lg" 
-        title={printData?.type === 'RECLAIM' ? 'In Biên bản thu hồi' : 'In Biên bản bàn giao'}
+        title={printData?.type === 'RECLAIM' ? 'In biên bản thu hồi' : 'In biên bản bàn giao'}
         footer={
           <>
             <Button variant="outline" onClick={() => setShowPrintModal(false)}>Đóng</Button>
-            <Button onClick={() => handlePrint()}>In Biên bản</Button>
+            <Button variant="outline" asChild>
+              <a href={printTemplate.href} target="_blank" rel="noreferrer">
+                <FilePdf className="mr-2 h-4 w-4" />
+                {printTemplate.code}
+              </a>
+            </Button>
+            <Button onClick={() => handlePrint()}>In biên bản</Button>
           </>
         }
       >
@@ -474,6 +534,9 @@ export function AssetAllocationPage() {
               {printData?.type === 'RECLAIM' ? 'BIÊN BẢN THU HỒI TÀI SẢN' : 'BIÊN BẢN BÀN GIAO TÀI SẢN'}
             </h1>
             <p>Số phiếu: {printData?.receiptCode}</p>
+            <p className="mt-2 text-xs italic text-slate-600">
+              Biên bản được in từ dữ liệu hệ thống. Có thể đối chiếu mẫu PDF {printTemplate.code} khi cần in mẫu trắng.
+            </p>
           </div>
           
           <div className="mb-4">
