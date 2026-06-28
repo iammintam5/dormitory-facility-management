@@ -124,6 +124,7 @@ export function DashboardLayout() {
                 <NavLink
                   key={item.path}
                   to={`${basePath}/${item.path}`}
+                  end={item.path === 'asset-transactions'}
                   className={({ isActive }) =>
                     `group flex items-center gap-3 rounded-lg px-3 py-2.5 transition-all duration-150 ${
                       isActive
