@@ -13,7 +13,7 @@ export type AssetReceiptItemRecord = {
 export type AssetReceiptRecord = {
   id: string;
   receiptCode: string;
-  type: 'IMPORT' | 'EXPORT';
+  type: 'IMPORT' | 'EXPORT' | 'HANDOVER' | 'RECLAIM';
   receiptDate: string;
   supplierName?: string;
   supplierAddress?: string;
