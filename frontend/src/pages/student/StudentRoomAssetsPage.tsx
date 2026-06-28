@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 import { SkeletonTable } from '../../components/ui/Skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Select as UISelect } from '../../components/ui/Select';
 import { Button } from '../../components/ui/Button';
+import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
+import { FilterBar } from '../../components/ui/FilterBar';
+import { SearchInput } from '../../components/ui/SearchInput';
+import { Pagination } from '../../components/ui/Pagination';
+import { useDebounce } from '../../hooks/useDebounce';
 import { 
   Door, 
   Buildings, 
@@ -28,6 +34,12 @@ export function StudentRoomAssetsPage() {
   const [roomCode, setRoomCode] = useState('A101');
   const [buildingCode, setBuildingCode] = useState('A');
   const [isLoading, setIsLoading] = useState(true);
+  const [keyword, setKeyword] = useState('');
+  const debouncedKeyword = useDebounce(keyword, 400);
+  const [statusFilter, setStatusFilter] = useState('');
+  
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
 
   useEffect(() => {
     async function load() {
@@ -48,6 +60,19 @@ export function StudentRoomAssetsPage() {
     }
     load();
   }, []);
+
+  const filteredAssets = roomAssets.filter(asset => {
+    const matchesSearch = !debouncedKeyword || asset.assetName.toLowerCase().includes(debouncedKeyword.toLowerCase()) || asset.assetCode.toLowerCase().includes(debouncedKeyword.toLowerCase());
+    const matchesStatus = !statusFilter || asset.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedKeyword, statusFilter]);
+
+  const totalPages = Math.ceil(filteredAssets.length / pageSize) || 1;
+  const paginatedAssets = filteredAssets.slice((page - 1) * pageSize, page * pageSize);
 
   if (isLoading) {
     return (
@@ -107,70 +132,73 @@ export function StudentRoomAssetsPage() {
               </div>
             </div>
           </div>
+          <div className="flex items-center gap-4 px-4 pr-0">
+            <div className="w-12 h-12 rounded-full bg-indigo-500/10 text-indigo-600 flex items-center justify-center shrink-0">
+              <Package size={24} weight="duotone" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Tổng số thiết bị</p>
+              <div className="flex items-baseline gap-1.5 mt-0.5">
+                <span className="text-xl font-bold text-foreground">{filteredAssets.length}</span>
+                <span className="text-xs text-muted-foreground font-medium">thiết bị</span>
+              </div>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4 items-end">
-        <Card className="border-border/50 flex-1">
-          <CardContent className="p-4 flex flex-wrap gap-4 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Tìm kiếm thiết bị</label>
-              <div className="relative">
-                <Input placeholder="Nhập tên hoặc mã thiết bị..." className="pl-9" />
-                <MagnifyingGlass size={16} className="absolute left-3 top-2.5 text-muted-foreground" />
-              </div>
-            </div>
-            <div className="w-full md:w-[150px]">
-              <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Tình trạng</label>
-              <UISelect>
-                <option>Tất cả</option>
-                <option>Tốt</option>
-                <option>Cần kiểm tra</option>
-                <option>Hỏng</option>
-              </UISelect>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-border/50 bg-muted/30 shrink-0 w-full md:w-[250px]">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <Package size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tổng số thiết bị</p>
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl font-bold text-foreground">{roomAssets.length}</span>
-                <span className="text-xs text-muted-foreground">thiết bị</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mb-6">
+        <FilterBar
+          searchNode={
+            <SearchInput
+              value={keyword}
+              onChange={setKeyword}
+              placeholder="Nhập tên hoặc mã thiết bị..."
+              aria-label="Tìm kiếm thiết bị"
+            />
+          }
+          filterNode={
+            <UISelect value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Lọc theo tình trạng">
+              <option value="">Tất cả tình trạng</option>
+              <option value="IN_USE">Tốt</option>
+              <option value="UNDER_MAINTENANCE">Đang bảo trì</option>
+              <option value="DAMAGED">Hỏng</option>
+            </UISelect>
+          }
+          appliedFilterCount={statusFilter ? 1 : 0}
+          onResetFilters={() => setStatusFilter('')}
+          filterChips={
+            statusFilter ? [{
+              id: 'status',
+              label: `Tình trạng: ${statusFilter === 'IN_USE' ? 'Tốt' : statusFilter === 'UNDER_MAINTENANCE' ? 'Đang bảo trì' : 'Hỏng'}`,
+              onRemove: () => setStatusFilter('')
+            }] : []
+          }
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
         {/* Table list */}
-        <Card className="lg:col-span-3 border-border/50 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead className="bg-muted/30 text-muted-foreground border-b border-border/50">
-                <tr>
-                  <th className="px-6 py-4 font-semibold text-center w-16">STT</th>
-                  <th className="px-6 py-4 font-semibold">Mã thiết bị</th>
-                  <th className="px-6 py-4 font-semibold">Tên thiết bị</th>
-                  <th className="px-6 py-4 font-semibold">Danh mục</th>
-                  <th className="px-6 py-4 font-semibold text-center">Năm SD</th>
-                  <th className="px-6 py-4 font-semibold text-center">Tình trạng</th>
-                  <th className="px-6 py-4 font-semibold">Ghi chú</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50 text-foreground">
-                {roomAssets.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="text-center py-10 text-muted-foreground">Không có thiết bị trong phòng</td>
-                  </tr>
-                ) : roomAssets.map((asset, index) => {
+        <div className="lg:col-span-3">
+            <Table aria-label="Danh sách thiết bị trong phòng">
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16 text-center">STT</TableHead>
+                  <TableHead>Mã thiết bị</TableHead>
+                  <TableHead>Tên thiết bị</TableHead>
+                  <TableHead>Danh mục</TableHead>
+                  <TableHead className="text-center">Năm SD</TableHead>
+                  <TableHead className="text-center">Tình trạng</TableHead>
+                  <TableHead>Ghi chú</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedAssets.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">Không có thiết bị trong phòng</TableCell>
+                  </TableRow>
+                ) : paginatedAssets.map((asset, index) => {
                   const statusColor = 
                     asset.status === 'IN_USE' ? 'bg-emerald-100 text-emerald-700' :
                     asset.status === 'UNDER_MAINTENANCE' ? 'bg-amber-100 text-amber-700' :
@@ -182,10 +210,10 @@ export function StudentRoomAssetsPage() {
                     asset.status === 'DAMAGED' ? 'Hỏng' :
                     'Sẵn sàng';
                   return (
-                    <tr key={asset.id} className="hover:bg-muted/30 transition-colors">
-                      <td className="px-6 py-4 text-center text-muted-foreground font-medium">{index + 1}</td>
-                      <td className="px-6 py-4 font-bold">{asset.assetCode}</td>
-                      <td className="px-6 py-4">
+                    <TableRow key={asset.id}>
+                      <TableCell className="text-center text-muted-foreground font-medium">{(page - 1) * pageSize + index + 1}</TableCell>
+                      <TableCell className="font-bold">{asset.assetCode}</TableCell>
+                      <TableCell>
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">
                             {asset.category?.name === 'Nội thất' || asset.categoryId === 1 ? <Armchair size={16} /> :
@@ -194,22 +222,63 @@ export function StudentRoomAssetsPage() {
                           </span>
                           <span className="font-semibold">{asset.assetName}</span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground">{asset.category?.name || '-'}</td>
-                      <td className="px-6 py-4 text-center font-bold">{asset.yearInUse || '-'}</td>
-                      <td className="px-6 py-4 text-center">
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{asset.category?.name || '-'}</TableCell>
+                      <TableCell className="text-center font-bold">{asset.yearInUse || '-'}</TableCell>
+                      <TableCell className="text-center">
                         <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-bold text-[11px] ${statusColor}`}>
                           {statusLabel}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-muted-foreground">{asset.description || '-'}</td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{asset.description || '-'}</TableCell>
+                    </TableRow>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
+          <div className="lg:hidden flex flex-col gap-3 p-3">
+            {paginatedAssets.map((asset) => {
+              const statusColor = 
+                asset.status === 'IN_USE' ? 'bg-emerald-100 text-emerald-700' :
+                asset.status === 'UNDER_MAINTENANCE' ? 'bg-amber-100 text-amber-700' :
+                asset.status === 'DAMAGED' ? 'bg-rose-100 text-rose-700' :
+                'bg-muted text-muted-foreground';
+              const statusLabel = 
+                asset.status === 'IN_USE' ? 'Tốt' :
+                asset.status === 'UNDER_MAINTENANCE' ? 'Đang bảo trì' :
+                asset.status === 'DAMAGED' ? 'Hỏng' :
+                'Sẵn sàng';
+              return (
+                <MobileDataCard
+                  key={asset.id}
+                  title={asset.assetCode}
+                  subtitle={asset.assetName}
+                  statusBadge={
+                    <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded font-bold text-[11px] ${statusColor}`}>
+                      {statusLabel}
+                    </span>
+                  }
+                >
+                  <DataLabel label="Danh mục" value={asset.category?.name || '-'} />
+                  <DataLabel label="Năm SD" value={asset.yearInUse?.toString() || '-'} />
+                  <DataLabel label="Ghi chú" value={asset.description || '-'} />
+                </MobileDataCard>
+              );
+            })}
           </div>
-        </Card>
+          
+          {totalPages > 1 && (
+            <div className="p-4 border-t border-border/50 bg-card rounded-b-xl">
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                total={filteredAssets.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+              />
+            </div>
+          )}
+        </div>
 
         {/* Note side bar */}
         <div className="lg:col-span-1 space-y-6">
