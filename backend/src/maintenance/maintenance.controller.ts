@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CreateMaintenanceRecordDto, UpdateMaintenanceRecordDto } from './dto/maintenance-record.dto';
+import { CreateMaintenanceRecordDto, UpdateMaintenanceRecordDto, CompleteMaintenanceRecordDto } from './dto/maintenance-record.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('maintenance')
@@ -49,6 +49,16 @@ export class MaintenanceController {
     @Body() body: UpdateMaintenanceRecordDto,
   ) {
     return this.maintenanceService.updateRecord(parseInt(id, 10), userId, body);
+  }
+
+  @Roles('MANAGER')
+  @Patch('records/:id/complete')
+  async completeRecord(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: number,
+    @Body() body: CompleteMaintenanceRecordDto,
+  ) {
+    return this.maintenanceService.completeRecord(parseInt(id, 10), userId, body);
   }
 
   @Roles('MANAGER')

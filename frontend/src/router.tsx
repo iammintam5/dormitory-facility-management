@@ -11,7 +11,7 @@ import { LoginPage } from './pages/LoginPage';
 // Lazy-loaded page components for code splitting
 const AdminDashboardPage = React.lazy(() => import('./pages/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
 const ChangePasswordPage = React.lazy(() => import('./pages/ChangePasswordPage').then(m => ({ default: m.ChangePasswordPage })));
-const DamageReportDetailPage = React.lazy(() => import('./pages/damage-reports/DamageReportDetailPage').then(m => ({ default: m.DamageReportDetailPage })));
+
 
 const MaintenanceAssetHistoryPage = React.lazy(() => import('./pages/maintenance/MaintenanceAssetHistoryPage').then(m => ({ default: m.MaintenanceAssetHistoryPage })));
 const ManagerDashboardPage = React.lazy(() => import('./pages/ManagerDashboardPage').then(m => ({ default: m.ManagerDashboardPage })));
@@ -76,7 +76,7 @@ const managerChildren = [
   { path: 'asset-categories', element: <AssetCategoriesManagementPage /> },
   { path: 'assets', element: <AssetsManagementPage /> },
   { path: 'damage-reports', element: <DamageReportsManagementPage /> },
-  { path: 'damage-reports/:id', element: <DamageReportDetailPage /> },
+
   { path: 'maintenance', element: <MaintenanceManagementPage /> },
   { path: 'maintenance/records/new', element: <MaintenanceRecordCreatePage /> },
   { path: 'maintenance/assets/:assetId/history', element: <MaintenanceAssetHistoryPage /> },          { path: 'inventory-checks', element: <InventoryChecksManagementPage /> },
@@ -96,7 +96,7 @@ const studentChildren = [
   { path: 'room', element: <StudentRoomPage /> },
   { path: 'room-assets', element: <StudentRoomAssetsPage /> },
   { path: 'damage-reports', element: <StudentDamageReportsHistoryPage /> },
-  { path: 'damage-reports/:id', element: <DamageReportDetailPage /> },
+
   { path: 'profile', element: <ProfilePage /> },
   { path: 'change-password', element: <ChangePasswordPage /> },
 ];

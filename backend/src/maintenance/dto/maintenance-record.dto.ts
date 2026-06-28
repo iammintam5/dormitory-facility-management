@@ -8,6 +8,16 @@ export class CreateMaintenanceRecordDto {
   @Type(() => Number)
   planId?: number;
 
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  damageReportId?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  inventoryItemId?: number;
+
   @IsInt()
   @Type(() => Number)
   assetId!: number;
@@ -21,8 +31,35 @@ export class CreateMaintenanceRecordDto {
   @IsString()
   content!: string;
 
+  @IsOptional()
+  @IsEnum(MaintenanceResultStatus)
+  resultStatus?: MaintenanceResultStatus;
+
+  @IsOptional()
+  @IsDateString()
+  nextMaintenanceDate?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  cost?: number;
+
+  @IsOptional()
+  @IsString()
+  materialNote?: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class CompleteMaintenanceRecordDto {
   @IsEnum(MaintenanceResultStatus)
   resultStatus!: MaintenanceResultStatus;
+
+  @IsOptional()
+  @IsString()
+  content?: string;
 
   @IsOptional()
   @IsDateString()
@@ -54,10 +91,6 @@ export class UpdateMaintenanceRecordDto {
   @IsOptional()
   @IsString()
   content?: string;
-
-  @IsOptional()
-  @IsEnum(MaintenanceResultStatus)
-  resultStatus?: MaintenanceResultStatus;
 
   @IsOptional()
   @IsDateString()

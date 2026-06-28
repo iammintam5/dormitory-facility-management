@@ -132,7 +132,7 @@ export class InventoryChecksService {
 
   async saveItems(
     id: number,
-    items: Array<{ itemId: number; actualQuantity: number; actualCondition?: string; note?: string }>,
+    items: Array<{ itemId: number; actualQuantity: number; actualCondition?: string; note?: string; discrepancyType?: any }>,
   ) {
     // Pre-validate payload
     if (items.length === 0) {
@@ -191,6 +191,7 @@ export class InventoryChecksService {
             difference,
             actualCondition: item.actualCondition ?? null,
             note: item.note ?? null,
+            discrepancyType: item.discrepancyType ?? 'NONE',
             isChecked: true,
           },
         });

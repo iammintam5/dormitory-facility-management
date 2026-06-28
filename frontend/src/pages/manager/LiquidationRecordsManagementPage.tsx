@@ -658,14 +658,6 @@ export function LiquidationRecordsManagementPage() {
                 <Input type="text" {...createForm.register('note')} />
               </FilterField>
             </div>
-
-            <div className="rounded-xl border border-border/50 bg-muted/20 p-5 mt-4">
-              <h3 className="text-sm font-semibold text-foreground">Hội đồng thanh lý</h3>
-              <p className="mt-1 text-xs text-muted-foreground">Có thể chọn trước thành viên hội đồng nếu hồ sơ cần trình duyệt ngay.</p>
-              <div className="mt-4">
-                <CouncilMemberSelect members={members} onChange={setMembers} disabled={isSubmitting} />
-              </div>
-            </div>
           </ModalBody>
           <ModalFooter>
             <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>

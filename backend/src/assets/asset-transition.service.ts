@@ -7,6 +7,8 @@ export type TransitionContext = {
   userId: number;
   note?: string;
   newRoomId?: number | null;
+  sourceTable?: string;
+  sourceId?: number;
 };
 
 @Injectable()
@@ -105,6 +107,8 @@ export class AssetTransitionService {
           oldRoomId: asset.roomId,
           newRoomId: targetRoomId,
           note: context.note,
+          sourceTable: context.sourceTable,
+          sourceId: context.sourceId,
           assetId: asset.id,
           performedById: context.userId || null,
         },
