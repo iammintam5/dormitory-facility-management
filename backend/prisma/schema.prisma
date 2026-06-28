@@ -47,11 +47,6 @@ enum DamageReportPriority {
   URGENT
 }
 
-enum InventoryCheckStatus {
-  DRAFT
-  COMPLETED
-}
-
 enum LiquidationStatus {
   DRAFT
   PENDING_APPROVAL
@@ -71,7 +66,6 @@ enum ReceiptType {
 enum MaintenanceType {
   SCHEDULED
   AD_HOC
-  AFTER_INVENTORY
 }
 
 enum MaintenanceResultStatus {
@@ -91,34 +85,9 @@ enum MaintenanceOrderStatus {
   CANCELLED
 }
 
-enum DiscrepancyType {
-  NONE
-  MISSING
-  WRONG_ROOM
-  DAMAGED
-  EXCESS
-  STATUS_MISMATCH
-  INFORMATION_MISMATCH
-}
-
-enum DiscrepancyResolutionStatus {
-  PENDING
-  IN_PROGRESS
-  RESOLVED
-  CANCELLED
-}
-
-enum DiscrepancyResolutionType {
-  MAINTENANCE
-  LIQUIDATION
-  TRANSFER
-  INVESTIGATION
-}
-
 enum LiquidationSourceType {
   MANUAL
   MAINTENANCE
-  INVENTORY
 }
 
 // ===========================
@@ -157,8 +126,6 @@ model User {
   ownedAssets                 Asset[]                 @relation("AssetCheckedByUser")
   createdMaintenancePlans     MaintenancePlan[]
   performedMaintenanceRecords MaintenanceRecord[]
-  createdInventoryChecks      InventoryCheck[]        @relation("CheckedByUser")
-  resolvedDiscrepancies       InventoryCheckItem[]    @relation("DiscrepancyResolvedBy")
   createdLiquidationRecords   LiquidationRecord[]
   createdAssetReceipts        AssetReceipt[]
   damageReports               DamageReport[]          @relation("Reporter")
@@ -237,7 +204,6 @@ model Room {
   roomStudentAssignments RoomStudentAssignment[]
   assets                 Asset[]
   damageReports          DamageReport[]
-  inventoryChecks        InventoryCheck[]
 
   @@map("rooms")
 }
@@ -297,7 +263,6 @@ model Asset {
   damageReports       DamageReport[]
   maintenancePlans    MaintenancePlan[]
   maintenanceRecords  MaintenanceRecord[]
-  inventoryCheckItems InventoryCheckItem[]
   liquidationItems    LiquidationItem[]
   receiptItems        AssetReceiptItem[]
   normalizedSearch    NormalizedSearch?
@@ -417,8 +382,6 @@ model MaintenanceRecord {
 
   damageReportId  Int?
   damageReport    DamageReport?       @relation(fields: [damageReportId], references: [id])
-  inventoryItemId Int?
-  inventoryItem   InventoryCheckItem? @relation("MaintenanceFromInventory", fields: [inventoryItemId], references: [id])
 
   planId Int?
   plan   MaintenancePlan? @relation(fields: [planId], references: [id])
@@ -429,61 +392,6 @@ model MaintenanceRecord {
   performer   User  @relation(fields: [performedBy], references: [id])
 
   @@map("maintenance_records")
-}
-
-// ===========================
-// INVENTORY CHECKS
-// ===========================
-
-model InventoryCheck {
-  id            Int                  @id @default(autoincrement())
-  inventoryCode String               @unique
-  checkDate     DateTime
-  status        InventoryCheckStatus @default(DRAFT)
-  generalNote   String?
-  completedAt   DateTime?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-
-  roomId    Int?
-  room      Room? @relation(fields: [roomId], references: [id])
-  checkedBy Int
-  checker   User  @relation("CheckedByUser", fields: [checkedBy], references: [id])
-
-  inventoryCheckItems InventoryCheckItem[]
-  councilMembers      CouncilMember[]
-
-  @@map("inventory_checks")
-}
-
-model InventoryCheckItem {
-  id              Int     @id @default(autoincrement())
-  systemQuantity  Int     @default(1)
-  actualQuantity  Int     @default(1)
-  difference      Int     @default(0)
-  isChecked       Boolean @default(false)
-  actualCondition String?
-  note            String?
-
-  discrepancyType       DiscrepancyType             @default(NONE)
-  resolutionStatus      DiscrepancyResolutionStatus @default(PENDING)
-  resolutionType        DiscrepancyResolutionType?
-  resolutionReferenceId Int?
-  resolvedById          Int?
-  resolvedBy            User?                       @relation("DiscrepancyResolvedBy", fields: [resolvedById], references: [id])
-  resolvedAt            DateTime?
-
-  inventoryCheckId Int
-  inventoryCheck   InventoryCheck @relation(fields: [inventoryCheckId], references: [id], onDelete: Restrict)
-
-  assetId Int
-  asset   Asset @relation(fields: [assetId], references: [id])
-
-  createdMaintenanceRecords MaintenanceRecord[] @relation("MaintenanceFromInventory")
-
-  @@unique([inventoryCheckId, assetId], map: "inventory_check_items_unique")
-  @@index([assetId], map: "idx_inventory_check_items_asset")
-  @@map("inventory_check_items")
 }
 
 // ===========================
@@ -498,7 +406,6 @@ model LiquidationRecord {
   note                      String?
   sourceType                LiquidationSourceType @default(MANUAL)
   sourceMaintenanceRecordId Int?
-  sourceInventoryItemId     Int?
   createdAt                 DateTime              @default(now())
   updatedAt                 DateTime              @updatedAt
 
@@ -540,10 +447,10 @@ model CouncilMember {
   userId Int
   user   User @relation(fields: [userId], references: [id])
 
-  inventoryCheckId    Int?
-  inventoryCheck      InventoryCheck?    @relation(fields: [inventoryCheckId], references: [id], onDelete: Cascade)
-  liquidationRecordId Int?
-  liquidationRecord   LiquidationRecord? @relation(fields: [liquidationRecordId], references: [id], onDelete: Cascade)
+  liquidationRecordId Int
+  liquidationRecord   LiquidationRecord @relation(fields: [liquidationRecordId], references: [id], onDelete: Cascade)
+
+  @@unique([liquidationRecordId, userId])
 
   @@map("council_members")
 }
