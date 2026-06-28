@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsInt, IsEnum, IsNumber, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
+import { MaintenanceType as PrismaMaintenanceType, MaintenanceResultStatus } from '@prisma/client';
 
 export class CreateMaintenanceRecordDto {
   @IsOptional()
@@ -14,14 +15,14 @@ export class CreateMaintenanceRecordDto {
   @IsDateString()
   maintenanceDate!: string;
 
-  @IsString()
-  maintenanceType!: string;
+  @IsEnum(PrismaMaintenanceType)
+  maintenanceType!: PrismaMaintenanceType;
 
   @IsString()
   content!: string;
 
-  @IsString()
-  resultStatus!: string;
+  @IsEnum(MaintenanceResultStatus)
+  resultStatus!: MaintenanceResultStatus;
 
   @IsOptional()
   @IsDateString()
@@ -47,16 +48,16 @@ export class UpdateMaintenanceRecordDto {
   maintenanceDate?: string;
 
   @IsOptional()
-  @IsString()
-  maintenanceType?: string;
+  @IsEnum(PrismaMaintenanceType)
+  maintenanceType?: PrismaMaintenanceType;
 
   @IsOptional()
   @IsString()
   content?: string;
 
   @IsOptional()
-  @IsString()
-  resultStatus?: string;
+  @IsEnum(MaintenanceResultStatus)
+  resultStatus?: MaintenanceResultStatus;
 
   @IsOptional()
   @IsDateString()

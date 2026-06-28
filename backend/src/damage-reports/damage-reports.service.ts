@@ -286,12 +286,28 @@ export class DamageReportsService {
       changes.push('mức độ ưu tiên');
     }
     if (body.assetId !== undefined && body.assetId !== report.assetId) {
+      // FIX 11: Validate the new asset belongs to the student's current room
+      const assignment = await this.prisma.roomStudentAssignment.findFirst({
+        where: { studentId: userId, isActive: true },
+      });
+      if (!assignment) {
+        throw new BadRequestException('Sinh viên chưa được phân phòng');
+      }
+
+      const newAsset = await this.prisma.asset.findUnique({ where: { id: body.assetId } });
+      if (!newAsset) {
+        throw new NotFoundException('Tài sản mới không tồn tại');
+      }
+
+      if (newAsset.roomId !== assignment.roomId) {
+        throw new BadRequestException('Tài sản mới không thuộc phòng hiện tại của sinh viên');
+      }
+
       updateData.assetId = body.assetId;
       changes.push('tài sản');
     }
     if (body.roomId !== undefined && body.roomId !== report.roomId) {
-      // Allow if body.roomId matches report.roomId, else ignore it or reject
-      // We will ignore updating roomId for student.
+      // Ignore roomId updates from students - room is auto-set from assignment
     }
 
     if (Object.keys(updateData).length === 0) {

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, BadRequestException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ReceiptType, AssetStatus } from '@prisma/client';
 import { generateCode } from '../common/utils/code-generator';
@@ -21,7 +21,6 @@ export class AssetReceiptsService {
       documentNumber,
       note,
       totalAmount,
-      roomId, // default room for the imported items
       items,
     } = payload;
 
@@ -149,6 +148,36 @@ export class AssetReceiptsService {
 
       const uniqueAssetIds = [...new Set(assetIds.map((id: any) => parseInt(id, 10)))] as number[];
 
+      // Pre-validate all assets are AVAILABLE before transitioning
+      const invalidAssets = await prisma.asset.findMany({
+        where: {
+          id: { in: uniqueAssetIds },
+          status: { not: AssetStatus.AVAILABLE },
+        },
+        select: { id: true, assetCode: true, status: true },
+      });
+
+      if (invalidAssets.length > 0) {
+        const invalidCodes = invalidAssets.map(a => `${a.assetCode} (${a.status})`).join(', ');
+        throw new BadRequestException(
+          `Không thể cấp phát các tài sản không ở trạng thái AVAILABLE: ${invalidCodes}`
+        );
+      }
+
+      // Also check if any asset is already in the target room (duplicate allocation)
+      const alreadyInRoom = await prisma.asset.findMany({
+        where: {
+          id: { in: uniqueAssetIds },
+          roomId: parseInt(targetRoomId, 10),
+        },
+        select: { id: true, assetCode: true },
+      });
+
+      if (alreadyInRoom.length > 0) {
+        const codes = alreadyInRoom.map(a => a.assetCode).join(', ');
+        throw new ConflictException(`Tài sản đã được cấp phát cho phòng này: ${codes}`);
+      }
+
       for (const assetId of uniqueAssetIds) {
         await this.assetTransitionService.transition(prisma, assetId, AssetStatus.IN_USE, {
           action: 'CẤP_PHÁT',
@@ -234,53 +263,47 @@ export class AssetReceiptsService {
 
     const receiptCode = generateCode('XX');
 
-    try {
-      const result = await this.prisma.$transaction(async (prisma) => {
-        // 1. Create Export Receipt
-        const receipt = await prisma.assetReceipt.create({
-          data: {
-            receiptCode,
-            type: ReceiptType.EXPORT,
-            receiptDate: exportDate ? new Date(exportDate) : new Date(),
-            supplierName: recipient, // Reuse field
-            supplierPhone: contactPhone, // Reuse field
-            contractNumber: contractNumber,
-            note: generalNote,
-            createdBy: userId,
-          },
+    return this.prisma.$transaction(async (prisma) => {
+      // 1. Create Export Receipt
+      const receipt = await prisma.assetReceipt.create({
+        data: {
+          receiptCode,
+          type: ReceiptType.EXPORT,
+          receiptDate: exportDate ? new Date(exportDate) : new Date(),
+          supplierName: recipient, // Reuse field
+          supplierPhone: contactPhone, // Reuse field
+          contractNumber: contractNumber,
+          note: generalNote,
+          createdBy: userId,
+        },
+      });
+
+      // 2. Process Items
+      const uniqueItems = Array.from(new Map(items.map((item: any) => [parseInt(item.id, 10), item])).values()) as any[];
+
+      for (const item of uniqueItems) {
+        const assetId = parseInt(item.id, 10);
+        
+        // Use Transition Service - PENDING_LIQUIDATION -> LIQUIDATED and AVAILABLE -> LIQUIDATED are allowed
+        await this.assetTransitionService.transition(prisma, assetId, AssetStatus.LIQUIDATED, {
+          action: 'XUẤT_KHO',
+          userId,
+          newRoomId: null,
+          note: `Xuất thiết bị theo phiếu ${receiptCode}. Lý do: ${reason}`,
         });
 
-        // 2. Process Items
-        const uniqueItems = Array.from(new Map(items.map((item: any) => [parseInt(item.id, 10), item])).values()) as any[];
-
-        for (const item of uniqueItems) {
-          const assetId = parseInt(item.id, 10);
-          
-          // Use Transition Service. It expects AVAILABLE or PENDING_LIQUIDATION to transition to LIQUIDATED
-          await this.assetTransitionService.transition(prisma, assetId, AssetStatus.LIQUIDATED, {
-            action: 'XUẤT_KHO',
-            userId,
-            newRoomId: null,
-            note: `Xuất thiết bị theo phiếu ${receiptCode}. Lý do: ${reason}`,
-          });
-
-          // Create Receipt Item
-          await prisma.assetReceiptItem.create({
-            data: {
-              receiptId: receipt.id,
-              assetId: assetId,
-              quantity: item.qty || 1,
-              note: item.note || reason,
-            },
-          });
-        }
-        return receipt;
-      });
-      return result;
-    } catch (error) {
-      console.error(error);
-      throw new InternalServerErrorException('Failed to create export receipt');
-    }
+        // Create Receipt Item
+        await prisma.assetReceiptItem.create({
+          data: {
+            receiptId: receipt.id,
+            assetId: assetId,
+            quantity: item.qty || 1,
+            note: item.note || reason,
+          },
+        });
+      }
+      return receipt;
+    });
   }
 
   async findAll(query: any) {

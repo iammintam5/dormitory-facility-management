@@ -132,6 +132,7 @@ export class InventoryChecksService {
     id: number,
     items: Array<{ itemId: number; actualQuantity: number; actualCondition?: string; note?: string }>,
   ) {
+    // FIX 8: Make inventory save atomic - validate all items first, then update in one transaction
     const record = await this.prisma.inventoryCheck.findUnique({ where: { id } });
     if (!record) throw new NotFoundException('Inventory check not found');
 
@@ -139,27 +140,64 @@ export class InventoryChecksService {
       throw new BadRequestException('Chỉ có thể cập nhật khi phiên kiểm kê ở trạng thái DRAFT');
     }
 
+    if (items.length === 0) {
+      throw new BadRequestException('Danh sách item không được rỗng');
+    }
+
+    // Pre-validate all items
     for (const item of items) {
-      if (item.actualQuantity < 0) {
-        throw new BadRequestException('Số lượng thực tế không được âm');
+      if (!Number.isInteger(item.actualQuantity)) {
+        throw new BadRequestException(`Item ID ${item.itemId}: Số lượng thực tế phải là số nguyên`);
       }
-
-      const updateResult = await this.prisma.inventoryCheckItem.updateMany({
-        where: { id: item.itemId, inventoryCheckId: id },
-        data: {
-          actualQuantity: item.actualQuantity,
-          difference: item.actualQuantity - 1,
-          actualCondition: item.actualCondition ?? null,
-          note: item.note ?? null,
-        },
-      });
-
-      if (updateResult.count === 0) {
-        throw new BadRequestException(`Item ID ${item.itemId} không thuộc phiên kiểm kê này hoặc không tồn tại`);
+      if (item.actualQuantity < 0) {
+        throw new BadRequestException(`Item ID ${item.itemId}: Số lượng thực tế không được âm`);
       }
     }
 
-    return this.findOne(id);
+    // Check for duplicate item IDs in payload
+    const itemIds = items.map(i => i.itemId);
+    if (new Set(itemIds).size !== itemIds.length) {
+      throw new BadRequestException('Danh sách item không được chứa ID trùng lặp');
+    }
+
+    // Validate all items belong to this session and get their system quantities
+    return this.prisma.$transaction(async (tx) => {
+      const existingItems = await tx.inventoryCheckItem.findMany({
+        where: { inventoryCheckId: id, id: { in: itemIds } },
+        select: { id: true, systemQuantity: true },
+      });
+
+      if (existingItems.length !== itemIds.length) {
+        const foundIds = existingItems.map(ei => ei.id);
+        const missingIds = itemIds.filter(iid => !foundIds.includes(iid));
+        throw new BadRequestException(`Item ID ${missingIds.join(', ')} không thuộc phiên kiểm kê này hoặc không tồn tại`);
+      }
+
+      // Get systemQuantity map
+      const systemQuantityMap = new Map(existingItems.map(ei => [ei.id, ei.systemQuantity]));
+
+      // Update all items in a batch
+      for (const item of items) {
+        const systemQuantity = systemQuantityMap.get(item.itemId) ?? 1;
+        const difference = item.actualQuantity - systemQuantity;
+
+        const updateResult = await tx.inventoryCheckItem.updateMany({
+          where: { id: item.itemId, inventoryCheckId: id },
+          data: {
+            actualQuantity: item.actualQuantity,
+            difference,
+            actualCondition: item.actualCondition ?? null,
+            note: item.note ?? null,
+          },
+        });
+
+        if (updateResult.count === 0) {
+          throw new BadRequestException(`Item ID ${item.itemId} không thuộc phiên kiểm kê này hoặc không tồn tại`);
+        }
+      }
+
+      return this.findOne(id);
+    });
   }
 
   async complete(id: number, generalNote?: string) {

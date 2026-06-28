@@ -86,7 +86,7 @@ export function ExportEquipmentPage() {
         const [cats, blds, assetsData] = await Promise.all([
           getAssetCategories(),
           getBuildings(),
-          getAssets({ pageSize: 1000 }).catch(() => ({ items: [] as AssetRecord[], pagination: { page: 1, pageSize: 1000, total: 0, totalPages: 0 } })),
+          getAssets({ pageSize: 1000, status: 'PENDING_LIQUIDATION' }).catch(() => ({ items: [] as AssetRecord[], pagination: { page: 1, pageSize: 1000, total: 0, totalPages: 0 } })),
         ]);
         setCategories(cats || []);
         setBuildings(blds || []);

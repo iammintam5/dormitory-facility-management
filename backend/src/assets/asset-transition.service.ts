@@ -15,7 +15,7 @@ export class AssetTransitionService {
 
   // Centralized Matrix
   private readonly ALLOWED_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
-    [AssetStatus.AVAILABLE]: [AssetStatus.IN_USE, AssetStatus.PENDING_LIQUIDATION, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE],
+    [AssetStatus.AVAILABLE]: [AssetStatus.IN_USE, AssetStatus.PENDING_LIQUIDATION, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE, AssetStatus.LIQUIDATED],
     [AssetStatus.IN_USE]: [AssetStatus.AVAILABLE, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE],
     [AssetStatus.UNDER_MAINTENANCE]: [AssetStatus.AVAILABLE, AssetStatus.IN_USE, AssetStatus.DAMAGED, AssetStatus.PENDING_LIQUIDATION],
     [AssetStatus.DAMAGED]: [AssetStatus.AVAILABLE, AssetStatus.UNDER_MAINTENANCE, AssetStatus.PENDING_LIQUIDATION],
