@@ -16,7 +16,7 @@ const ChangePasswordPage = React.lazy(() => import('./pages/ChangePasswordPage')
 const MaintenanceAssetHistoryPage = React.lazy(() => import('./pages/maintenance/MaintenanceAssetHistoryPage').then(m => ({ default: m.MaintenanceAssetHistoryPage })));
 const ManagerDashboardPage = React.lazy(() => import('./pages/ManagerDashboardPage').then(m => ({ default: m.ManagerDashboardPage })));
 const ProfilePage = React.lazy(() => import('./pages/ProfilePage').then(m => ({ default: m.ProfilePage })));
-const InventoryCheckPrintPreviewPage = React.lazy(() => import('./pages/print/InventoryCheckPrintPreviewPage').then(m => ({ default: m.InventoryCheckPrintPreviewPage })));
+
 const StudentDashboardPage = React.lazy(() => import('./pages/StudentDashboardPage').then(m => ({ default: m.StudentDashboardPage })));
 const AuditLogsPage = React.lazy(() => import('./pages/admin/AuditLogsPage').then(m => ({ default: m.AuditLogsPage })));
 const UsersManagementPage = React.lazy(() => import('./pages/admin/UsersManagementPage').then(m => ({ default: m.UsersManagementPage })));
@@ -25,7 +25,7 @@ const AssetsManagementPage = React.lazy(() => import('./pages/admin/AssetsManage
 const LocationsManagementPage = React.lazy(() => import('./pages/admin/LocationsManagementPage').then(m => ({ default: m.LocationsManagementPage })));
 const RoomStudentsManagementPage = React.lazy(() => import('./pages/admin/RoomStudentsManagementPage').then(m => ({ default: m.RoomStudentsManagementPage })));
 const RoomsManagementPage = React.lazy(() => import('./pages/admin/RoomsManagementPage').then(m => ({ default: m.RoomsManagementPage })));
-const InventoryChecksManagementPage = React.lazy(() => import('./pages/manager/InventoryChecksManagementPage').then(m => ({ default: m.InventoryChecksManagementPage })));
+
 const EquipmentTransactionsPage = React.lazy(() => import('./pages/manager/EquipmentTransactionsPage').then(m => ({ default: m.EquipmentTransactionsPage })));
 const ImportEquipmentPage = React.lazy(() => import('./pages/manager/ImportEquipmentPage').then(m => ({ default: m.ImportEquipmentPage })));
 const ExportEquipmentPage = React.lazy(() => import('./pages/manager/ExportEquipmentPage').then(m => ({ default: m.ExportEquipmentPage })));
@@ -78,8 +78,7 @@ const managerChildren = [
 
   { path: 'maintenance', element: <MaintenanceManagementPage /> },
   { path: 'maintenance/records/new', element: <MaintenanceRecordCreatePage /> },
-  { path: 'maintenance/assets/:assetId/history', element: <MaintenanceAssetHistoryPage /> },          { path: 'inventory-checks', element: <InventoryChecksManagementPage /> },
-  { path: 'inventory-checks/:id/print', element: <InventoryCheckPrintPreviewPage /> },
+  { path: 'maintenance/assets/:assetId/history', element: <MaintenanceAssetHistoryPage /> },
   { path: 'liquidations', element: <Navigate to="../asset-transactions/export" replace /> },
   { path: 'asset-transactions', element: <EquipmentTransactionsPage /> },
   { path: 'asset-transactions/import', element: <ImportEquipmentPage /> },
@@ -109,7 +108,7 @@ export const router = createBrowserRouter([
       {
         element: <SuspenseLayout />,
         children: [
-          { path: '/print/inventory/:id', element: <InventoryCheckPrintPreviewPage /> },
+
           {
             element: <RoleRoute allowedRoles={['ADMIN']} />,
             children: [{ path: '/admin', element: <DashboardLayout />, children: adminChildren }],

@@ -66,7 +66,7 @@ export class LiquidationRecordsService {
       status: r.status,
       sourceType: r.sourceType,
       sourceMaintenanceRecordId: r.sourceMaintenanceRecordId,
-      sourceInventoryItemId: r.sourceInventoryItemId,
+
       note: r.note,
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
       updatedAt: r.updatedAt ? (r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt) : null,
@@ -132,7 +132,7 @@ export class LiquidationRecordsService {
       note?: string;
       sourceType?: any;
       sourceMaintenanceRecordId?: number;
-      sourceInventoryItemId?: number;
+
     },
   ) {
     const code = generateCode('TL-');
@@ -171,7 +171,7 @@ export class LiquidationRecordsService {
           status: LiquidationStatus.DRAFT,
           sourceType: body.sourceType ?? 'MANUAL',
           sourceMaintenanceRecordId: body.sourceMaintenanceRecordId ?? null,
-          sourceInventoryItemId: body.sourceInventoryItemId ?? null,
+
           liquidationItems: {
             create: {
               assetId: body.assetId,
