@@ -35,7 +35,7 @@ export class MaintenanceService {
       status: r.status,
       planId: r.planId,
       damageReportId: r.damageReportId,
-      inventoryItemId: r.inventoryItemId,
+
       assetId: r.assetId,
       performedBy: r.performedBy,
       maintenanceDate: r.maintenanceDate instanceof Date ? r.maintenanceDate.toISOString().split('T')[0] : r.maintenanceDate,
@@ -106,7 +106,7 @@ export class MaintenanceService {
     body: {
       planId?: number;
       damageReportId?: number;
-      inventoryItemId?: number;
+
       assetId: number;
       maintenanceDate: string;
       maintenanceType: MaintenanceType;
@@ -145,11 +145,7 @@ export class MaintenanceService {
         expectedReportStatus = dr.status;
       }
 
-      if (body.inventoryItemId) {
-        const item = await tx.inventoryCheckItem.findUnique({ where: { id: body.inventoryItemId } });
-        if (!item) throw new NotFoundException('Sai lệch kiểm kê không tồn tại');
-        if (item.assetId !== body.assetId) throw new BadRequestException('Tài sản không khớp với sai lệch');
-      }
+
 
       const rec = await tx.maintenanceRecord.create({
         data: {
@@ -165,7 +161,7 @@ export class MaintenanceService {
           previousRoomId: asset.roomId,
           planId: body.planId ?? null,
           damageReportId: body.damageReportId ?? null,
-          inventoryItemId: body.inventoryItemId ?? null,
+
           nextMaintenanceDate: body.nextMaintenanceDate ? new Date(body.nextMaintenanceDate) : null,
           cost: body.cost ?? null,
           materialNote: body.materialNote ?? null,
@@ -199,16 +195,7 @@ export class MaintenanceService {
         });
       }
 
-      if (body.inventoryItemId) {
-        await tx.inventoryCheckItem.update({
-          where: { id: body.inventoryItemId },
-          data: {
-            resolutionStatus: 'IN_PROGRESS',
-            resolutionType: 'MAINTENANCE',
-            resolutionReferenceId: rec.id
-          }
-        });
-      }
+
 
       if (asset.status !== AssetStatus.UNDER_MAINTENANCE) {
         await this.assetTransitionService.transition(tx, body.assetId, AssetStatus.UNDER_MAINTENANCE, {
@@ -307,17 +294,7 @@ export class MaintenanceService {
         }
       }
 
-      if (record.inventoryItemId) {
-        await tx.inventoryCheckItem.update({
-          where: { id: record.inventoryItemId },
-          data: {
-            resolutionStatus: 'RESOLVED',
-            resolvedById: userId,
-            resolvedAt: new Date(),
-            note: `Đã bảo trì xong, kết quả: ${body.resultStatus}`
-          }
-        });
-      }
+
 
       if (body.resultStatus === 'RECOMMEND_LIQUIDATION') {
         const activeLiq = await tx.liquidationItem.findFirst({

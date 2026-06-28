@@ -13,10 +13,7 @@ export class CreateMaintenanceRecordDto {
   @Type(() => Number)
   damageReportId?: number;
 
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  inventoryItemId?: number;
+
 
   @IsInt()
   @Type(() => Number)

@@ -11,7 +11,7 @@ import { LocationsModule } from './locations/locations.module';
 import { RoomsModule } from './rooms/rooms.module';
 import { DamageReportsModule } from './damage-reports/damage-reports.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
-import { InventoryChecksModule } from './inventory-checks/inventory-checks.module';
+
 import { LiquidationRecordsModule } from './liquidation-records/liquidation-records.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AuditLogsModule } from './audit-logs/audit-logs.module';
@@ -34,7 +34,7 @@ import { AssetReceiptsModule } from './asset-receipts/asset-receipts.module';
     RoomsModule,
     DamageReportsModule,
     MaintenanceModule,
-    InventoryChecksModule,
+
     LiquidationRecordsModule,
     NotificationsModule,
     AuditLogsModule,

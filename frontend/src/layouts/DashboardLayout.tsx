@@ -18,7 +18,6 @@ import {
   Package,
   WarningOctagon,
   Wrench,
-  ClipboardText,
   Trash,
   ArrowsLeftRight,
   Handshake,
@@ -319,7 +318,6 @@ function getNavGroups(role: UserRole, pendingDamageCount: number = 0): NavGroup[
         items: [
           { path: 'damage-reports', label: 'Phiếu báo hỏng', badge: pendingDamageCount, icon: WarningOctagon },
           { path: 'maintenance', label: 'Bảo trì và sửa chữa', icon: Wrench },
-          { path: 'inventory-checks', label: 'Phiếu kiểm kê', icon: ClipboardText },
           { path: 'liquidations', label: 'Thanh lý thiết bị', icon: Trash },
           { path: 'asset-transactions', label: 'Lịch sử nhập/xuất', icon: ArrowsLeftRight },
           { path: 'asset-transactions/allocation', label: 'Cấp phát - Thu hồi', icon: Handshake },

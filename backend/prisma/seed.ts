@@ -9,7 +9,7 @@ async function main() {
   const hash = (pw: string) => bcrypt.hashSync(pw, 10);
 
   console.log('   Clearing existing data...');
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE "users", "roles", "profiles", "dorm_buildings", "floors", "rooms", "room_student_assignments", "asset_categories", "assets", "asset_histories", "damage_reports", "maintenance_plans", "maintenance_records", "inventory_checks", "inventory_check_items", "liquidation_records", "liquidation_items", "council_members", "notifications", "audit_logs", "normalized_searches", "asset_receipts", "asset_receipt_items" CASCADE;`);
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE "users", "roles", "profiles", "dorm_buildings", "floors", "rooms", "room_student_assignments", "asset_categories", "assets", "asset_histories", "damage_reports", "maintenance_plans", "maintenance_records", "liquidation_records", "liquidation_items", "council_members", "notifications", "audit_logs", "normalized_searches", "asset_receipts", "asset_receipt_items" CASCADE;`);
 
   console.log('   [1/8] Creating Roles...');
   const roleAdmin = await prisma.role.create({ data: { code: 'ADMIN', name: 'Quản trị viên', description: 'Quản trị hệ thống' } });
