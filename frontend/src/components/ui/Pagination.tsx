@@ -1,4 +1,4 @@
-import { CaretLeft, CaretRight, DotsThree } from '@phosphor-icons/react';
+import { CaretDoubleLeft, CaretDoubleRight, CaretLeft, CaretRight, DotsThree } from '@phosphor-icons/react';
 import { Button } from './Button';
 
 interface PaginationProps {
@@ -7,11 +7,22 @@ interface PaginationProps {
   total: number;
   pageSize: number;
   onPageChange: (page: number) => void;
+  onPageSizeChange?: (pageSize: number) => void;
+  pageSizeOptions?: number[];
   /** Optional custom label override. Defaults to "Hiển thị X đến Y của Z kết quả" */
   label?: string;
 }
 
-export function Pagination({ page, totalPages, total, pageSize, onPageChange, label }: PaginationProps) {
+export function Pagination({ 
+  page, 
+  totalPages, 
+  total, 
+  pageSize, 
+  onPageChange, 
+  onPageSizeChange,
+  pageSizeOptions = [10, 20, 50, 100],
+  label 
+}: PaginationProps) {
   if (total === 0) return null;
 
   const from = (page - 1) * pageSize + 1;
@@ -45,8 +56,38 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange, la
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-border/50 bg-muted/10 px-4 py-3 sm:px-6 sm:py-4">
-      <div className="text-xs sm:text-sm text-muted-foreground font-medium">{displayLabel}</div>
+      <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-muted-foreground font-medium">
+        <span>{displayLabel}</span>
+        {onPageSizeChange && (
+          <div className="flex items-center gap-2 border-l border-border/50 pl-4">
+            <label htmlFor="pageSizeSelect" className="sr-only">Số dòng trên trang</label>
+            <select
+              id="pageSizeSelect"
+              value={pageSize}
+              onChange={(e) => onPageSizeChange(Number(e.target.value))}
+              className="h-7 rounded-md border border-input bg-background px-2 py-0.5 text-xs ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              {pageSizeOptions.map((size) => (
+                <option key={size} value={size}>
+                  {size} dòng/trang
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
       <div className="flex items-center gap-1.5 sm:gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page <= 1}
+          onClick={() => onPageChange(1)}
+          className="h-8 px-2 hidden sm:flex shadow-sm"
+          title="Trang đầu"
+          aria-label="Đi đến trang đầu"
+        >
+          <CaretDoubleLeft size={16} weight="bold" />
+        </Button>
         <Button
           variant="outline"
           size="sm"
@@ -54,6 +95,7 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange, la
           onClick={() => onPageChange(page - 1)}
           className="h-8 px-2 sm:px-3 text-xs sm:text-sm shadow-sm"
           title="Trang trước"
+          aria-label="Đi đến trang trước"
         >
           <CaretLeft size={16} weight="bold" />
           <span className="hidden sm:inline ml-1">Trước</span>
@@ -75,6 +117,8 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange, la
                 variant={isCurrent ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => onPageChange(p as number)}
+                aria-current={isCurrent ? "page" : undefined}
+                aria-label={`Đi đến trang ${p}`}
                 className={`h-8 min-w-[2rem] px-2 text-xs sm:text-sm shadow-sm transition-all ${
                   isCurrent ? 'ring-2 ring-primary/20 ring-offset-1 ring-offset-background' : 'hover:bg-muted'
                 }`}
@@ -92,9 +136,21 @@ export function Pagination({ page, totalPages, total, pageSize, onPageChange, la
           onClick={() => onPageChange(page + 1)}
           className="h-8 px-2 sm:px-3 text-xs sm:text-sm shadow-sm"
           title="Trang sau"
+          aria-label="Đi đến trang sau"
         >
           <span className="hidden sm:inline mr-1">Sau</span>
           <CaretRight size={16} weight="bold" />
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(totalPages)}
+          className="h-8 px-2 hidden sm:flex shadow-sm"
+          title="Trang cuối"
+          aria-label="Đi đến trang cuối"
+        >
+          <CaretDoubleRight size={16} weight="bold" />
         </Button>
       </div>
     </div>

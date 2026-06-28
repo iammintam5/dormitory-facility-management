@@ -5,7 +5,7 @@ interface SkeletonProps {
 export function Skeleton({ className = '' }: SkeletonProps) {
   return (
     <div
-      className={`rounded-md bg-muted animate-skeleton-pulse ${className}`}
+      className={`rounded-md bg-muted motion-safe:animate-skeleton-pulse ${className}`}
       aria-hidden="true"
     />
   );

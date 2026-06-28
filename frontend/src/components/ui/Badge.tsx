@@ -22,13 +22,13 @@ type WorkflowStatusMeta = {
 
 const toneClassNames: Record<BadgeTone, string> = {
   slate: 'border-border bg-muted/50 text-foreground',
-  amber: 'border-amber-200 bg-amber-100 text-amber-700',
-  emerald: 'border-emerald-200 bg-emerald-100 text-emerald-700',
-  sky: 'border-sky-200 bg-sky-100 text-sky-700',
-  indigo: 'border-indigo-200 bg-indigo-100 text-indigo-700',
-  rose: 'border-rose-200 bg-rose-100 text-rose-700',
-  teal: 'border-teal-200 bg-teal-100 text-teal-700',
-  violet: 'border-violet-200 bg-violet-100 text-violet-700',
+  amber: 'border-warning-border bg-warning-muted text-warning',
+  emerald: 'border-success-border bg-success-muted text-success',
+  sky: 'border-info-border bg-info-muted text-info',
+  indigo: 'border-primary/20 bg-primary/10 text-primary',
+  rose: 'border-destructive-border bg-destructive-muted text-destructive',
+  teal: 'border-success-border bg-success-muted text-success',
+  violet: 'border-primary/20 bg-primary/10 text-primary',
 };
 
 const statusMetaMap: Record<string, WorkflowStatusMeta> = {
@@ -70,9 +70,9 @@ function Badge({ className = '', variant = 'default', status, label, tone, icon,
     secondary: 'border-transparent bg-secondary text-secondary-foreground',
     destructive: 'border-transparent bg-destructive text-destructive-foreground',
     outline: 'text-foreground',
-    success: 'border-transparent bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100',
-    warning: 'border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100',
-    info: 'border-transparent bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100',
+    success: 'border-success-border bg-success-muted text-success',
+    warning: 'border-warning-border bg-warning-muted text-warning',
+    info: 'border-info-border bg-info-muted text-info',
   };
 
   const variantStyles = variants[variant] || variants.default;

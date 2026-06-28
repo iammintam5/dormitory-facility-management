@@ -20,6 +20,8 @@ export default {
                 destructive: {
                     DEFAULT: 'hsl(var(--destructive))',
                     foreground: 'hsl(var(--destructive-foreground))',
+                    muted: 'hsl(var(--destructive-muted))',
+                    border: 'hsl(var(--destructive-border))',
                 },
                 muted: {
                     DEFAULT: 'hsl(var(--muted))',
@@ -40,6 +42,43 @@ export default {
                 sidebar: {
                     bg: 'hsl(var(--sidebar-bg))',
                     border: 'hsl(var(--sidebar-border))',
+                    active: 'hsl(var(--sidebar-active))',
+                    'active-foreground': 'hsl(var(--sidebar-active-foreground))',
+                    hover: 'hsl(var(--sidebar-hover))',
+                },
+                success: {
+                    DEFAULT: 'hsl(var(--success))',
+                    foreground: 'hsl(var(--success-foreground))',
+                    muted: 'hsl(var(--success-muted))',
+                    border: 'hsl(var(--success-border))',
+                },
+                warning: {
+                    DEFAULT: 'hsl(var(--warning))',
+                    foreground: 'hsl(var(--warning-foreground))',
+                    muted: 'hsl(var(--warning-muted))',
+                    border: 'hsl(var(--warning-border))',
+                },
+                info: {
+                    DEFAULT: 'hsl(var(--info))',
+                    foreground: 'hsl(var(--info-foreground))',
+                    muted: 'hsl(var(--info-muted))',
+                    border: 'hsl(var(--info-border))',
+                },
+                surface: {
+                    DEFAULT: 'hsl(var(--surface))',
+                    muted: 'hsl(var(--surface-muted))',
+                    elevated: 'hsl(var(--surface-elevated))',
+                },
+                hover: 'hsl(var(--hover))',
+                selected: 'hsl(var(--selected))',
+                disabled: {
+                    DEFAULT: 'hsl(var(--disabled))',
+                    foreground: 'hsl(var(--disabled-foreground))',
+                },
+                focus: 'hsl(var(--focus))',
+                table: {
+                    header: 'hsl(var(--table-header))',
+                    hover: 'hsl(var(--table-row-hover))',
                 },
             },
             borderRadius: {
