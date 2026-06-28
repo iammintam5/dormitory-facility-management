@@ -38,6 +38,7 @@ export type DamageReport = {
   asset?: Asset;
   room?: Room;
   damageReportLogs?: DamageReportLog[];
+  maintenanceRecords?: { id: number, maintenanceCode: string }[];
 };
 
 export type DamageReportsResponse = {

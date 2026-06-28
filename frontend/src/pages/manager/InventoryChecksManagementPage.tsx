@@ -811,6 +811,7 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath, onUpdat
                     <th className="px-4 py-3 font-semibold text-center">Chênh lệch</th>
                     <th className="px-4 py-3 font-semibold">Tình trạng</th>
                     <th className="px-4 py-3 font-semibold">Ghi chú</th>
+                    <th className="px-4 py-3 font-semibold text-center w-24">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/50">
@@ -848,6 +849,18 @@ function DetailInventoryCheckModal({ checkId, isOpen, onClose, basePath, onUpdat
                             <input value={note} onChange={(e) => updateDraft(item.id, 'note', e.target.value)} className="w-full min-w-[140px] rounded-md border border-input bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary" />
                           ) : (
                             <span>{note || '--'}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          {!isDraft && highlight && (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="text-[10px] h-7 px-2"
+                              onClick={() => navigate(`${basePath}/maintenance/records/new?inventoryItemId=${item.id}&assetId=${item.assetId}`)}
+                            >
+                              Xử lý
+                            </Button>
                           )}
                         </td>
                       </tr>

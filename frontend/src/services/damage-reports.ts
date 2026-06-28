@@ -51,16 +51,6 @@ export async function rejectDamageReport(id: string | number) {
   return unwrapApiResponse<DamageReport>(response.data);
 }
 
-export async function startProcessingReport(id: string | number) {
-  const response = await apiClient.post(`/damage-reports/${id}/start-processing`);
-  return unwrapApiResponse<DamageReport>(response.data);
-}
-
-export async function completeReport(id: string | number) {
-  const response = await apiClient.post(`/damage-reports/${id}/complete`);
-  return unwrapApiResponse<DamageReport>(response.data);
-}
-
 export async function cancelReport(id: string | number) {
   const response = await apiClient.post(`/damage-reports/${id}/cancel`);
   return unwrapApiResponse<DamageReport>(response.data);

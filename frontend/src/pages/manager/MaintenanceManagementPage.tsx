@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useToast } from '../../toast/toast-context';
@@ -25,7 +26,7 @@ import {
   WarningCircle,
   FloppyDisk
 } from '@phosphor-icons/react';
-import { getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, getMaintenancePlans } from '../../services/maintenance';
+import { getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, completeMaintenanceRecord, getMaintenancePlans } from '../../services/maintenance';
 import { getAssets } from '../../services/assets';
 import { getApiErrorMessage } from '../../lib/api-client';
 import type { MaintenanceRecord, MaintenancePlan } from '../../types/maintenance';
@@ -37,7 +38,7 @@ const recordSchema = z.object({
   maintenanceDate: z.string().min(1, 'Chọn ngày bảo trì.'),
   maintenanceType: z.enum(['SCHEDULED', 'AD_HOC', 'AFTER_INVENTORY']),
   content: z.string().min(1, 'Nhập nội dung thực hiện.'),
-  resultStatus: z.enum(['GOOD', 'NEED_MONITORING', 'NEED_REPAIR', 'RECOMMEND_LIQUIDATION']),
+  resultStatus: z.enum(['GOOD', 'RECOMMEND_LIQUIDATION']).optional(),
   nextMaintenanceDate: z.string().optional(),
   cost: z.union([z.coerce.number().min(0), z.nan()]).optional(),
   materialNote: z.string().optional(),
@@ -60,12 +61,15 @@ export function MaintenanceManagementPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
   
   const [activeTab, setActiveTab] = useState('Tất cả');
   
   // Filter states
-  const [searchKeyword, setSearchKeyword] = useState('');
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
+  const [searchKeyword, setSearchKeyword] = useState(initialSearch);
   const [statusFilter, setStatusFilter] = useState('Tất cả');
   const [typeFilter, setTypeFilter] = useState('Tất cả');
 
@@ -129,8 +133,6 @@ export function MaintenanceManagementPage() {
       if (activeTab !== 'Tất cả') {
         const tabMap: Record<string, string> = {
           'Tốt': 'GOOD',
-          'Cần theo dõi': 'NEED_MONITORING',
-          'Cần sửa chữa': 'NEED_REPAIR',
           'Đề nghị thanh lý': 'RECOMMEND_LIQUIDATION',
         };
         if (record.resultStatus !== tabMap[activeTab]) return false;
@@ -165,8 +167,6 @@ export function MaintenanceManagementPage() {
     return {
       total: records.length,
       good: records.filter(r => r.resultStatus === 'GOOD').length,
-      needMonitor: records.filter(r => r.resultStatus === 'NEED_MONITORING').length,
-      needRepair: records.filter(r => r.resultStatus === 'NEED_REPAIR').length,
       recommendLiquidation: records.filter(r => r.resultStatus === 'RECOMMEND_LIQUIDATION').length,
     };
   }, [records]);
@@ -228,7 +228,6 @@ export function MaintenanceManagementPage() {
           maintenanceDate: data.maintenanceDate,
           maintenanceType: data.maintenanceType,
           content: data.content,
-          resultStatus: data.resultStatus,
           nextMaintenanceDate: data.nextMaintenanceDate || undefined,
           cost: Number.isNaN(data.cost) ? undefined : data.cost,
           materialNote: data.materialNote?.trim() || undefined,
@@ -255,6 +254,26 @@ export function MaintenanceManagementPage() {
     }
   };
 
+  const handleComplete = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRecord) return;
+    
+    const formData = new FormData(e.target as HTMLFormElement);
+    const resultStatus = formData.get('resultStatus') as string;
+    
+    setIsSubmitting(true);
+    try {
+      await completeMaintenanceRecord(selectedRecord.id, { resultStatus });
+      showToast('Hoàn tất phiếu bảo trì thành công.', 'success');
+      setIsCompleteModalOpen(false);
+      loadRecords();
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Lưu thông tin thất bại.'), 'error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   function translateType(type: string) {
     switch (type) {
       case 'SCHEDULED': return 'Định kỳ';
@@ -267,8 +286,6 @@ export function MaintenanceManagementPage() {
   function translateStatus(status: string) {
     switch (status) {
       case 'GOOD': return 'Tốt';
-      case 'NEED_MONITORING': return 'Cần theo dõi';
-      case 'NEED_REPAIR': return 'Cần sửa chữa';
       case 'RECOMMEND_LIQUIDATION': return 'Đề nghị thanh lý';
       default: return status;
     }
@@ -277,8 +294,6 @@ export function MaintenanceManagementPage() {
   const renderStatusBadge = (status: string) => {
     switch (status) {
       case 'GOOD': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-700">Tốt</span>;
-      case 'NEED_MONITORING': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-700">Cần theo dõi</span>;
-      case 'NEED_REPAIR': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-700">Cần sửa chữa</span>;
       case 'RECOMMEND_LIQUIDATION': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-700">Đề nghị thanh lý</span>;
       default: return null;
     }
@@ -313,7 +328,7 @@ export function MaintenanceManagementPage() {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-border/50">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
@@ -333,28 +348,6 @@ export function MaintenanceManagementPage() {
             <div>
               <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tốt</p>
               <p className="text-2xl font-bold text-foreground">{summaryCounts.good}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
-              <Clock size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Cần theo dõi</p>
-              <p className="text-2xl font-bold text-foreground">{summaryCounts.needMonitor}</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-rose-500/10 flex items-center justify-center text-rose-600 shrink-0">
-              <WarningCircle size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Cần sửa chữa</p>
-              <p className="text-2xl font-bold text-foreground">{summaryCounts.needRepair}</p>
             </div>
           </CardContent>
         </Card>
@@ -387,12 +380,8 @@ export function MaintenanceManagementPage() {
           </div>
           <div className="w-full md:w-40">
             <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Kết quả</label>
-            <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option>Tất cả</option>
-              <option value="GOOD">Tốt</option>
-              <option value="NEED_MONITORING">Cần theo dõi</option>
-              <option value="NEED_REPAIR">Cần sửa chữa</option>
-              <option value="RECOMMEND_LIQUIDATION">Đề nghị thanh lý</option>
+            <Select className="w-[160px] bg-background border-border/50 text-foreground" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+              {['Tất cả', 'Tốt', 'Đề nghị thanh lý'].map(s => <option key={s} value={s === 'Tất cả' ? 'Tất cả' : (s === 'Tốt' ? 'GOOD' : 'RECOMMEND_LIQUIDATION')}>{s}</option>)}
             </Select>
           </div>
           <div className="w-full md:w-36">
@@ -419,7 +408,7 @@ export function MaintenanceManagementPage() {
 
       <Card className="border-border/50 overflow-hidden">
         <div className="flex items-center gap-6 border-b border-border/50 px-6 bg-muted/20 overflow-x-auto">
-          {['Tất cả', 'Tốt', 'Cần theo dõi', 'Cần sửa chữa', 'Đề nghị thanh lý'].map((tab) => (
+          {['Tất cả', 'Tốt', 'Đề nghị thanh lý'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -484,6 +473,11 @@ export function MaintenanceManagementPage() {
                         <Button variant="ghost" size="icon" onClick={() => openEditModal(record)} title="Sửa">
                           <PencilSimple size={16} className="text-primary" />
                         </Button>
+                        {record.status === 'IN_PROGRESS' && (
+                          <Button variant="ghost" size="icon" onClick={() => { setSelectedRecord(record); setIsCompleteModalOpen(true); }} title="Hoàn tất">
+                            <CheckCircle size={16} className="text-emerald-600" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -513,7 +507,7 @@ export function MaintenanceManagementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">Tài sản <span className="text-destructive">*</span></label>
-                  <Select {...form.register('assetId', { valueAsNumber: true })}>
+                  <Select {...form.register('assetId', { valueAsNumber: true })} disabled={isEditMode}>
                     <option value={0}>-- Chọn tài sản --</option>
                     {assets.map((asset) => (
                       <option key={asset.id} value={asset.id}>{asset.assetCode} - {asset.assetName}</option>
@@ -523,7 +517,7 @@ export function MaintenanceManagementPage() {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">Kế hoạch bảo trì</label>
-                  <Select {...form.register('planId', { valueAsNumber: true })}>
+                  <Select {...form.register('planId', { valueAsNumber: true })} disabled={isEditMode}>
                     <option value="">Không gắn kế hoạch</option>
                     {plans.map((plan) => (
                       <option key={plan.id} value={plan.id}>
@@ -540,26 +534,26 @@ export function MaintenanceManagementPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">Ngày bảo trì <span className="text-destructive">*</span></label>
-                  <Input type="date" {...form.register('maintenanceDate')} />
+                  <Input type="date" {...form.register('maintenanceDate')} disabled={isEditMode} />
                   {form.formState.errors.maintenanceDate && <p className="text-xs text-destructive mt-1">{form.formState.errors.maintenanceDate.message}</p>}
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">Loại bảo trì <span className="text-destructive">*</span></label>
-                  <Select {...form.register('maintenanceType')}>
+                  <Select {...form.register('maintenanceType')} disabled={isEditMode}>
                     <option value="SCHEDULED">Định kỳ</option>
                     <option value="AD_HOC">Đột xuất</option>
                     <option value="AFTER_INVENTORY">Sau kiểm kê</option>
                   </Select>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Kết quả <span className="text-destructive">*</span></label>
-                  <Select {...form.register('resultStatus')}>
-                    <option value="GOOD">Tốt</option>
-                    <option value="NEED_MONITORING">Cần theo dõi</option>
-                    <option value="NEED_REPAIR">Cần sửa chữa</option>
-                    <option value="RECOMMEND_LIQUIDATION">Đề nghị thanh lý</option>
-                  </Select>
-                </div>
+                {!isEditMode && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground">Kết quả <span className="text-destructive">*</span></label>
+                    <Select {...form.register('resultStatus')}>
+                      <option value="GOOD">Tốt</option>
+                      <option value="RECOMMEND_LIQUIDATION">Đề nghị thanh lý</option>
+                    </Select>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -626,7 +620,7 @@ export function MaintenanceManagementPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Kết quả</p>
-                  {renderStatusBadge(selectedRecord.resultStatus)}
+                  {renderStatusBadge(selectedRecord.resultStatus || '')}
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Thiết bị</p>
@@ -698,6 +692,30 @@ export function MaintenanceManagementPage() {
         <ModalFooter>
           <Button onClick={() => setIsDetailModalOpen(false)}>Đóng</Button>
         </ModalFooter>
+      </Modal>
+
+      <Modal isOpen={isCompleteModalOpen} onClose={() => setIsCompleteModalOpen(false)} size="sm">
+        <ModalHeader>
+          <ModalTitle>Hoàn tất phiếu bảo trì</ModalTitle>
+        </ModalHeader>
+        <form onSubmit={handleComplete}>
+          <ModalBody className="space-y-4">
+            <p className="text-sm text-muted-foreground">Vui lòng chọn kết quả sau khi bảo trì để hệ thống tự động mở khóa tài sản.</p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Kết quả <span className="text-destructive">*</span></label>
+              <Select name="resultStatus" required>
+                <option value="GOOD">Tốt (Đã sửa xong)</option>
+                <option value="RECOMMEND_LIQUIDATION">Đề nghị thanh lý (Hỏng nặng)</option>
+              </Select>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button type="button" variant="outline" onClick={() => setIsCompleteModalOpen(false)}>Hủy</Button>
+            <Button type="submit" disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+              {isSubmitting ? 'Đang xử lý...' : 'Xác nhận hoàn tất'}
+            </Button>
+          </ModalFooter>
+        </form>
       </Modal>
     </div>
   );

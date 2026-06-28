@@ -32,7 +32,6 @@ export async function updateMaintenanceRecord(id: number, payload: {
   maintenanceDate?: string;
   maintenanceType?: string;
   content?: string;
-  resultStatus?: string;
   nextMaintenanceDate?: string;
   cost?: number;
   materialNote?: string;
@@ -42,17 +41,31 @@ export async function updateMaintenanceRecord(id: number, payload: {
   return unwrapApiResponse<MaintenanceRecord>(response.data);
 }
 
+export async function completeMaintenanceRecord(id: number, payload: {
+  resultStatus: string;
+  content?: string;
+  nextMaintenanceDate?: string;
+  cost?: number;
+  materialNote?: string;
+  note?: string;
+}) {
+  const response = await apiClient.patch(`/maintenance/records/${id}/complete`, payload);
+  return unwrapApiResponse<MaintenanceRecord>(response.data);
+}
+
 export async function createMaintenanceRecord(payload: {
   planId?: number;
   assetId: number;
   maintenanceDate: string;
   maintenanceType: string;
   content: string;
-  resultStatus: string;
+  resultStatus?: string;
   nextMaintenanceDate?: string;
   cost?: number;
   materialNote?: string;
   note?: string;
+  damageReportId?: number;
+  inventoryItemId?: number;
 }) {
   const response = await apiClient.post('/maintenance/records', payload);
   return unwrapApiResponse<MaintenanceRecord>(response.data);

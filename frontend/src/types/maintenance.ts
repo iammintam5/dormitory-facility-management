@@ -4,8 +4,6 @@ import { User } from './users';
 export type MaintenanceType = 'SCHEDULED' | 'AD_HOC' | 'AFTER_INVENTORY';
 export type MaintenanceResultStatus =
   | 'GOOD'
-  | 'NEED_MONITORING'
-  | 'NEED_REPAIR'
   | 'RECOMMEND_LIQUIDATION';
 
 export type MaintenancePlan = {
@@ -26,6 +24,7 @@ export type MaintenancePlan = {
 export type MaintenanceRecord = {
   id: number;
   maintenanceCode: string;
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   planId?: number | null;
   assetId: number;
   performedBy: number;

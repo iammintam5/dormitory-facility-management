@@ -1,14 +1,17 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useToast } from '../../toast/toast-context';
 
-import { getDamageReports, createDamageReport, acceptDamageReport, rejectDamageReport, startProcessingReport, completeReport, cancelReport } from '../../services/damage-reports';
+import { getDamageReports, createDamageReport, acceptDamageReport, rejectDamageReport, cancelReport } from '../../services/damage-reports';
 import { getApiErrorMessage } from '../../lib/api-client';
 import { DamageReport, DamageReportPriority } from '../../types/damage-reports';
 import { getBuildings, getRooms, BuildingRecord, RoomRecord } from '../../services/locations';
 import { getAssets, AssetRecord } from '../../services/assets';
+import { DamageReportPriorityBadge, DamageReportStatusBadge } from '../../components/damage-reports/DamageReportBadge';
+import { DamageReportTimeline } from '../../components/damage-reports/DamageReportTimeline';
 
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -21,14 +24,16 @@ import {
   Plus, 
   Funnel, 
   ArrowsClockwise, 
-  WarningCircle, 
+  WarningCircle,
   Clock, 
-  Wrench, 
+  Wrench,
+  ArrowRight,
   CheckCircle, 
   Check, 
   Play, 
   X,
-  MagnifyingGlass 
+  MagnifyingGlass,
+  Eye
 } from '@phosphor-icons/react';
 
 const reportSchema = z.object({
@@ -50,6 +55,7 @@ type ReportFormValues = z.infer<typeof reportSchema>;
 
 export function DamageReportsManagementPage() {
   const { showToast } = useToast();
+  const navigate = useNavigate();
   
   const [reports, setReports] = useState<DamageReport[]>([]);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
@@ -68,6 +74,9 @@ export function DamageReportsManagementPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  
+  const [activeReportDetail, setActiveReportDetail] = useState<DamageReport | null>(null);
+  const [detailTab, setDetailTab] = useState<'detail' | 'history'>('detail');
 
   const form = useForm<ReportFormValues>({
     resolver: zodResolver(reportSchema),
@@ -172,8 +181,6 @@ export function DamageReportsManagementPage() {
     try {
       if (action === 'accept') await acceptDamageReport(reportId);
       if (action === 'reject') await rejectDamageReport(reportId);
-      if (action === 'start') await startProcessingReport(reportId);
-      if (action === 'complete') await completeReport(reportId);
       if (action === 'cancel') await cancelReport(reportId);
       showToast('Cập nhật trạng thái thành công', 'success');
       loadReports();
@@ -404,6 +411,14 @@ export function DamageReportsManagementPage() {
                     <td className="px-4 py-3.5 text-center">{renderStatusBadge(report.status)}</td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-center gap-1.5">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => setActiveReportDetail(report)}
+                          title="Xem chi tiết"
+                        >
+                          <Eye size={16} className="text-blue-600" />
+                        </Button>
                         {report.status === 'SUBMITTED' && (
                           <>
                             <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'accept')} title="Duyệt">
@@ -416,8 +431,15 @@ export function DamageReportsManagementPage() {
                         )}
                         {(report.status === 'APPROVED' || report.status === 'REVIEWING') && (
                           <>
-                            <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'start')} title="Bắt đầu sửa">
-                              <Play size={16} className="text-amber-600" />
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => {
+                                navigate(`/manager/maintenance/records/new?damageReportId=${report.id}&assetId=${report.assetId}`);
+                              }} 
+                              title="Tạo lệnh bảo trì"
+                            >
+                              <Wrench size={16} className="text-amber-600" />
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'reject')} title="Từ chối">
                               <X size={16} className="text-destructive" />
@@ -425,9 +447,18 @@ export function DamageReportsManagementPage() {
                           </>
                         )}
                         {report.status === 'IN_PROGRESS' && (
-                          <Button variant="ghost" size="icon" onClick={() => handleAction(report.id, 'complete')} title="Hoàn thành">
-                            <CheckCircle size={16} className="text-emerald-600" />
-                          </Button>
+                          <div className="flex flex-col items-center gap-1">
+                            {report.maintenanceRecords && report.maintenanceRecords.length > 0 && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => navigate(`/manager/maintenance?search=${report.maintenanceRecords![0].maintenanceCode}`)}
+                                title="Xem phiếu bảo trì"
+                              >
+                                <ArrowRight size={16} className="text-emerald-600" />
+                              </Button>
+                            )}
+                          </div>
                         )}
                       </div>
                     </td>
@@ -519,6 +550,93 @@ export function DamageReportsManagementPage() {
             <Button type="submit" disabled={isLoading}>{isLoading ? 'Đang lưu...' : 'Lưu báo hỏng'}</Button>
           </ModalFooter>
         </form>
+      </Modal>
+
+      {/* Detail Modal */}
+      <Modal isOpen={activeReportDetail !== null} onClose={() => setActiveReportDetail(null)} size="lg">
+        {activeReportDetail && (
+          <>
+            <ModalHeader>
+              <ModalTitle>Chi tiết phiếu báo hỏng</ModalTitle>
+            </ModalHeader>
+            <div className="flex border-b border-border/50 px-6 shrink-0 bg-muted/10">
+              <button 
+                className={`py-3 px-4 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${detailTab === 'detail' ? 'text-primary border-primary' : 'text-muted-foreground border-transparent hover:text-foreground'}`}
+                onClick={() => setDetailTab('detail')}
+              >
+                Chi tiết báo hỏng
+              </button>
+              <button 
+                className={`py-3 px-4 text-sm font-bold uppercase tracking-wider transition-colors border-b-2 ${detailTab === 'history' ? 'text-primary border-primary' : 'text-muted-foreground border-transparent hover:text-foreground'}`}
+                onClick={() => setDetailTab('history')}
+              >
+                Lịch sử xử lý
+              </button>
+            </div>
+
+            <ModalBody className="p-6 overflow-y-auto max-h-[60vh]">
+              {detailTab === 'detail' ? (
+                <div className="space-y-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-lg font-bold text-foreground">{activeReportDetail.reportCode}</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">Ngày gửi: {new Date(activeReportDetail.createdAt).toLocaleString('vi-VN')}</p>
+                    </div>
+                    {renderStatusBadge(activeReportDetail.status)}
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-4 pb-3 border-b border-border/50">
+                      <span className="text-sm font-semibold text-muted-foreground w-28 shrink-0">Người báo</span>
+                      <span className="text-sm text-foreground font-medium">{activeReportDetail.reporter?.fullName || activeReportDetail.reporterId}</span>
+                    </div>
+                    <div className="flex items-start gap-4 pb-3 border-b border-border/50">
+                      <span className="text-sm font-semibold text-muted-foreground w-28 shrink-0">Thiết bị</span>
+                      <span className="text-sm text-foreground font-medium">{activeReportDetail.asset?.assetName}</span>
+                    </div>
+                    <div className="flex items-start gap-4 pb-3 border-b border-border/50">
+                      <span className="text-sm font-semibold text-muted-foreground w-28 shrink-0">Phòng</span>
+                      <span className="text-sm text-foreground font-medium">{activeReportDetail.room?.roomCode}</span>
+                    </div>
+                    <div className="flex items-start gap-4 pb-3 border-b border-border/50">
+                      <span className="text-sm font-semibold text-muted-foreground w-28 shrink-0">Mức độ</span>
+                      {renderPriorityBadge(activeReportDetail.priority)}
+                    </div>
+                    <div className="flex items-start gap-4 pb-3 border-b border-border/50">
+                      <span className="text-sm font-semibold text-muted-foreground w-28 shrink-0">Mô tả sự cố</span>
+                      <span className="text-sm text-foreground font-medium leading-relaxed">{activeReportDetail.description}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative pt-2 pl-4">
+                  <DamageReportTimeline logs={activeReportDetail.damageReportLogs ?? []} />
+                </div>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <div className="flex w-full justify-end gap-3">
+                <Button variant="outline" onClick={() => setActiveReportDetail(null)}>Đóng</Button>
+                {activeReportDetail.status === 'SUBMITTED' && (
+                  <>
+                    <Button variant="destructive" onClick={() => { handleAction(activeReportDetail.id, 'reject'); setActiveReportDetail(null); }}>Từ chối</Button>
+                    <Button onClick={() => { handleAction(activeReportDetail.id, 'accept'); setActiveReportDetail(null); }}>Duyệt phiếu</Button>
+                  </>
+                )}
+                {activeReportDetail.status === 'APPROVED' && (
+                  <Button className="bg-amber-600 hover:bg-amber-500" onClick={() => navigate(`/manager/maintenance/records/new?damageReportId=${activeReportDetail.id}&assetId=${activeReportDetail.assetId}`)}>
+                    Tạo Phiếu bảo trì
+                  </Button>
+                )}
+                {activeReportDetail.status === 'IN_PROGRESS' && activeReportDetail.maintenanceRecords && activeReportDetail.maintenanceRecords.length > 0 && (
+                  <Button className="bg-sky-600 hover:bg-sky-500" onClick={() => navigate(`/manager/maintenance?search=${activeReportDetail.maintenanceRecords![0].maintenanceCode}`)}>
+                    Xem Phiếu bảo trì
+                  </Button>
+                )}
+              </div>
+            </ModalFooter>
+          </>
+        )}
       </Modal>
     </div>
   );

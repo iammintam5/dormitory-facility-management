@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
 import { Button } from '../../components/ui/Button';
 import { Card, CardContent } from '../../components/ui/Card';
@@ -10,19 +10,23 @@ import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { useAuth } from '../../auth/auth-context';
 import { createMaintenanceRecord, getMaintenancePlans } from '../../services/maintenance';
+import { getDamageReportById } from '../../services/damage-reports';
 import { getAssets } from '../../services/assets';
 import { useToast } from '../../toast/toast-context';
 import { Asset } from '../../types/assets';
+import { DamageReport } from '../../types/damage-reports';
 import { MaintenancePlan, MaintenanceResultStatus, MaintenanceType } from '../../types/maintenance';
 import { FloppyDisk, CaretLeft } from '@phosphor-icons/react';
 
 const recordSchema = z.object({
   planId: z.coerce.number().optional(),
+  damageReportId: z.coerce.number().optional(),
+  inventoryItemId: z.coerce.number().optional(),
   assetId: z.coerce.number().int().positive(),
   maintenanceDate: z.string().min(1, 'Vui lòng chọn ngày bảo trì.'),
   maintenanceType: z.enum(['SCHEDULED', 'AD_HOC', 'AFTER_INVENTORY']),
   content: z.string().min(1, 'Nội dung không được để trống.'),
-  resultStatus: z.enum(['GOOD', 'NEED_MONITORING', 'NEED_REPAIR', 'RECOMMEND_LIQUIDATION']),
+  resultStatus: z.enum(['GOOD', 'RECOMMEND_LIQUIDATION']),
   nextMaintenanceDate: z.string().optional(),
   cost: z.union([z.coerce.number().min(0), z.nan()]).optional(),
   materialNote: z.string().optional(),
@@ -39,16 +43,24 @@ export function MaintenanceRecordCreatePage() {
   
   const [assets, setAssets] = useState<Asset[]>([]);
   const [plans, setPlans] = useState<MaintenancePlan[]>([]);
+  const [damageReport, setDamageReport] = useState<DamageReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [searchParams] = useSearchParams();
+  const damageReportIdStr = searchParams.get('damageReportId');
+  const inventoryItemIdStr = searchParams.get('inventoryItemId');
+  const assetIdStr = searchParams.get('assetId');
 
   const form = useForm<RecordFormValues>({
     resolver: zodResolver(recordSchema),
     defaultValues: {
       planId: undefined,
-      assetId: 0,
+      damageReportId: damageReportIdStr ? parseInt(damageReportIdStr) : undefined,
+      inventoryItemId: inventoryItemIdStr ? parseInt(inventoryItemIdStr) : undefined,
+      assetId: assetIdStr ? parseInt(assetIdStr) : 0,
       maintenanceDate: new Date().toISOString().slice(0, 10),
-      maintenanceType: 'SCHEDULED',
+      maintenanceType: damageReportIdStr ? 'AD_HOC' : inventoryItemIdStr ? 'AFTER_INVENTORY' : 'SCHEDULED',
       content: '',
       resultStatus: 'GOOD',
       nextMaintenanceDate: '',
@@ -64,9 +76,23 @@ export function MaintenanceRecordCreatePage() {
   async function loadLookups() {
     setIsLoading(true);
     try {
-      const [assetResponse, planList] = await Promise.all([getAssets({ pageSize: 100 }), getMaintenancePlans()]);
+      const promises: any[] = [getAssets({ pageSize: 100 }), getMaintenancePlans()];
+      if (damageReportIdStr) {
+        promises.push(getDamageReportById(parseInt(damageReportIdStr)));
+      }
+      
+      const results = await Promise.all(promises);
+      const assetResponse = results[0];
+      const planList = results[1];
+      const report = results[2];
+
       setAssets(assetResponse.items.map((a: any) => ({ id: parseInt(a.id), categoryId: 1, assetCode: a.assetCode, assetName: a.assetName, status: a.status, description: a.description, yearInUse: null, createdAt: a.createdAt })));
       setPlans(planList);
+
+      if (report) {
+        setDamageReport(report);
+        form.setValue('content', `Xử lý sự cố: ${report.description}`);
+      }
     } catch (error) {
       showToast('Không thể tải dữ liệu tạo phiếu bảo trì.', 'error');
     } finally {
@@ -74,25 +100,32 @@ export function MaintenanceRecordCreatePage() {
     }
   }
 
-  const onSubmit = form.handleSubmit(async (values) => {
+  const onSubmit = async (values: RecordFormValues) => {
     setIsSubmitting(true);
     try {
       const response = await createMaintenanceRecord({
         ...values,
         planId: values.planId || undefined,
+        damageReportId: values.damageReportId || undefined,
+        inventoryItemId: values.inventoryItemId || undefined,
         nextMaintenanceDate: values.nextMaintenanceDate || undefined,
         cost: Number.isNaN(values.cost) ? undefined : values.cost,
         materialNote: values.materialNote?.trim() || undefined,
         note: values.note?.trim() || undefined,
       });
       showToast('Tạo phiếu bảo trì thành công.', 'success');
-      navigate(`${basePath}/maintenance/records/${response.id}/print`);
+      navigate(`${basePath}/maintenance`);
     } catch (error) {
       showToast('Không thể tạo phiếu bảo trì.', 'error');
     } finally {
       setIsSubmitting(false);
     }
-  });
+  };
+
+  const onError = (errors: any) => {
+    console.log('Form validation errors:', errors);
+    showToast('Lỗi nhập liệu: ' + Object.keys(errors).join(', '), 'error');
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-10">
@@ -114,13 +147,13 @@ export function MaintenanceRecordCreatePage() {
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-16 gap-2 text-muted-foreground">
               <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-              <span className="text-sm font-medium">Đang tải dữ liệu...</span>
+              <p className="text-sm">Đang tải dữ liệu...</p>
             </div>
           ) : (
-            <form className="grid gap-6 xl:grid-cols-2" onSubmit={onSubmit}>
+            <form className="grid gap-6 xl:grid-cols-2" onSubmit={form.handleSubmit(onSubmit, onError)}>
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted-foreground">Tài sản <span className="text-destructive">*</span></label>
-                <Select {...form.register('assetId', { valueAsNumber: true })}>
+                <Select {...form.register('assetId', { valueAsNumber: true })} className={assetIdStr ? "pointer-events-none opacity-60 bg-muted" : ""} tabIndex={assetIdStr ? -1 : 0}>
                   <option value={0}>-- Chọn tài sản --</option>
                   {assets.map((asset) => <option key={asset.id} value={asset.id}>{asset.assetCode} - {asset.assetName}</option>)}
                 </Select>
@@ -129,7 +162,7 @@ export function MaintenanceRecordCreatePage() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted-foreground">Kế hoạch bảo trì</label>
-                <Select {...form.register('planId', { valueAsNumber: true })}>
+                <Select {...form.register('planId')} className={damageReportIdStr ? "pointer-events-none opacity-60 bg-muted" : ""} tabIndex={damageReportIdStr ? -1 : 0}>
                   <option value="">Không gắn kế hoạch</option>
                   {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.asset.assetCode} - đến hạn {plan.nextDueDate.slice(0, 10)}</option>)}
                 </Select>
@@ -208,7 +241,7 @@ export function MaintenanceRecordCreatePage() {
 }
 
 const maintenanceTypes: MaintenanceType[] = ['SCHEDULED', 'AD_HOC', 'AFTER_INVENTORY'];
-const resultStatuses: MaintenanceResultStatus[] = ['GOOD', 'NEED_MONITORING', 'NEED_REPAIR', 'RECOMMEND_LIQUIDATION'];
+const resultStatuses: MaintenanceResultStatus[] = ['GOOD', 'RECOMMEND_LIQUIDATION'];
 
 function translateMaintenanceType(type: MaintenanceType) {
   switch (type) {
@@ -222,8 +255,6 @@ function translateMaintenanceType(type: MaintenanceType) {
 function translateResultStatus(status: MaintenanceResultStatus) {
   switch (status) {
     case 'GOOD': return 'Tốt';
-    case 'NEED_MONITORING': return 'Cần theo dõi';
-    case 'NEED_REPAIR': return 'Cần sửa chữa';
     case 'RECOMMEND_LIQUIDATION': return 'Đề nghị thanh lý';
     default: return status;
   }
