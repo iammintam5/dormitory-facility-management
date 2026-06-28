@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AuditLogsService {
@@ -16,6 +17,31 @@ export class AuditLogsService {
     ipAddress?: string | null;
   }) {
     return this.prisma.auditLog.create({
+      data: {
+        userId: params.userId ?? null,
+        action: params.action,
+        tableName: params.tableName,
+        recordId: params.recordId ?? null,
+        content: params.content ?? null,
+        oldValue: serializeAuditValue(params.oldValue),
+        newValue: serializeAuditValue(params.newValue),
+        ipAddress: params.ipAddress ?? null,
+      },
+    });
+  }
+
+  /** Write audit log inside an existing transaction */
+  async createWithTx(tx: Prisma.TransactionClient, params: {
+    userId?: number | null;
+    action: string;
+    tableName: string;
+    recordId?: number | null;
+    content?: string | null;
+    oldValue?: unknown;
+    newValue?: unknown;
+    ipAddress?: string | null;
+  }) {
+    return tx.auditLog.create({
       data: {
         userId: params.userId ?? null,
         action: params.action,

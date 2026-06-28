@@ -9,6 +9,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM rooms WHERE capacity IS NOT NULL AND capacity <= 0) THEN
     RAISE NOTICE 'Found rooms with invalid capacity, skipping constraint';
   ELSE
+    ALTER TABLE rooms DROP CONSTRAINT IF EXISTS rooms_capacity_check;
     ALTER TABLE rooms ADD CONSTRAINT rooms_capacity_check CHECK (capacity IS NULL OR capacity > 0);
   END IF;
 END $$;
@@ -24,6 +25,7 @@ BEGIN
   ) THEN
     RAISE NOTICE 'Found duplicate floors, skipping unique constraint';
   ELSE
+    ALTER TABLE floors DROP CONSTRAINT IF EXISTS floors_building_floor_unique;
     ALTER TABLE floors ADD CONSTRAINT floors_building_floor_unique UNIQUE ("buildingId", "floorNumber");
   END IF;
 END $$;
@@ -38,6 +40,7 @@ BEGIN
   ) THEN
     RAISE NOTICE 'Found duplicate inventory items, skipping unique constraint';
   ELSE
+    ALTER TABLE inventory_check_items DROP CONSTRAINT IF EXISTS inventory_check_items_unique;
     ALTER TABLE inventory_check_items ADD CONSTRAINT inventory_check_items_unique UNIQUE ("inventoryCheckId", "assetId");
   END IF;
 END $$;
@@ -52,6 +55,7 @@ BEGIN
   ) THEN
     RAISE NOTICE 'Found duplicate liquidation items, skipping unique constraint';
   ELSE
+    ALTER TABLE liquidation_items DROP CONSTRAINT IF EXISTS liquidation_items_unique;
     ALTER TABLE liquidation_items ADD CONSTRAINT liquidation_items_unique UNIQUE ("liquidationRecordId", "assetId");
   END IF;
 END $$;
@@ -66,6 +70,7 @@ BEGIN
   ) THEN
     RAISE NOTICE 'Found duplicate receipt items, skipping unique constraint';
   ELSE
+    ALTER TABLE asset_receipt_items DROP CONSTRAINT IF EXISTS asset_receipt_items_unique;
     ALTER TABLE asset_receipt_items ADD CONSTRAINT asset_receipt_items_unique UNIQUE ("receiptId", "assetId");
   END IF;
 END $$;
@@ -76,6 +81,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM inventory_check_items WHERE "actualQuantity" < 0) THEN
     RAISE NOTICE 'Found negative actualQuantity, skipping constraint';
   ELSE
+    ALTER TABLE inventory_check_items DROP CONSTRAINT IF EXISTS inventory_items_quantity_check;
     ALTER TABLE inventory_check_items ADD CONSTRAINT inventory_items_quantity_check CHECK ("actualQuantity" >= 0);
   END IF;
 END $$;
@@ -86,6 +92,7 @@ BEGIN
   IF EXISTS (SELECT 1 FROM inventory_check_items WHERE "systemQuantity" < 0) THEN
     RAISE NOTICE 'Found negative systemQuantity, skipping constraint';
   ELSE
+    ALTER TABLE inventory_check_items DROP CONSTRAINT IF EXISTS inventory_items_system_qty_check;
     ALTER TABLE inventory_check_items ADD CONSTRAINT inventory_items_system_qty_check CHECK ("systemQuantity" >= 0);
   END IF;
 END $$;

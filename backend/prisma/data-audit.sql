@@ -3,92 +3,92 @@
 
 -- 1. Asset AVAILABLE but roomId is NOT null
 SELECT 'CHECK 1: AVAILABLE assets with non-null roomId' AS check_name;
-SELECT id, asset_code, status, room_id FROM assets 
-WHERE status = 'AVAILABLE' AND room_id IS NOT NULL;
+SELECT id, "assetCode", status, "roomId" FROM assets 
+WHERE status = 'AVAILABLE' AND "roomId" IS NOT NULL;
 
 -- 2. Asset IN_USE but roomId is null
 SELECT 'CHECK 2: IN_USE assets with null roomId' AS check_name;
-SELECT id, asset_code, status, room_id FROM assets 
-WHERE status = 'IN_USE' AND room_id IS NULL;
+SELECT id, "assetCode", status, "roomId" FROM assets 
+WHERE status = 'IN_USE' AND "roomId" IS NULL;
 
 -- 3. Asset LIQUIDATED but roomId is NOT null
 SELECT 'CHECK 3: LIQUIDATED assets with non-null roomId' AS check_name;
-SELECT id, asset_code, status, room_id FROM assets 
-WHERE status = 'LIQUIDATED' AND room_id IS NOT NULL;
+SELECT id, "assetCode", status, "roomId" FROM assets 
+WHERE status = 'LIQUIDATED' AND "roomId" IS NOT NULL;
 
 -- 4. Asset PENDING_LIQUIDATION but roomId is NOT null (should still be in room)
 SELECT 'CHECK 4: PENDING_LIQUIDATION assets with null roomId' AS check_name;
-SELECT id, asset_code, status, room_id FROM assets 
-WHERE status = 'PENDING_LIQUIDATION' AND room_id IS NULL;
+SELECT id, "assetCode", status, "roomId" FROM assets 
+WHERE status = 'PENDING_LIQUIDATION' AND "roomId" IS NULL;
 
 -- 5. Asset in multiple active liquidation records
 SELECT 'CHECK 5: Assets in multiple active liquidation records' AS check_name;
-SELECT li.asset_id, a.asset_code, COUNT(DISTINCT li.liquidation_record_id) as active_liquidations
+SELECT li."assetId", a."assetCode", COUNT(DISTINCT li."liquidationRecordId") as active_liquidations
 FROM liquidation_items li
-JOIN liquidation_records lr ON li.liquidation_record_id = lr.id
-JOIN assets a ON li.asset_id = a.id
+JOIN liquidation_records lr ON li."liquidationRecordId" = lr.id
+JOIN assets a ON li."assetId" = a.id
 WHERE lr.status IN ('DRAFT', 'PENDING_APPROVAL', 'APPROVED')
-GROUP BY li.asset_id, a.asset_code
-HAVING COUNT(DISTINCT li.liquidation_record_id) > 1;
+GROUP BY li."assetId", a."assetCode"
+HAVING COUNT(DISTINCT li."liquidationRecordId") > 1;
 
 -- 6. Same asset appears multiple times in the same receipt
 SELECT 'CHECK 6: Duplicate assets in same receipt' AS check_name;
-SELECT receipt_id, asset_id, COUNT(*) as cnt
+SELECT "receiptId", "assetId", COUNT(*) as cnt
 FROM asset_receipt_items
-GROUP BY receipt_id, asset_id
+GROUP BY "receiptId", "assetId"
 HAVING COUNT(*) > 1;
 
 -- 7. Same asset appears multiple times in the same inventory check
 SELECT 'CHECK 7: Duplicate assets in same inventory check' AS check_name;
-SELECT inventory_check_id, asset_id, COUNT(*) as cnt
+SELECT "inventoryCheckId", "assetId", COUNT(*) as cnt
 FROM inventory_check_items
-GROUP BY inventory_check_id, asset_id
+GROUP BY "inventoryCheckId", "assetId"
 HAVING COUNT(*) > 1;
 
 -- 8. Same asset appears multiple times in the same liquidation
 SELECT 'CHECK 8: Duplicate assets in same liquidation' AS check_name;
-SELECT liquidation_record_id, asset_id, COUNT(*) as cnt
+SELECT "liquidationRecordId", "assetId", COUNT(*) as cnt
 FROM liquidation_items
-GROUP BY liquidation_record_id, asset_id
+GROUP BY "liquidationRecordId", "assetId"
 HAVING COUNT(*) > 1;
 
 -- 9. Rooms with capacity <= 0
 SELECT 'CHECK 9: Rooms with invalid capacity' AS check_name;
-SELECT id, room_code, capacity FROM rooms 
+SELECT id, "roomCode", capacity FROM rooms 
 WHERE capacity IS NOT NULL AND capacity <= 0;
 
 -- 10. Rooms where occupancy exceeds capacity
 SELECT 'CHECK 10: Occupancy exceeds capacity' AS check_name;
-SELECT r.id, r.room_code, r.capacity, COUNT(rsa.id) as actual_occupancy
+SELECT r.id, r."roomCode", r.capacity, COUNT(rsa.id) as actual_occupancy
 FROM rooms r
-LEFT JOIN room_student_assignments rsa ON r.id = rsa.room_id AND rsa.is_active = true
+LEFT JOIN room_student_assignments rsa ON r.id = rsa."roomId" AND rsa."isActive" = true
 WHERE r.capacity IS NOT NULL
-GROUP BY r.id, r.room_code, r.capacity
+GROUP BY r.id, r."roomCode", r.capacity
 HAVING COUNT(rsa.id) > r.capacity;
 
 -- 11. Duplicate floor numbers in same building
 SELECT 'CHECK 11: Duplicate floors in building' AS check_name;
-SELECT building_id, floor_number, COUNT(*) as cnt
+SELECT "buildingId", "floorNumber", COUNT(*) as cnt
 FROM floors
-GROUP BY building_id, floor_number
+GROUP BY "buildingId", "floorNumber"
 HAVING COUNT(*) > 1;
 
 -- 12. Inventory items with negative quantities
 SELECT 'CHECK 12: Negative inventory quantities' AS check_name;
-SELECT id, inventory_check_id, asset_id, actual_quantity 
-FROM inventory_check_items WHERE actual_quantity < 0;
+SELECT id, "inventoryCheckId", "assetId", "actualQuantity" 
+FROM inventory_check_items WHERE "actualQuantity" < 0;
 
 -- 13. Inventory items with negative system quantities
 SELECT 'CHECK 13: Negative system quantities' AS check_name;
-SELECT id, inventory_check_id, asset_id, system_quantity 
-FROM inventory_check_items WHERE system_quantity < 0;
+SELECT id, "inventoryCheckId", "assetId", "systemQuantity" 
+FROM inventory_check_items WHERE "systemQuantity" < 0;
 
 -- 14. Students with multiple active room assignments
 SELECT 'CHECK 14: Students with multiple active assignments' AS check_name;
-SELECT student_id, COUNT(*) as active_assignments
+SELECT "studentId", COUNT(*) as active_assignments
 FROM room_student_assignments
-WHERE is_active = true
-GROUP BY student_id
+WHERE "isActive" = true
+GROUP BY "studentId"
 HAVING COUNT(*) > 1;
 
 -- Summary

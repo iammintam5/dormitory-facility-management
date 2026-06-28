@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateCode } from '../common/utils/code-generator';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -372,24 +372,39 @@ export class DamageReportsService {
     const workflow = WORKFLOW_MAP[action];
     if (!workflow) throw new BadRequestException(`Invalid action: ${action}`);
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const updatedReport = await tx.damageReport.update({
-        where: { id },
+    const expectedStatus = report.status;
+
+    return this.prisma.$transaction(async (tx) => {
+      // Conditional update – prevents lost-update race
+      const updateResult = await tx.damageReport.updateMany({
+        where: { id, status: expectedStatus as any },
         data: {
           status: workflow.newStatus as any,
           ...(action === 'complete' ? { updatedAt: new Date() } : {}),
         },
+      });
+
+      if (updateResult.count === 0) {
+        throw new ConflictException(
+          `Xung đột trạng thái: Phiếu báo hỏng #${id} đã bị thay đổi bởi giao dịch khác.`
+        );
+      }
+
+      // Fetch updated report for return
+      const updatedReport = await tx.damageReport.findUnique({
+        where: { id },
         include: {
           reporter: { include: { role: true } },
           asset: { include: { category: true } },
           room: { include: { floor: { include: { building: true } } } },
           damageReportLogs: {
             include: { createdByUser: { include: { role: true } } },
-            orderBy: { createdAt: 'asc' },
+            orderBy: { createdAt: 'asc' as const },
           },
         },
       });
 
+      // Status log – inside transaction
       await tx.damageReportLog.create({
         data: {
           action: workflow.action,
@@ -419,7 +434,7 @@ export class DamageReportsService {
         });
       }
 
-      // When rejected, just create history entry, since status didn't change (still DAMAGED or IN_USE)
+      // When rejected, just create history entry
       if (action === 'reject' && report.assetId) {
         await tx.assetHistory.create({
           data: {
@@ -427,24 +442,23 @@ export class DamageReportsService {
             action: 'TỪ_CHỐI_BÁO_HỎNG',
             newStatus: report.asset?.status,
             note: `Từ chối báo hỏng #${report.reportCode}`,
+            performedById: userId,
           },
         });
       }
 
+      // Audit log – inside transaction for atomicity
+      await this.auditLogsService.createWithTx(tx, {
+        userId,
+        action: workflow.action.toUpperCase().replace(/ /g, '_'),
+        tableName: 'damage_reports',
+        recordId: id,
+        content: `${workflow.action} phiếu báo hỏng #${id} (${report.reportCode}): ${report.status} → ${workflow.newStatus}`,
+        oldValue: report.status,
+        newValue: workflow.newStatus,
+      });
+
       return updatedReport;
     });
-
-    // Audit log
-    await this.auditLogsService.create({
-      userId,
-      action: workflow.action.toUpperCase().replace(/ /g, '_'),
-      tableName: 'damage_reports',
-      recordId: id,
-      content: `${workflow.action} phiếu báo hỏng #${id} (${report.reportCode}): ${report.status} → ${workflow.newStatus}`,
-      oldValue: report.status,
-      newValue: workflow.newStatus,
-    });
-
-    return updated;
   }
 }

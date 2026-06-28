@@ -102,6 +102,7 @@ export class InventoryChecksService {
 
     const assets = await this.prisma.asset.findMany({ where: { roomId: body.roomId } });
 
+    // Items created with isChecked=false – must be explicitly inspected before complete
     const record = await this.prisma.inventoryCheck.create({
       data: {
         inventoryCode: code,
@@ -115,6 +116,7 @@ export class InventoryChecksService {
             systemQuantity: 1,
             actualQuantity: 1,
             difference: 0,
+            isChecked: false,
           })),
         },
       },
@@ -132,19 +134,11 @@ export class InventoryChecksService {
     id: number,
     items: Array<{ itemId: number; actualQuantity: number; actualCondition?: string; note?: string }>,
   ) {
-    // FIX 8: Make inventory save atomic - validate all items first, then update in one transaction
-    const record = await this.prisma.inventoryCheck.findUnique({ where: { id } });
-    if (!record) throw new NotFoundException('Inventory check not found');
-
-    if (record.status !== 'DRAFT') {
-      throw new BadRequestException('Chỉ có thể cập nhật khi phiên kiểm kê ở trạng thái DRAFT');
-    }
-
+    // Pre-validate payload
     if (items.length === 0) {
       throw new BadRequestException('Danh sách item không được rỗng');
     }
 
-    // Pre-validate all items
     for (const item of items) {
       if (!Number.isInteger(item.actualQuantity)) {
         throw new BadRequestException(`Item ID ${item.itemId}: Số lượng thực tế phải là số nguyên`);
@@ -160,8 +154,17 @@ export class InventoryChecksService {
       throw new BadRequestException('Danh sách item không được chứa ID trùng lặp');
     }
 
-    // Validate all items belong to this session and get their system quantities
+    // ENTIRE operation inside transaction using tx client
     return this.prisma.$transaction(async (tx) => {
+      // Read session status INSIDE tx
+      const record = await tx.inventoryCheck.findUnique({ where: { id } });
+      if (!record) throw new NotFoundException('Inventory check not found');
+
+      if (record.status !== 'DRAFT') {
+        throw new BadRequestException('Chỉ có thể cập nhật khi phiên kiểm kê ở trạng thái DRAFT');
+      }
+
+      // Validate all items belong to this session using tx
       const existingItems = await tx.inventoryCheckItem.findMany({
         where: { inventoryCheckId: id, id: { in: itemIds } },
         select: { id: true, systemQuantity: true },
@@ -176,7 +179,7 @@ export class InventoryChecksService {
       // Get systemQuantity map
       const systemQuantityMap = new Map(existingItems.map(ei => [ei.id, ei.systemQuantity]));
 
-      // Update all items in a batch
+      // Update all items atomically with isChecked = true
       for (const item of items) {
         const systemQuantity = systemQuantityMap.get(item.itemId) ?? 1;
         const difference = item.actualQuantity - systemQuantity;
@@ -188,6 +191,7 @@ export class InventoryChecksService {
             difference,
             actualCondition: item.actualCondition ?? null,
             note: item.note ?? null,
+            isChecked: true,
           },
         });
 
@@ -196,32 +200,68 @@ export class InventoryChecksService {
         }
       }
 
-      return this.findOne(id);
+      // Fetch and return using tx
+      const updated = await tx.inventoryCheck.findUnique({
+        where: { id },
+        include: {
+          room: { include: { floor: { include: { building: true } } } },
+          checker: true,
+          inventoryCheckItems: { include: { asset: { include: { category: true, room: true } } } },
+          councilMembers: { include: { user: true } },
+        },
+      });
+      return this.mapRecord(updated);
     });
   }
 
   async complete(id: number, generalNote?: string) {
-    const record = await this.prisma.inventoryCheck.findUnique({ where: { id } });
-    if (!record) throw new NotFoundException('Inventory check not found');
+    // ENTIRE operation inside transaction
+    return this.prisma.$transaction(async (tx) => {
+      // Read session INSIDE tx
+      const record = await tx.inventoryCheck.findUnique({
+        where: { id },
+        include: { inventoryCheckItems: true },
+      });
+      if (!record) throw new NotFoundException('Inventory check not found');
 
-    if (record.status !== 'DRAFT') {
-      throw new BadRequestException('Phiên kiểm kê đã hoàn tất hoặc không ở trạng thái DRAFT');
-    }
+      if (record.status !== 'DRAFT') {
+        throw new BadRequestException('Phiên kiểm kê đã hoàn tất hoặc không ở trạng thái DRAFT');
+      }
 
-    const updateResult = await this.prisma.inventoryCheck.updateMany({
-      where: { id, status: 'DRAFT' },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        generalNote: generalNote ?? record.generalNote,
-      },
+      // Verify ALL items have been actually inspected
+      const uncheckedItems = record.inventoryCheckItems.filter((item: any) => !item.isChecked);
+      if (uncheckedItems.length > 0) {
+        throw new BadRequestException(
+          `Còn ${uncheckedItems.length} tài sản chưa được kiểm kê. Vui lòng kiểm tra tất cả trước khi hoàn tất.`
+        );
+      }
+
+      // Conditional update to prevent double-complete
+      const updateResult = await tx.inventoryCheck.updateMany({
+        where: { id, status: 'DRAFT' },
+        data: {
+          status: 'COMPLETED',
+          completedAt: new Date(),
+          generalNote: generalNote ?? record.generalNote,
+        },
+      });
+
+      if (updateResult.count === 0) {
+        throw new ConflictException('Xung đột trạng thái: Phiên kiểm kê đã bị thay đổi');
+      }
+
+      // Fetch and return using tx
+      const updated = await tx.inventoryCheck.findUnique({
+        where: { id },
+        include: {
+          room: { include: { floor: { include: { building: true } } } },
+          checker: true,
+          inventoryCheckItems: { include: { asset: { include: { category: true, room: true } } } },
+          councilMembers: { include: { user: true } },
+        },
+      });
+      return this.mapRecord(updated);
     });
-
-    if (updateResult.count === 0) {
-      throw new ConflictException('Xung đột trạng thái: Phiên kiểm kê đã bị thay đổi');
-    }
-
-    return this.findOne(id);
   }
 
   async exportData(id: number) {
