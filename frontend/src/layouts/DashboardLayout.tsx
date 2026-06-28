@@ -65,37 +65,59 @@ type NavGroup = {
 };
 
 function useDarkMode() {
-  const [isDark, setIsDark] = useState(() => {
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('theme');
-      if (stored === 'dark') return true;
-      if (stored === 'light') return false;
-      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (stored === 'dark' || stored === 'light' || stored === 'system') return stored;
     }
-    return false;
+    return 'system';
   });
 
   useEffect(() => {
     const root = document.documentElement;
+    const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    
     if (isDark) {
       root.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
     } else {
       root.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
     }
-  }, [isDark]);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
 
-  const toggle = useCallback(() => setIsDark((prev) => !prev), []);
+  useEffect(() => {
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const handler = (e: MediaQueryListEvent) => {
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      };
+      mediaQuery.addEventListener('change', handler);
+      return () => mediaQuery.removeEventListener('change', handler);
+    }
+  }, [theme]);
 
-  return { isDark, toggle };
+  const toggle = useCallback(() => {
+    setTheme(prev => {
+      if (prev === 'light') return 'dark';
+      if (prev === 'dark') return 'system';
+      return 'light';
+    });
+  }, []);
+
+  const isDark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+  return { isDark, toggle, theme };
 }
 
 export function DashboardLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isDark, toggle: toggleDark } = useDarkMode();
+  const { isDark, toggle: toggleDark, theme } = useDarkMode();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -143,15 +165,17 @@ export function DashboardLayout() {
   const basePath = getBasePath(user.role);
   const navGroups = getNavGroups(user.role, pendingDamageCount);
 
-  const sidebarContent = (
+  const renderSidebarContent = (isCollapsed: boolean) => (
     <nav className="flex-1 space-y-1 px-3 py-4 text-[13px] font-medium">
       {navGroups.map((group, groupIndex) => (
         <div key={groupIndex} className="mb-4">
-          {group.title ? (
+          {group.title && !isCollapsed ? (
             <h4 className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/70">
               {group.title}
             </h4>
-          ) : null}
+          ) : (
+            group.title && isCollapsed && <div className="h-4" />
+          )}
           <div className="space-y-0.5">
             {group.items.map((item) => {
               const Icon = item.icon;
@@ -160,10 +184,10 @@ export function DashboardLayout() {
                   key={item.path}
                   to={`${basePath}/${item.path}`}
                   end={item.path === 'asset-transactions'}
-                  title={isDesktopCollapsed ? item.label : undefined}
+                  title={isCollapsed ? item.label : undefined}
                   className={({ isActive }) =>
                     `group flex items-center gap-3 rounded-lg py-2.5 transition-all duration-150 ${
-                      isDesktopCollapsed ? 'justify-center px-0' : 'px-3'
+                      isCollapsed ? 'justify-center px-0 relative' : 'px-3'
                     } ${
                       isActive
                         ? 'bg-primary text-primary-foreground shadow-sm'
@@ -171,11 +195,11 @@ export function DashboardLayout() {
                     }`
                   }
                 >
-                  <Icon size={isDesktopCollapsed ? 22 : 18} weight={isDesktopCollapsed ? "regular" : "duotone"} className="shrink-0" />
-                  {!isDesktopCollapsed && <span className="truncate">{item.label}</span>}
+                  <Icon size={isCollapsed ? 22 : 18} weight={isCollapsed ? "regular" : "duotone"} className="shrink-0" />
+                  {!isCollapsed && <span className="truncate">{item.label}</span>}
                   {item.badge ? (
-                    <span className={`flex items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground ${isDesktopCollapsed ? 'absolute right-1 top-1 h-3 w-3' : 'ml-auto h-5 min-w-5 px-1.5'}`}>
-                      {!isDesktopCollapsed && item.badge}
+                    <span className={`flex items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground ${isCollapsed ? 'absolute right-1 top-1 h-3 w-3' : 'ml-auto h-5 min-w-5 px-1.5'}`}>
+                      {!isCollapsed && item.badge}
                     </span>
                   ) : null}
                 </NavLink>
@@ -186,16 +210,21 @@ export function DashboardLayout() {
       ))}
     </nav>
   );
-
   return (
-    <div className="flex h-screen w-full flex-col bg-background font-sans text-foreground overflow-hidden">
+    <div className="fixed inset-0 flex flex-col bg-background font-sans text-foreground overflow-hidden">
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 focus:z-[100] focus:p-4 focus:bg-background focus:text-foreground focus:font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        Bỏ qua đến nội dung chính
+      </a>
       {/* Header */}
       <header className="sticky top-0 z-40 flex h-[60px] shrink-0 items-center justify-between border-b border-white/10 bg-[hsl(var(--header-bg))] px-4 text-white shadow-header print:hidden dark:border-border">
         <div className="flex items-center gap-3">
           {/* Mobile hamburger */}
           <button
             onClick={() => setIsMobileOpen(true)}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white sm:hidden"
+            className="flex h-9 w-9 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white lg:hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label="Mở menu"
           >
             <List size={22} weight="bold" />
@@ -206,12 +235,12 @@ export function DashboardLayout() {
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/15 backdrop-blur-sm">
               <img src="/Logo_PTIT_University_khong_khung.png" alt="PTIT" className="h-8 w-8 object-contain" />
             </div>
-            <div className="hidden flex-col md:flex">
-              <span className="max-w-[620px] text-[9px] font-bold uppercase leading-tight tracking-[0.08em] text-[#f0b1b1]">
+            <div className="hidden flex-col sm:flex">
+              <span className="max-w-[620px] text-[9px] font-bold uppercase leading-tight tracking-[0.08em] text-[#f0b1b1] hidden md:block">
                 HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG CƠ SỞ TẠI THÀNH PHỐ HỒ CHÍ MINH
               </span>
               <span className="text-xs font-bold uppercase tracking-wide">
-                QUẢN LÝ CƠ SỞ VẬT CHẤT KÝ TÚC XÁ
+                QUẢN LÝ KÝ TÚC XÁ
               </span>
             </div>
           </div>
@@ -225,10 +254,14 @@ export function DashboardLayout() {
           <UserDropdown 
             user={user} 
             basePath={basePath} 
-            onLogout={handleLogout} 
-            isDark={isDark} 
-            toggleDark={toggleDark} 
-            subtitle={getHeaderSubtitle(user.role)} 
+            onLogout={handleLogout}
+            isDark={isDark}
+            theme={theme}
+            toggleDark={toggleDark}
+            subtitle={
+              user.role === 'ADMIN' ? 'Quản trị hệ thống' : 
+              user.role === 'MANAGER' ? 'Quản lý ký túc xá' : 'Sinh viên'
+            }
           />
         </div>
       </header>
@@ -236,7 +269,7 @@ export function DashboardLayout() {
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop Sidebar */}
         <aside 
-          className={`[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] hidden shrink-0 overflow-y-auto border-r border-sidebar-border bg-sidebar-bg sm:flex sm:flex-col print:hidden transition-all duration-300 relative ${
+          className={`[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] hidden shrink-0 overflow-y-auto border-r border-sidebar-border bg-sidebar-bg lg:flex lg:flex-col print:hidden transition-all duration-300 relative ${
             isDesktopCollapsed ? 'w-[72px]' : 'w-64'
           }`}
         >
@@ -249,19 +282,34 @@ export function DashboardLayout() {
                 {isDesktopCollapsed ? <CaretRight size={14} weight="bold" /> : <CaretLeft size={14} weight="bold" />}
              </button>
           </div>
-          {sidebarContent}
+          {renderSidebarContent(isDesktopCollapsed)}
         </aside>
 
         {/* Mobile Sidebar Overlay */}
         {isMobileOpen && (
-          <div className="fixed inset-0 z-50 sm:hidden">
+          <div className="fixed inset-0 z-50 lg:hidden">
             {/* Backdrop */}
             <div
               className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
               onClick={() => setIsMobileOpen(false)}
             />
             {/* Sidebar panel */}
-            <aside className="absolute inset-y-0 left-0 w-72 bg-sidebar-bg shadow-2xl animate-slide-in-right overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <aside 
+              role="dialog"
+              aria-modal="true"
+              aria-label="Menu chính"
+              className="absolute inset-y-0 left-0 w-72 bg-sidebar-bg shadow-2xl animate-slide-in-right overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] focus:outline-none"
+              tabIndex={-1}
+              ref={(el) => {
+                if (el) el.focus();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setIsMobileOpen(false);
+                }
+              }}
+            >
               <div className="flex h-[60px] items-center justify-between border-b border-sidebar-border px-4">
                 <div className="flex items-center gap-2">
                   <img src="/Logo_PTIT_University_khong_khung.png" alt="PTIT" className="h-8 w-8 object-contain" />
@@ -269,18 +317,23 @@ export function DashboardLayout() {
                 </div>
                 <button
                   onClick={() => setIsMobileOpen(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label="Đóng menu"
                 >
-                  <X size={18} weight="bold" />
+                  <X size={18} weight="bold" aria-hidden="true" />
                 </button>
               </div>
-              {sidebarContent}
+              {renderSidebarContent(false)}
             </aside>
           </div>
         )}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-auto bg-background p-4 md:p-6 lg:p-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <main 
+          id="main-content" 
+          tabIndex={-1} 
+          className="flex-1 overflow-auto bg-background p-4 md:p-6 lg:p-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] focus:outline-none focus-visible:ring-inset focus-visible:ring-2 focus-visible:ring-primary"
+        >
           <PageTransition>
             <Suspense fallback={<PageLoader />}>
               <Outlet />

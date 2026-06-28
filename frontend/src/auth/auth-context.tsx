@@ -60,6 +60,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     void bootstrap();
+
+    const handleSessionExpired = () => {
+      setAccessToken(null);
+      setUser(null);
+      clearStoredAuth();
+    };
+
+    window.addEventListener('auth:session-expired', handleSessionExpired);
+    return () => {
+      window.removeEventListener('auth:session-expired', handleSessionExpired);
+    };
   }, []);
 
   const value = useMemo<AuthContextValue>(
