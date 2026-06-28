@@ -78,19 +78,11 @@ export async function createAsset(payload: {
 export async function createBulkAssets(payload: {
   categoryId?: string;
   categoryCode?: string;
-  roomId?: string;
-  roomCode?: string;
   prefix: string;
   startNumber: number;
   endNumber: number;
   assetName: string;
   description?: string;
-  status?: AssetStatus;
-  condition?: AssetCondition;
-  notes?: string;
-  purchaseDate?: string;
-  warrantyExpiryDate?: string;
-  purchaseCost?: number | string;
 }) {
   const response = await apiClient.post('/assets/bulk', payload);
   // Backend returns count or an array depending on implementation

@@ -1,6 +1,5 @@
-import { IsString, IsInt, IsOptional, IsEnum, Min } from 'class-validator';
+import { IsString, IsInt, IsOptional, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { AssetStatusEnum } from './create-asset.dto';
 
 export class BulkCreateAssetDto {
   @IsString()
@@ -26,13 +25,4 @@ export class BulkCreateAssetDto {
   @IsOptional()
   @IsString()
   description?: string | null;
-
-  @IsOptional()
-  @IsEnum(AssetStatusEnum)
-  status?: AssetStatusEnum;
-
-  @IsOptional()
-  @IsInt()
-  @Type(() => Number)
-  roomId?: number | null;
 }

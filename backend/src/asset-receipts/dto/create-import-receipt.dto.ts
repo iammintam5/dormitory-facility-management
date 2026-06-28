@@ -64,10 +64,6 @@ export class CreateImportReceiptDto {
   @Type(() => Number)
   totalAmount?: number;
 
-  @IsOptional()
-  @IsString()
-  roomId?: string;
-
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ImportReceiptItemDto)

@@ -202,18 +202,12 @@ export function AssetsManagementPage() {
     try {
       const quantityNum = parseInt(data.quantity, 10);
       
+      // FIX 12: Only send fields that UpdateAssetDto accepts
       const payload = {
-        categoryId: data.categoryId,
-        supplierId: data.supplierId || undefined,
         assetCode: data.assetCode,
         assetName: data.assetName,
-        serialNumber: data.serialNumber || undefined,
-        condition: data.condition as AssetCondition,
+        categoryId: data.categoryId,
         description: data.description || undefined,
-        notes: data.notes || undefined,
-        purchaseDate: data.purchaseDate || undefined,
-        warrantyExpiryDate: data.warrantyExpiryDate || undefined,
-        purchaseCost: data.purchaseCost || undefined,
       };
 
       if (selectedAsset) {

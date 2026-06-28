@@ -45,9 +45,10 @@ export class MaintenanceController {
   @Patch('records/:id')
   async updateRecord(
     @Param('id') id: string,
+    @CurrentUser('sub') userId: number,
     @Body() body: UpdateMaintenanceRecordDto,
   ) {
-    return this.maintenanceService.updateRecord(parseInt(id, 10), body);
+    return this.maintenanceService.updateRecord(parseInt(id, 10), userId, body);
   }
 
   @Roles('MANAGER')

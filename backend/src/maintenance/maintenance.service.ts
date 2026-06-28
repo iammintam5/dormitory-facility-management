@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { generateCode } from '../common/utils/code-generator';
 import { AssetTransitionService } from '../assets/asset-transition.service';
-import { AssetStatus } from '@prisma/client';
+import { AssetStatus, MaintenanceType, MaintenanceResultStatus } from '@prisma/client';
 
 @Injectable()
 export class MaintenanceService {
@@ -96,9 +96,9 @@ export class MaintenanceService {
       planId?: number;
       assetId: number;
       maintenanceDate: string;
-      maintenanceType: string;
+      maintenanceType: MaintenanceType;
       content: string;
-      resultStatus: string;
+      resultStatus: MaintenanceResultStatus;
       nextMaintenanceDate?: string;
       cost?: number;
       materialNote?: string;
@@ -114,9 +114,9 @@ export class MaintenanceService {
           assetId: body.assetId,
           performedBy: userId,
           maintenanceDate: new Date(body.maintenanceDate),
-          maintenanceType: body.maintenanceType as any,
+          maintenanceType: body.maintenanceType,
           content: body.content,
-          resultStatus: body.resultStatus as any,
+          resultStatus: body.resultStatus,
           planId: body.planId ?? null,
           nextMaintenanceDate: body.nextMaintenanceDate ? new Date(body.nextMaintenanceDate) : null,
           cost: body.cost ?? null,
@@ -154,11 +154,12 @@ export class MaintenanceService {
 
   async updateRecord(
     id: number,
+    userId: number,
     body: {
       maintenanceDate?: string;
-      maintenanceType?: string;
+      maintenanceType?: MaintenanceType;
       content?: string;
-      resultStatus?: string;
+      resultStatus?: MaintenanceResultStatus;
       nextMaintenanceDate?: string;
       cost?: number;
       materialNote?: string;
@@ -201,7 +202,7 @@ export class MaintenanceService {
         if (nextStatus) {
           await this.assetTransitionService.transition(tx, record.assetId, nextStatus, {
             action: 'CẬP_NHẬT_BẢO_TRÌ',
-            userId: 0,
+            userId,
             note: `Cập nhật bảo trì: ${body.resultStatus}`,
           });
         }

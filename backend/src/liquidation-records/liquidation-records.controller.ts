@@ -82,6 +82,12 @@ export class LiquidationRecordsController {
   }
 
   @Roles('MANAGER')
+  @Post(':id/reopen')
+  async reopen(@Param('id') id: string, @CurrentUser('sub') userId: number) {
+    return this.service.transition(parseInt(id, 10), 'reopen', userId);
+  }
+
+  @Roles('MANAGER')
   @Get(':id/export')
   async export(@Param('id') id: string) {
     return this.service.exportData(parseInt(id, 10));

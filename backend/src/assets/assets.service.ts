@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AssetStatus } from '@prisma/client';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -137,7 +137,7 @@ export class AssetsService {
   }
 
   async bulkCreate(payload: any, userId: number = 0) {
-    const { prefix, startNumber, endNumber, assetName, description, status } = payload;
+    const { prefix, startNumber, endNumber, assetName, description } = payload;
     if (!payload.categoryId) {
       throw new BadRequestException('categoryId is required');
     }
@@ -233,7 +233,8 @@ export class AssetsService {
     });
     if (!existing) throw new NotFoundException('Asset not found');
 
-    // Soft delete: if asset has business history, mark as LIQUIDATED instead of deleting
+    // If asset has business history, prevent deletion entirely
+    // Asset must go through the liquidation workflow instead
     const hasHistory =
       existing.damageReports.length > 0 ||
       existing.maintenanceRecords.length > 0 ||
@@ -244,42 +245,13 @@ export class AssetsService {
       existing.assetHistories.length > 0;
 
     if (hasHistory) {
-      await this.prisma.$transaction(async (tx) => {
-        await tx.asset.update({
-          where: { id },
-          data: {
-            status: 'LIQUIDATED',
-            roomId: null,
-            description: existing.description
-              ? `${existing.description} (Đã xóa mềm)`
-              : 'Đã xóa mềm',
-          },
-        });
-
-        await tx.assetHistory.create({
-          data: {
-            assetId: id,
-            action: 'XÓA_MỀM',
-            oldStatus: existing.status,
-            newStatus: 'LIQUIDATED',
-            note: 'Xóa mềm tài sản (có lịch sử nghiệp vụ)',
-          },
-        });
-      });
-
-      // Audit log
-      await this.auditLogsService.create({
-        userId,
-        action: 'SOFT_DELETE_ASSET',
-        tableName: 'assets',
-        recordId: id,
-        content: `Xóa mềm tài sản #${id} (${existing.assetCode}) - có lịch sử nghiệp vụ`,
-        oldValue: JSON.stringify({ status: existing.status, assetCode: existing.assetCode }),
-      });
-
-      return { message: 'Asset soft-deleted (has business history)' };
+      throw new ConflictException(
+        `Không thể xóa tài sản #${id} (${existing.assetCode}) vì đã phát sinh dữ liệu nghiệp vụ. ` +
+        'Vui lòng sử dụng quy trình thanh lý để ngừng sử dụng tài sản này.'
+      );
     }
 
+    // Only allow hard delete for assets with NO business history
     await this.prisma.asset.delete({ where: { id } });
 
     // Audit log

@@ -39,32 +39,35 @@ export class RoomsService {
   }
 
   async update(id: number, body: { roomCode?: string; capacity?: number; note?: string }) {
-    const room = await this.prisma.room.findUnique({ where: { id } });
-    if (!room) throw new NotFoundException('Room not found');
+    // FIX 9: Use Serializable transaction to prevent race condition with assignStudent
+    return this.prisma.$transaction(async (tx) => {
+      const room = await tx.room.findUnique({ where: { id } });
+      if (!room) throw new NotFoundException('Room not found');
 
-    if (body.capacity !== undefined && body.capacity !== null) {
-      if (body.capacity <= 0) {
-        throw new ConflictException('Sức chứa phải là số nguyên dương lớn hơn 0.');
+      if (body.capacity !== undefined && body.capacity !== null) {
+        if (body.capacity <= 0) {
+          throw new ConflictException('Sức chứa phải là số nguyên dương lớn hơn 0.');
+        }
+        const activeAssignments = await tx.roomStudentAssignment.count({
+          where: { roomId: id, isActive: true },
+        });
+        if (body.capacity < activeAssignments) {
+          throw new ConflictException(`Không thể giảm sức chứa xuống ${body.capacity} vì phòng đang có ${activeAssignments} sinh viên.`);
+        }
       }
-      const activeAssignments = await this.prisma.roomStudentAssignment.count({
-        where: { roomId: id, isActive: true },
+
+      return tx.room.update({
+        where: { id },
+        data: {
+          ...(body.roomCode !== undefined && { roomCode: body.roomCode }),
+          ...(body.capacity !== undefined && { capacity: body.capacity }),
+          ...(body.note !== undefined && { note: body.note }),
+        },
+        include: {
+          floor: { include: { building: true } },
+        },
       });
-      if (body.capacity < activeAssignments) {
-        throw new ConflictException(`Không thể giảm sức chứa xuống ${body.capacity} vì phòng đang có ${activeAssignments} sinh viên.`);
-      }
-    }
-
-    return this.prisma.room.update({
-      where: { id },
-      data: {
-        ...(body.roomCode !== undefined && { roomCode: body.roomCode }),
-        ...(body.capacity !== undefined && { capacity: body.capacity }),
-        ...(body.note !== undefined && { note: body.note }),
-      },
-      include: {
-        floor: { include: { building: true } },
-      },
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async delete(id: number) {
@@ -96,7 +99,7 @@ export class RoomsService {
   async getStudents(roomId: number, user?: any) {
     if (user && user.role === 'STUDENT') {
       const assignment = await this.prisma.roomStudentAssignment.findFirst({
-        where: { studentId: user.userId, roomId, isActive: true },
+        where: { studentId: user.sub, roomId, isActive: true },
       });
       if (!assignment) {
         throw new ForbiddenException('Bạn không có quyền xem thông tin sinh viên của phòng này.');
@@ -271,7 +274,7 @@ export class RoomsService {
   async getAssets(roomId: number, user?: any) {
     if (user && user.role === 'STUDENT') {
       const assignment = await this.prisma.roomStudentAssignment.findFirst({
-        where: { studentId: user.userId, roomId, isActive: true },
+        where: { studentId: user.sub, roomId, isActive: true },
       });
       if (!assignment) {
         throw new ForbiddenException('Bạn không có quyền xem thông tin tài sản của phòng này.');
