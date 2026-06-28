@@ -13,7 +13,7 @@ export function PrintLayout({
   children: ReactNode;
 }) {
   return (
-    <main className="bg-slate-50 print:bg-white">
+    <main className="bg-muted/30 print:bg-white">
       <style>{`
         @page {
           size: A4;
@@ -115,7 +115,7 @@ export function PrintLayout({
       </div>
 
       <article
-        className="print-sheet mx-auto box-border min-h-[297mm] w-[210mm] bg-white pt-[20mm] pr-[15mm] pb-[20mm] pl-[30mm] text-slate-900 shadow-xl"
+        className="print-sheet mx-auto box-border min-h-[297mm] w-[210mm] bg-white pt-[20mm] pr-[15mm] pb-[20mm] pl-[30mm] text-foreground shadow-xl"
         style={{
           fontFamily: '"Times New Roman", Times, serif',
           lineHeight: 1.45,
@@ -209,13 +209,13 @@ export function PrintTable({
 }) {
   return (
     <div className="mb-5">
-      <table className="w-full border-collapse border border-slate-900 text-[13pt]">
+      <table className="w-full border-collapse border border-border text-[13pt]">
         <thead>
           <tr>
             {headers.map((header) => (
               <th
                 key={header}
-                className="border border-slate-900 p-2 text-center font-bold"
+                className="border border-border p-2 text-center font-bold"
               >
                 {header}
               </th>

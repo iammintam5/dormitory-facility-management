@@ -49,10 +49,10 @@ export class ErrorBoundary extends Component<Props, State> {
                 />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold text-slate-900 mb-2">
+            <h1 className="text-2xl font-bold text-foreground mb-2">
               Đã xảy ra lỗi
             </h1>
-            <p className="text-slate-600 mb-6">
+            <p className="text-muted-foreground mb-6">
               Xin lỗi, hệ thống gặp sự cố. Vui lòng thử lại hoặc liên hệ với quản trị viên.
             </p>
             {this.state.error && (
@@ -65,13 +65,13 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="flex flex-col gap-3">
               <button
                 onClick={() => window.location.href = '/'}
-                className="w-full px-4 py-3 bg-slate-900 text-white font-semibold rounded-xl hover:bg-slate-700 transition"
+                className="w-full px-4 py-3 bg-card text-white font-semibold rounded-xl hover:bg-slate-700 transition"
               >
                 Về trang chủ
               </button>
               <button
                 onClick={() => window.location.reload()}
-                className="w-full px-4 py-3 border border-slate-200 text-slate-700 font-semibold rounded-xl hover:bg-slate-50 transition"
+                className="w-full px-4 py-3 border border-border text-foreground font-semibold rounded-xl hover:bg-muted/30 transition"
               >
                 Tải lại trang
               </button>

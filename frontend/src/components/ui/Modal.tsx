@@ -10,19 +10,60 @@ interface ModalProps {
   children: React.ReactNode;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | 'full';
   className?: string;
+  preventCloseOnOverlayClick?: boolean;
 }
 
-export function Modal({ isOpen, onClose, title, footer, children, size = 'md', className = '' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, footer, children, size = 'md', className = '', preventCloseOnOverlayClick = false }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const previouslyFocusedElement = useRef<HTMLElement | null>(null);
 
-  // Close on Escape
+  // Close on Escape & Focus Management
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    
+    // Store previously focused element
+    previouslyFocusedElement.current = document.activeElement as HTMLElement;
+    
+    // Focus the dialog when opened
+    dialogRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      
+      // Basic Focus Trap
+      if (e.key === 'Tab') {
+        const focusableElements = dialogRef.current?.querySelectorAll(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        ) as NodeListOf<HTMLElement>;
+        
+        if (!focusableElements || focusableElements.length === 0) return;
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === firstElement || document.activeElement === dialogRef.current) {
+            e.preventDefault();
+            lastElement.focus();
+          }
+        } else {
+          if (document.activeElement === lastElement) {
+            e.preventDefault();
+            firstElement.focus();
+          }
+        }
+      }
     };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      // Restore focus
+      previouslyFocusedElement.current?.focus();
+    };
   }, [isOpen, onClose]);
 
   // Lock body scroll
@@ -50,17 +91,22 @@ export function Modal({ isOpen, onClose, title, footer, children, size = 'md', c
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-[2px] animate-fade-in"
-        onClick={onClose}
+        onClick={() => !preventCloseOnOverlayClick && onClose()}
+        aria-hidden="true"
       />
 
       {/* Dialog */}
       <div
         ref={dialogRef}
-        className={`relative z-50 w-full ${sizeClasses[size]} rounded-xl border border-border/50 bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-scale-in ${className}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? 'modal-title' : undefined}
+        tabIndex={-1}
+        className={`relative z-50 w-full ${sizeClasses[size]} rounded-xl border border-border/50 bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-scale-in outline-none ${className}`}
       >
         {title && (
           <ModalHeader onClose={onClose}>
-            <ModalTitle>{title}</ModalTitle>
+            <ModalTitle id="modal-title">{title}</ModalTitle>
           </ModalHeader>
         )}
         {title || footer ? (
@@ -95,18 +141,19 @@ export function ModalHeader({ children, className = '', onClose }: { children: R
       {onClose && (
         <button 
           onClick={onClose}
-          className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-all duration-150 active:scale-95"
+          aria-label="Đóng hộp thoại"
+          className="text-muted-foreground hover:text-foreground hover:bg-muted p-1.5 rounded-lg transition-all duration-150 active:scale-95 focus:outline-none focus:ring-2 focus:ring-primary"
         >
-          <X size={18} weight="bold" />
+          <X size={18} weight="bold" aria-hidden="true" />
         </button>
       )}
     </div>
   );
 }
 
-export function ModalTitle({ children, className = '' }: { children: React.ReactNode, className?: string }) {
+export function ModalTitle({ children, className = '', id }: { children: React.ReactNode, className?: string, id?: string }) {
   return (
-    <h3 className={`text-base font-semibold text-foreground ${className}`}>
+    <h3 id={id} className={`text-lg font-semibold text-foreground ${className}`}>
       {children}
     </h3>
   );

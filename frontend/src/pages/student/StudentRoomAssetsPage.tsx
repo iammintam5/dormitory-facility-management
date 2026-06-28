@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { SkeletonTable } from '../../components/ui/Skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Select as UISelect } from '../../components/ui/Select';
@@ -50,8 +51,16 @@ export function StudentRoomAssetsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner size={32} className="animate-spin text-primary" />
+      <div className="space-y-6 mx-auto max-w-7xl pb-10">
+        <PageHeader 
+          title="Thiết bị trong phòng" 
+          description="Danh sách tài sản, thiết bị được bàn giao cho phòng."
+        />
+        <Card className="border-border/50">
+          <div className="p-5">
+            <SkeletonTable rows={8} cols={6} />
+          </div>
+        </Card>
       </div>
     );
   }

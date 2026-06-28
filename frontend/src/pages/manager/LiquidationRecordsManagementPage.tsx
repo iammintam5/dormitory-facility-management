@@ -7,6 +7,8 @@ import { CouncilMemberSelect, CouncilMemberState } from '../../components/counci
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { Badge } from '../../components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog';
+import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select as UISelect } from '../../components/ui/Select';
@@ -314,11 +316,17 @@ export function LiquidationRecordsManagementPage() {
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard title="Tổng số phiếu" value={overview.total} subtitle="Tất cả thời gian" tone="blue" icon={<ClipboardText size={28} weight="duotone" />} />
-        <StatCard title="Chờ duyệt" value={overview.pending} subtitle={percentLabel(overview.pending, overview.total)} tone="amber" icon={<Clock size={28} weight="duotone" />} />
-        <StatCard title="Đang xử lý" value={overview.processing} subtitle={percentLabel(overview.processing, overview.total)} tone="indigo" icon={<Gear size={28} weight="duotone" />} />
-        <StatCard title="Đã thanh lý" value={overview.completed} subtitle={percentLabel(overview.completed, overview.total)} tone="emerald" icon={<CheckCircle size={28} weight="duotone" />} />
-        <StatCard title="Đã từ chối" value={overview.rejected} subtitle={percentLabel(overview.rejected, overview.total)} tone="rose" icon={<XCircle size={28} weight="duotone" />} />
+        {isLoading ? (
+          Array.from({ length: 5 }).map((_, i) => <SkeletonStatCard key={i} />)
+        ) : (
+          <>
+            <StatCard title="Tổng số phiếu" value={overview.total} subtitle="Tất cả thời gian" tone="blue" icon={<ClipboardText size={28} weight="duotone" />} />
+            <StatCard title="Chờ duyệt" value={overview.pending} subtitle={percentLabel(overview.pending, overview.total)} tone="amber" icon={<Clock size={28} weight="duotone" />} />
+            <StatCard title="Đang xử lý" value={overview.processing} subtitle={percentLabel(overview.processing, overview.total)} tone="indigo" icon={<Gear size={28} weight="duotone" />} />
+            <StatCard title="Đã thanh lý" value={overview.completed} subtitle={percentLabel(overview.completed, overview.total)} tone="emerald" icon={<CheckCircle size={28} weight="duotone" />} />
+            <StatCard title="Đã từ chối" value={overview.rejected} subtitle={percentLabel(overview.rejected, overview.total)} tone="rose" icon={<XCircle size={28} weight="duotone" />} />
+          </>
+        )}
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -406,9 +414,8 @@ export function LiquidationRecordsManagementPage() {
             {errorMessage ? (
               <div className="px-5 py-6 text-sm text-destructive font-medium">{errorMessage}</div>
             ) : isLoading ? (
-              <div className="px-5 py-14 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
-                <ArrowsClockwise size={24} className="animate-spin text-primary" />
-                Đang tải dữ liệu thanh lý...
+              <div className="p-5">
+                <SkeletonTable rows={5} cols={6} />
               </div>
             ) : filteredRecords.length === 0 ? (
               <div className="px-5 py-14 text-center text-sm text-muted-foreground">Chưa có hồ sơ thanh lý phù hợp với bộ lọc hiện tại.</div>

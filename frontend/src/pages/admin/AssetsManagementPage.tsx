@@ -27,6 +27,7 @@ import {
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
+import { SkeletonStatCard, SkeletonTable } from '../../components/ui/Skeleton';
 import { Select } from '../../components/ui/Select';
 import { Modal } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
@@ -238,63 +239,69 @@ export function AssetsManagementPage() {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="border-border/50">
-          <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-blue-50 text-blue-600 border-blue-100">
-              <Desktop size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Tổng thiết bị</p>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-2xl font-bold tabular-nums text-foreground">{pagination.total}</span>
+      {isFetching && pagination.total === 0 ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card className="border-border/50">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-blue-50 text-blue-600 border-blue-100">
+                <Desktop size={24} weight="duotone" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-border/50">
-          <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-emerald-50 text-emerald-600 border-emerald-100">
-              <Checks size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Đang sử dụng</p>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-2xl font-bold tabular-nums text-emerald-600">{assetCounts.inUse}</span>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Tổng thiết bị</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-2xl font-bold tabular-nums text-foreground">{pagination.total}</span>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-border/50">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-emerald-50 text-emerald-600 border-emerald-100">
+                <Checks size={24} weight="duotone" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Đang sử dụng</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-2xl font-bold tabular-nums text-emerald-600">{assetCounts.inUse}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-border/50">
-          <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-amber-50 text-amber-600 border-amber-100">
-              <Wrench size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Bảo trì / Sửa chữa</p>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-2xl font-bold tabular-nums text-amber-600">{assetCounts.maintenance}</span>
+          <Card className="border-border/50">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-amber-50 text-amber-600 border-amber-100">
+                <Wrench size={24} weight="duotone" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Bảo trì / Sửa chữa</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-2xl font-bold tabular-nums text-amber-600">{assetCounts.maintenance}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-border/50">
-          <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-rose-50 text-rose-600 border-rose-100">
-              <Prohibit size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Hỏng / Thanh lý</p>
-              <div className="flex items-baseline gap-1 mt-1">
-                <span className="text-2xl font-bold tabular-nums text-rose-600">{assetCounts.damaged}</span>
+          <Card className="border-border/50">
+            <CardContent className="flex items-center gap-4 p-5">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border bg-rose-50 text-rose-600 border-rose-100">
+                <Prohibit size={24} weight="duotone" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">Hỏng / Thanh lý</p>
+                <div className="flex items-baseline gap-1 mt-1">
+                  <span className="text-2xl font-bold tabular-nums text-rose-600">{assetCounts.damaged}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Filter Section */}
       <Card className="border-border/50">
@@ -375,8 +382,8 @@ export function AssetsManagementPage() {
       {/* Table Section */}
       <Card className="border-border/50 overflow-hidden">
         {isFetching ? (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size={32} className="animate-spin text-primary" />
+          <div className="p-5 bg-card">
+            <SkeletonTable rows={5} cols={5} />
           </div>
         ) : (
           <Table>

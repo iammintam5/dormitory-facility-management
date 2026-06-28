@@ -16,6 +16,7 @@ import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 import { getAssetCategories, AssetCategoryRecord } from '../../services/asset-categories';
 import { getBuildings, getRooms, BuildingRecord, RoomRecord } from '../../services/locations';
@@ -229,7 +230,21 @@ export function ImportEquipmentPage() {
         }
       />
 
-      <Card className="border-border/50">
+      {loading ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <SkeletonStatCard />
+            <SkeletonStatCard />
+          </div>
+          <Card className="border-border/50">
+            <div className="p-5">
+              <SkeletonTable rows={5} cols={5} />
+            </div>
+          </Card>
+        </>
+      ) : (
+        <>
+          <Card className="border-border/50">
         {/* Section 1: Receipt Info */}
         <div className="p-6 border-b border-border/50">
           <h3 className="text-sm font-bold text-foreground uppercase tracking-wider mb-6">1. Thông tin phiếu nhập</h3>
@@ -441,6 +456,8 @@ export function ImportEquipmentPage() {
           </div>
         </div>
       </Card>
+        </>
+      )}
 
       {/* Add Item Modal */}
       <Modal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} size="xl">

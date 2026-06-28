@@ -18,7 +18,7 @@ export function DamageReportPriorityBadge({ priority }: { priority: DamageReport
 function getPriorityClassName(priority: DamageReportPriority) {
   switch (priority) {
     case 'LOW':
-      return 'bg-slate-200 text-slate-700';
+      return 'bg-muted text-foreground';
     case 'MEDIUM':
       return 'bg-sky-100 text-sky-700';
     case 'HIGH':

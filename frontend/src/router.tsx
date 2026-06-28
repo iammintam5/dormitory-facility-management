@@ -38,25 +38,6 @@ const StudentDamageReportsHistoryPage = React.lazy(() => import('./pages/student
 const StudentRoomAssetsPage = React.lazy(() => import('./pages/student/StudentRoomAssetsPage').then(m => ({ default: m.StudentRoomAssetsPage })));
 const StudentRoomPage = React.lazy(() => import('./pages/student/StudentRoomPage').then(m => ({ default: m.StudentRoomPage })));
 
-// Shared loading fallback for Suspense
-function PageLoader() {
-  return (
-    <div className="flex min-h-[60vh] items-center justify-center">
-      <div className="flex flex-col items-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary/30 border-t-primary" />
-        <p className="text-sm font-medium text-muted-foreground">Đang tải...</p>
-      </div>
-    </div>
-  );
-}
-
-function SuspenseLayout() {
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <Outlet />
-    </Suspense>
-  );
-}
 
 const adminChildren = [
   { index: true, element: <Navigate to="dashboard" replace /> },
@@ -107,10 +88,6 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
-      {
-        element: <SuspenseLayout />,
-        children: [
-
           {
             element: <RoleRoute allowedRoles={['ADMIN']} />,
             children: [{ path: '/admin', element: <DashboardLayout />, children: adminChildren }],
@@ -123,8 +100,6 @@ export const router = createBrowserRouter([
             element: <RoleRoute allowedRoles={['STUDENT']} />,
             children: [{ path: '/student', element: <DashboardLayout />, children: studentChildren }],
           },
-        ],
-      },
     ],
   },
   { path: '*', element: <Navigate to="/" replace /> },

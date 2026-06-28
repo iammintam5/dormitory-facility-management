@@ -10,6 +10,7 @@ import { DamageReport, DamageReportPriority } from '../../types/damage-reports';
 import { studentsApi } from '../../services/students';
 
 import { Card, CardContent } from '../../components/ui/Card';
+import { SkeletonStatCard, SkeletonTable } from '../../components/ui/Skeleton';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select as UISelect } from '../../components/ui/Select';
@@ -153,63 +154,68 @@ export function StudentDamageReportsHistoryPage() {
       />
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
-              <WarningCircle size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tổng số phiếu</p>
-              <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-bold text-foreground tabular-nums">{pagination.total}</p>
-                <span className="text-xs text-muted-foreground">phiếu</span>
+      {isFetching && pagination.total === 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 shrink-0">
+                <WarningCircle size={24} weight="duotone" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
-              <Clock size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Đang xử lý</p>
-              <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-bold text-foreground tabular-nums">
-                  {reports.filter(r => ['SUBMITTED', 'REVIEWING', 'IN_PROGRESS'].includes(r.status)).length}
-                </p>
-                <span className="text-xs text-muted-foreground">phiếu</span>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Tổng số phiếu</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-2xl font-bold text-foreground tabular-nums">{pagination.total}</p>
+                  <span className="text-xs text-muted-foreground">phiếu</span>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 shrink-0">
+                <Clock size={24} weight="duotone" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Đang xử lý</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-2xl font-bold text-foreground tabular-nums">
+                    {reports.filter(r => ['SUBMITTED', 'REVIEWING', 'IN_PROGRESS'].includes(r.status)).length}
+                  </p>
+                  <span className="text-xs text-muted-foreground">phiếu</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card className="border-border/50">
-          <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
-              <CheckCircle size={24} weight="duotone" />
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-muted-foreground mb-0.5">Hoàn thành</p>
-              <div className="flex items-baseline gap-1">
-                <p className="text-2xl font-bold text-foreground tabular-nums">
-                  {reports.filter(r => r.status === 'COMPLETED').length}
-                </p>
-                <span className="text-xs text-muted-foreground">phiếu</span>
+          <Card className="border-border/50">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-600 shrink-0">
+                <CheckCircle size={24} weight="duotone" />
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground mb-0.5">Hoàn thành</p>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-2xl font-bold text-foreground tabular-nums">
+                    {reports.filter(r => r.status === 'COMPLETED').length}
+                  </p>
+                  <span className="text-xs text-muted-foreground">phiếu</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <Card className="border-border/50 overflow-hidden">
         <div className="overflow-x-auto py-6">
           {isFetching ? (
-            <div className="flex flex-col items-center justify-center p-10 gap-2 text-muted-foreground">
-              <ArrowsClockwise size={24} className="animate-spin text-primary" />
-              <span className="text-sm">Đang tải dữ liệu...</span>
+            <div className="p-5">
+              <SkeletonTable rows={5} cols={7} />
             </div>
           ) : (
             <table className="w-full text-sm text-left">

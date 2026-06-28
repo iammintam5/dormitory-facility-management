@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { 
@@ -47,8 +48,19 @@ export function StudentRoomPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner size={32} className="animate-spin text-primary" />
+      <div className="space-y-6 mx-auto max-w-7xl pb-10">
+        <PageHeader 
+          title="Phòng của tôi" 
+          description="Thông tin chi tiết về phòng và các thành viên cùng phòng."
+        />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+        <Card className="border-border/50 mt-6">
+          <div className="p-5">
+            <SkeletonTable rows={8} cols={6} />
+          </div>
+        </Card>
       </div>
     );
   }

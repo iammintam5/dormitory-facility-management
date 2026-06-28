@@ -30,6 +30,7 @@ import { SummaryCard } from '../../components/ui/SummaryCard';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
+import { SkeletonStatCard, SkeletonTable } from '../../components/ui/Skeleton';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '../../components/ui/Table';
 
@@ -274,36 +275,42 @@ export function LocationsManagementPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard 
-          label="Tổng số khu nhà" 
-          value={String(totalBuildings)} 
-          unit="khu" 
-          icon={<Buildings size={24} weight="duotone" />} 
-          colorClass="text-blue-600 bg-blue-50 border-blue-100" 
-        />
-        <SummaryCard 
-          label="Tổng số phòng" 
-          value={String(totalRooms)} 
-          unit="phòng" 
-          icon={<DoorOpen size={24} weight="duotone" />} 
-          colorClass="text-emerald-600 bg-emerald-50 border-emerald-100" 
-        />
-        <SummaryCard 
-          label="Tổng số thiết bị" 
-          value={totalDevices.toLocaleString('vi-VN')} 
-          unit="thiết bị" 
-          icon={<Desktop size={24} weight="duotone" />} 
-          colorClass="text-amber-600 bg-amber-50 border-amber-100" 
-        />
-        <SummaryCard 
-          label="Tổng số sinh viên" 
-          value={totalStudents.toLocaleString('vi-VN')} 
-          unit="sinh viên" 
-          icon={<Users size={24} weight="duotone" />} 
-          colorClass="text-purple-600 bg-purple-50 border-purple-100" 
-        />
-      </div>
+      {isLoading ? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => <SkeletonStatCard key={i} />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <SummaryCard 
+            label="Tổng số khu nhà" 
+            value={String(totalBuildings)} 
+            unit="khu" 
+            icon={<Buildings size={24} weight="duotone" />} 
+            colorClass="text-blue-600 bg-blue-50 border-blue-100" 
+          />
+          <SummaryCard 
+            label="Tổng số phòng" 
+            value={String(totalRooms)} 
+            unit="phòng" 
+            icon={<DoorOpen size={24} weight="duotone" />} 
+            colorClass="text-emerald-600 bg-emerald-50 border-emerald-100" 
+          />
+          <SummaryCard 
+            label="Tổng số thiết bị" 
+            value={totalDevices.toLocaleString('vi-VN')} 
+            unit="thiết bị" 
+            icon={<Desktop size={24} weight="duotone" />} 
+            colorClass="text-amber-600 bg-amber-50 border-amber-100" 
+          />
+          <SummaryCard 
+            label="Tổng số sinh viên" 
+            value={totalStudents.toLocaleString('vi-VN')} 
+            unit="sinh viên" 
+            icon={<Users size={24} weight="duotone" />} 
+            colorClass="text-purple-600 bg-purple-50 border-purple-100" 
+          />
+        </div>
+      )}
 
       <Card className="border-border/50">
         <CardContent className="flex flex-col gap-4 p-5 md:flex-row md:items-end">
@@ -332,8 +339,8 @@ export function LocationsManagementPage() {
 
       <Card className="border-border/50 overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <Spinner size={32} className="animate-spin text-primary" />
+          <div className="p-5 bg-card">
+            <SkeletonTable rows={5} cols={5} />
           </div>
         ) : (
           <Table>
