@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, BadRequestException, ConflictException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ReceiptType, AssetStatus, LiquidationStatus } from '@prisma/client';
+import { ReceiptType, AssetStatus } from '@prisma/client';
 import { generateCode } from '../common/utils/code-generator';
 import { AssetTransitionService } from '../assets/asset-transition.service';
 
@@ -284,29 +284,30 @@ export class AssetReceiptsService {
       for (const item of uniqueItems) {
         const assetId = parseInt(item.id, 10);
 
-        // Verify asset has an approved liquidation record before allowing export
-        const approvedLiquidation = await prisma.liquidationItem.findFirst({
-          where: {
-            assetId,
-            liquidationRecord: {
-              status: LiquidationStatus.APPROVED,
-            },
-          },
-          include: { liquidationRecord: { select: { liquidationCode: true } } },
+        const asset = await prisma.asset.findUnique({
+          where: { id: assetId },
+          select: { id: true, assetCode: true, status: true, roomId: true },
         });
 
-        if (!approvedLiquidation) {
+        if (!asset) {
+          throw new BadRequestException(`Tài sản ID ${assetId} không tồn tại.`);
+        }
+
+        if (asset.status === AssetStatus.LIQUIDATED) {
+          throw new BadRequestException(`Tài sản ${asset.assetCode} đã được xuất/thanh lý trước đó.`);
+        }
+
+        if (asset.status === AssetStatus.IN_USE || asset.roomId !== null) {
           throw new BadRequestException(
-            `Tài sản ID ${assetId} chưa có hồ sơ thanh lý được duyệt. Không thể xuất kho trực tiếp.`
+            `Tài sản ${asset.assetCode} đang thuộc phòng sử dụng. Vui lòng thu hồi về kho trước khi xuất/thanh lý.`
           );
         }
 
-        // Use Transition Service - only PENDING_LIQUIDATION -> LIQUIDATED via ĐÃ_THANH_LÝ action
         await this.assetTransitionService.transition(prisma, assetId, AssetStatus.LIQUIDATED, {
           action: 'ĐÃ_THANH_LÝ',
           userId,
           newRoomId: null,
-          note: `Xuất thiết bị theo phiếu ${receiptCode}, hồ sơ thanh lý #${approvedLiquidation.liquidationRecord.liquidationCode}. Lý do: ${reason}`,
+          note: `Xuất/thanh lý thiết bị theo phiếu ${receiptCode}. Lý do: ${reason}`,
         });
 
         // Create Receipt Item
@@ -324,8 +325,45 @@ export class AssetReceiptsService {
   }
 
   async findAll(query: any) {
+    const where: any = {};
+
+    const requestedTypes = typeof query.types === 'string'
+      ? query.types.split(',').map((type: string) => type.trim()).filter(Boolean)
+      : [];
+
+    if (requestedTypes.length > 0) {
+      where.type = { in: requestedTypes };
+    } else if (query.type) {
+      where.type = query.type;
+    }
+
+    if (query.search) {
+      const search = String(query.search).trim();
+      where.OR = [
+        { receiptCode: { contains: search, mode: 'insensitive' } },
+        { supplierName: { contains: search, mode: 'insensitive' } },
+        { note: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    if (query.dateFrom || query.dateTo) {
+      where.receiptDate = {};
+      if (query.dateFrom) {
+        where.receiptDate.gte = new Date(query.dateFrom);
+      }
+      if (query.dateTo) {
+        const dateTo = new Date(query.dateTo);
+        dateTo.setHours(23, 59, 59, 999);
+        where.receiptDate.lte = dateTo;
+      }
+    }
+
     return this.prisma.assetReceipt.findMany({
-      include: { creator: { select: { fullName: true } } },
+      where,
+      include: {
+        creator: { select: { fullName: true } },
+        _count: { select: { items: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

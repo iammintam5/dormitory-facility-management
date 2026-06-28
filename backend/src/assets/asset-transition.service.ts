@@ -15,12 +15,12 @@ export type TransitionContext = {
 export class AssetTransitionService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // Centralized Matrix – LIQUIDATED chỉ đạt được qua COMPLETE_APPROVED_LIQUIDATION
+  // Centralized Matrix - xuất kho/thanh lý được thực hiện qua phiếu xuất.
   private readonly ALLOWED_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
-    [AssetStatus.AVAILABLE]: [AssetStatus.IN_USE, AssetStatus.PENDING_LIQUIDATION, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE],
+    [AssetStatus.AVAILABLE]: [AssetStatus.IN_USE, AssetStatus.PENDING_LIQUIDATION, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE, AssetStatus.LIQUIDATED],
     [AssetStatus.IN_USE]: [AssetStatus.AVAILABLE, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE],
-    [AssetStatus.UNDER_MAINTENANCE]: [AssetStatus.AVAILABLE, AssetStatus.IN_USE, AssetStatus.DAMAGED, AssetStatus.PENDING_LIQUIDATION],
-    [AssetStatus.DAMAGED]: [AssetStatus.AVAILABLE, AssetStatus.UNDER_MAINTENANCE, AssetStatus.PENDING_LIQUIDATION],
+    [AssetStatus.UNDER_MAINTENANCE]: [AssetStatus.AVAILABLE, AssetStatus.IN_USE, AssetStatus.DAMAGED, AssetStatus.PENDING_LIQUIDATION, AssetStatus.LIQUIDATED],
+    [AssetStatus.DAMAGED]: [AssetStatus.AVAILABLE, AssetStatus.UNDER_MAINTENANCE, AssetStatus.PENDING_LIQUIDATION, AssetStatus.LIQUIDATED],
     [AssetStatus.PENDING_LIQUIDATION]: [AssetStatus.LIQUIDATED, AssetStatus.AVAILABLE, AssetStatus.IN_USE, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE],
     [AssetStatus.LIQUIDATED]: [], // Terminal state
   };
@@ -53,9 +53,9 @@ export class AssetTransitionService {
       }
     }
 
-    // LIQUIDATED chỉ đạt được qua complete approved liquidation
+    // LIQUIDATED chỉ đạt được qua phiếu xuất/thanh lý chính thức.
     if (newStatus === AssetStatus.LIQUIDATED && context.action !== 'ĐÃ_THANH_LÝ') {
-      throw new ConflictException('Trạng thái LIQUIDATED chỉ có thể đạt được thông qua hoàn tất hồ sơ thanh lý đã được duyệt.');
+      throw new ConflictException('Trạng thái LIQUIDATED chỉ có thể đạt được thông qua phiếu xuất/thanh lý.');
     }
 
     // Check Location Integrity
