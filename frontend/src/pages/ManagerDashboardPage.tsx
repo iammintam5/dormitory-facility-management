@@ -142,7 +142,7 @@ export function ManagerDashboardPage() {
               <QuickAction to="/manager/damage-reports" label="Xử lý báo hỏng" icon={WarningOctagon} />
               <QuickAction to="/manager/maintenance" label="Bảo trì thiết bị" icon={Wrench} />
               <QuickAction to="/manager/inventory-checks" label="Kiểm kê thiết bị" icon={Desktop} />
-              <QuickAction to="/manager/liquidations" label="Thanh lý thiết bị" icon={Trash} />
+              <QuickAction to="/manager/asset-transactions/export" label="Xuất/Thanh lý thiết bị" icon={Trash} />
             </CardContent>
           </Card>
         </div>

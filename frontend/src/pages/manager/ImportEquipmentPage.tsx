@@ -198,8 +198,6 @@ export function ImportEquipmentPage() {
   const grandTotal = totalAmount + vatAmount;
 
   const formatCurrency = (n: number) => n.toLocaleString('vi-VN');
-  const receiptNumber = `NN${new Date().getFullYear()}-${String(importItems.length > 0 ? Math.floor(Date.now() / 1000) % 10000 : 0).padStart(4, '0')}`;
-
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
@@ -217,7 +215,7 @@ export function ImportEquipmentPage() {
         title="Nhập thiết bị" 
         breadcrumbs={[
           { label: 'Nghiệp vụ', href: '#' },
-          { label: 'Nhập - Xuất thiết bị', href: `${basePath}/asset-transactions` },
+          { label: 'Nhập/Xuất thiết bị', href: `${basePath}/asset-transactions` },
           { label: 'Nhập thiết bị' }
         ]}
         actions={
@@ -274,8 +272,12 @@ export function ImportEquipmentPage() {
               <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Số phiếu nhập
               </label>
-              <div className="font-bold text-lg text-primary mt-1">{receiptNumber}</div>
+              <div className="font-semibold text-sm text-muted-foreground mt-2">Tự sinh khi lưu phiếu</div>
             </div>
+          </div>
+
+          <div className="mb-6 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+            Phiếu nhập sẽ tạo tài sản mới trong kho trung tâm. Trước khi lưu có thể thêm, xoá hoặc chỉnh số lượng/đơn giá; sau khi lưu, phiếu được khóa để bảo toàn lịch sử.
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-2">
@@ -575,7 +577,6 @@ export function ImportEquipmentPage() {
           </Button>
           <Button 
             onClick={handleAddNewItem}
-            disabled={!newItem.assetCode || !newItem.assetName || !newItem.categoryId}
           >
             <Plus size={16} weight="bold" className="mr-1" />
             Thêm vào danh sách
