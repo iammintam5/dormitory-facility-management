@@ -134,8 +134,40 @@ export class AssetReceiptsService {
   async createHandoverReceipt(payload: any, userId: number) {
     const { targetRoomId, assetIds, note, receiptDate } = payload;
     const receiptCode = generateCode('CP');
+    const parsedTargetRoomId = parseInt(targetRoomId, 10);
+    const uniqueAssetIds = Array.from(
+      new Set((Array.isArray(assetIds) ? assetIds : []).map((id: any) => parseInt(id, 10))),
+    ).filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0);
+
+    if (!Number.isInteger(parsedTargetRoomId) || parsedTargetRoomId <= 0) {
+      throw new BadRequestException('Vui lòng chọn phòng nhận hợp lệ.');
+    }
+
+    if (uniqueAssetIds.length === 0) {
+      throw new BadRequestException('Vui lòng chọn ít nhất một tài sản để cấp phát.');
+    }
 
     return this.prisma.$transaction(async (prisma) => {
+      const targetRoom = await prisma.room.findUnique({
+        where: { id: parsedTargetRoomId },
+        select: { id: true },
+      });
+
+      if (!targetRoom) {
+        throw new BadRequestException('Phòng nhận không tồn tại hoặc đã bị xoá.');
+      }
+
+      const existingAssets = await prisma.asset.findMany({
+        where: { id: { in: uniqueAssetIds } },
+        select: { id: true, assetCode: true },
+      });
+
+      if (existingAssets.length !== uniqueAssetIds.length) {
+        const existingIds = new Set(existingAssets.map((asset) => asset.id));
+        const missingIds = uniqueAssetIds.filter((id) => !existingIds.has(id));
+        throw new BadRequestException(`Tài sản không tồn tại: ${missingIds.join(', ')}`);
+      }
+
       const receipt = await prisma.assetReceipt.create({
         data: {
           receiptCode,
@@ -145,8 +177,6 @@ export class AssetReceiptsService {
           createdBy: userId,
         },
       });
-
-      const uniqueAssetIds = [...new Set(assetIds.map((id: any) => parseInt(id, 10)))] as number[];
 
       // Pre-validate all assets are AVAILABLE before transitioning
       const invalidAssets = await prisma.asset.findMany({
@@ -187,7 +217,7 @@ export class AssetReceiptsService {
         await this.assetTransitionService.transition(prisma, assetId, AssetStatus.IN_USE, {
           action: 'CẤP_PHÁT',
           userId,
-          newRoomId: parseInt(targetRoomId, 10),
+          newRoomId: parsedTargetRoomId,
           note: `Cấp phát theo phiếu ${receiptCode}`,
         });
 

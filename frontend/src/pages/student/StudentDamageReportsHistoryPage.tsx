@@ -532,6 +532,17 @@ export function StudentDamageReportsHistoryPage() {
           </ModalFooter>
         </form>
       </Modal>
+
+      <AlertDialog
+        isOpen={cancelConfirm.isOpen}
+        onClose={() => setCancelConfirm({ isOpen: false, reportId: null })}
+        onConfirm={handleConfirmCancel}
+        title="Hủy phiếu báo hỏng?"
+        description="Phiếu sau khi hủy sẽ chuyển sang trạng thái đã hủy và không tiếp tục xử lý. Bạn chắc chắn muốn hủy phiếu này?"
+        confirmText="Hủy phiếu"
+        cancelText="Đóng"
+        isLoading={isCancelling}
+      />
     </div>
   );
 }

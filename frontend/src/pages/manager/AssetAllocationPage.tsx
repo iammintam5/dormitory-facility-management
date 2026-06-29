@@ -33,7 +33,8 @@ export function AssetAllocationPage() {
   const { showToast } = useToast();
   const [activeTab, setActiveTab] = useState<'handover' | 'reclaim'>('handover');
   const [buildings, setBuildings] = useState<BuildingRecord[]>([]);
-  const [rooms, setRooms] = useState<RoomRecord[]>([]);
+  const [targetRooms, setTargetRooms] = useState<RoomRecord[]>([]);
+  const [fromRooms, setFromRooms] = useState<RoomRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingRoomAssets, setIsFetchingRoomAssets] = useState(false);
   
@@ -132,17 +133,23 @@ export function AssetAllocationPage() {
     }
   };
 
-  const handleBuildingChange = async (buildingId: string, setRoomFn: (val: string) => void) => {
+  const handleBuildingChange = async (
+    buildingId: string,
+    setRoomFn: (val: string) => void,
+    setRoomsFn: (rooms: RoomRecord[]) => void,
+  ) => {
     setRoomFn('');
     if (!buildingId) {
-      setRooms([]);
+      setRoomsFn([]);
       return;
     }
     try {
       const res = await getRooms({ buildingId, pageSize: 100 });
-      setRooms(res);
+      setRoomsFn(res);
     } catch (error) {
       console.error(error);
+      setRoomsFn([]);
+      showToast('Không thể tải danh sách phòng.', 'error');
     }
   };
 
@@ -164,13 +171,13 @@ export function AssetAllocationPage() {
 
   const switchTab = (tab: 'handover' | 'reclaim') => {
     setActiveTab(tab);
-    setRooms([]);
     setSearchQuery('');
     setSelectedCategory('');
 
     if (tab === 'handover') {
       setFromBuildingId('');
       setFromRoomId('');
+      setFromRooms([]);
       setRoomAssets([]);
       setSelectedReclaimAssets(new Set());
       return;
@@ -178,6 +185,7 @@ export function AssetAllocationPage() {
 
     setTargetBuildingId('');
     setTargetRoomId('');
+    setTargetRooms([]);
     setSelectedHandoverAssets(new Set());
   };
 
@@ -193,7 +201,7 @@ export function AssetAllocationPage() {
       };
       const receipt = await createHandoverReceipt(payload);
       
-      const roomName = rooms.find(r => r.id === targetRoomId)?.roomCode || '';
+      const roomName = targetRooms.find(r => r.id === targetRoomId)?.roomCode || '';
       const assetsData = availableAssets.filter(a => selectedHandoverAssets.has(a.id));
       
       showToast('Đã lập biên bản cấp phát thành công', 'success');
@@ -231,7 +239,7 @@ export function AssetAllocationPage() {
       const receipt = await createReclaimReceipt(payload);
       showToast('Đã lập biên bản thu hồi thành công', 'success');
       
-      const roomName = rooms.find(r => r.id === fromRoomId)?.roomCode || '';
+      const roomName = fromRooms.find(r => r.id === fromRoomId)?.roomCode || '';
       const assetsData = roomAssets.filter(a => selectedReclaimAssets.has(a.id));
 
       // Reset
@@ -314,7 +322,7 @@ export function AssetAllocationPage() {
                 onChange={(e) => {
                   setTargetBuildingId(e.target.value);
                   setSelectedHandoverAssets(new Set());
-                  handleBuildingChange(e.target.value, setTargetRoomId);
+                  handleBuildingChange(e.target.value, setTargetRoomId, setTargetRooms);
                 }}
               >
                 <option value="">Chọn khu nhà</option>
@@ -331,7 +339,7 @@ export function AssetAllocationPage() {
                 }}
               >
                 <option value="">Chọn phòng</option>
-                {rooms.map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
+                {targetRooms.map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
               </Select>
             </div>
             <div>
@@ -427,7 +435,7 @@ export function AssetAllocationPage() {
                   handleBuildingChange(e.target.value, (val) => {
                     setFromRoomId(val);
                     setRoomAssets([]);
-                  });
+                  }, setFromRooms);
                 }}
               >
                 <option value="">Chọn khu nhà</option>
@@ -445,7 +453,7 @@ export function AssetAllocationPage() {
                 }}
               >
                 <option value="">Chọn phòng</option>
-                {rooms.map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
+                {fromRooms.map(r => <option key={r.id} value={r.id}>{r.roomCode}</option>)}
               </Select>
             </div>
             <div>
@@ -547,6 +555,17 @@ export function AssetAllocationPage() {
         }
       >
         <div className="bg-white text-black p-8 border" ref={printRef}>
+          <div className="mb-6 flex justify-between border-b border-gray-300 pb-4">
+            <div>
+              <p className="text-sm font-bold">Bộ Khoa học và Công nghệ</p>
+              <p className="text-sm font-bold">Học viện Công nghệ Bưu chính Viễn thông</p>
+              <p className="text-sm font-bold">Cơ sở tại Thành phố Hồ Chí Minh</p>
+            </div>
+            <div className="text-right text-xs">
+              <p className="font-semibold">Mẫu số: {printTemplate.code}</p>
+              <p>Số phiếu: {printData?.receiptCode}</p>
+            </div>
+          </div>
           <div className="text-center mb-6">
             <h2 className="text-xl font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h2>
             <p className="font-semibold">Độc lập - Tự do - Hạnh phúc</p>
@@ -554,7 +573,6 @@ export function AssetAllocationPage() {
             <h1 className="text-2xl font-bold mt-6 uppercase">
               {printData?.type === 'RECLAIM' ? 'BIÊN BẢN THU HỒI TÀI SẢN' : 'BIÊN BẢN BÀN GIAO TÀI SẢN'}
             </h1>
-            <p>Số phiếu: {printData?.receiptCode}</p>
             <p className="mt-2 text-xs italic text-muted-foreground">
               Biên bản được in từ dữ liệu hệ thống. Có thể đối chiếu mẫu PDF {printTemplate.code} khi cần in mẫu trắng.
             </p>

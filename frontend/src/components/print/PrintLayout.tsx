@@ -124,10 +124,13 @@ export function PrintLayout({
         <header className="mb-8 flex items-start justify-between gap-4">
           <div className="w-1/2 text-center">
             <p className="text-[13pt] font-semibold leading-[1.2]">
-              BỘ THÔNG TIN VÀ TRUYỀN THÔNG
+              Bộ Khoa học và Công nghệ
             </p>
             <p className="text-[13pt] font-bold leading-[1.2]">
-              HỌC VIỆN CÔNG NGHỆ BƯU CHÍNH VIỄN THÔNG CƠ SỞ TẠI THÀNH PHỐ HỒ CHÍ MINH
+              Học viện Công nghệ Bưu chính Viễn thông
+            </p>
+            <p className="text-[13pt] font-bold leading-[1.2]">
+              Cơ sở tại Thành phố Hồ Chí Minh
             </p>
             <div className="mx-auto mt-1 h-[1.5px] w-[60%] bg-black"></div>
           </div>

@@ -17,6 +17,12 @@
 | API users | Response user thieu `profile.course` | Bo sung `course` de frontend co the tu dien khoa hoc |
 | Nhap/Xuat | Chi tiet phieu nhap hien phong, khong dung logic nhap kho | Bo cot phong trong bang thiet bi cua chi tiet phieu nhap/xuat |
 | Nhap/Xuat | Chi tiet phieu hien cac truong chung tu/hop dong khong dong bo voi form hien tai | Luoc bo so chung tu/hop dong khoi modal chi tiet va tim kiem |
+| Cap phat - Thu hoi | Cap phat khong on dinh khi doi khu/phong hoac request sai | Tach danh sach phong nhan/phong thu hoi tren UI, them validate phong/tai san o backend de bao loi ro |
+| Sinh vien bao hong | Nut huy phieu bao hong mo state nhung khong render hop thoai xac nhan | Render `AlertDialog` cho thao tac huy, goi API cancel va refresh danh sach sau khi thanh cong |
+| Mau in | Header goc trai chua dung format moi | Chuan hoa thanh `Bo Khoa hoc va Cong nghe / Hoc vien Cong nghe Buu chinh Vien thong / Co so tai Thanh pho Ho Chi Minh` |
+| Mau in nghiem thu | Phieu PDF con chi phi sua chua va vat tu | Bo chi phi/vat tu khoi mau in va modal chi tiet bao tri |
+| Sinh vien bao hong | Lich su thao tac co the lo ma nguoi dung | Bo ma nguoi dung trong timeline, chi hien ho ten nguoi thao tac |
+| Sua chua - bao tri | Con option bao tri dinh ky | Bo lua chon dinh ky/ke hoach khoi UI, mac dinh luong hien tai la sua chua phat sinh `AD_HOC` |
 
 ## Chua xu ly trong pass nay
 

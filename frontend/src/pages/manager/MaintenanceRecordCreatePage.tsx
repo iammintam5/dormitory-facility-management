@@ -10,27 +10,23 @@ import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { useAuth } from '../../auth/auth-context';
-import { createMaintenanceRecord, getMaintenancePlans, createDirectCompletedRecord } from '../../services/maintenance';
+import { createMaintenanceRecord, createDirectCompletedRecord } from '../../services/maintenance';
 import { getDamageReportById } from '../../services/damage-reports';
 import { getAssets } from '../../services/assets';
 import { useToast } from '../../toast/toast-context';
 import { Asset } from '../../types/assets';
 import { DamageReport } from '../../types/damage-reports';
-import { MaintenancePlan, MaintenanceResultStatus, MaintenanceType } from '../../types/maintenance';
 import { FloppyDisk, CaretLeft, Printer, CheckCircle } from '@phosphor-icons/react';
 import { useReactToPrint } from 'react-to-print';
 
 const recordSchema = z.object({
-  planId: z.coerce.number().optional(),
   damageReportId: z.coerce.number().optional(),
 
   assetId: z.coerce.number().int().positive(),
   maintenanceDate: z.string().min(1, 'Vui lòng chọn ngày bảo trì.'),
-  maintenanceType: z.enum(['SCHEDULED', 'AD_HOC']),
+  maintenanceType: z.literal('AD_HOC'),
   content: z.string().min(1, 'Nội dung không được để trống.'),
   resultStatus: z.enum(['GOOD', 'RECOMMEND_LIQUIDATION']).optional(),
-  cost: z.union([z.coerce.number().min(0), z.nan()]).optional(),
-  materialNote: z.string().optional(),
   note: z.string().optional(),
 });
 
@@ -43,7 +39,6 @@ export function MaintenanceRecordCreatePage() {
   const basePath = user?.role === 'ADMIN' ? '/admin' : '/manager';
   
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [plans, setPlans] = useState<MaintenancePlan[]>([]);
   const [damageReport, setDamageReport] = useState<DamageReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,16 +58,13 @@ export function MaintenanceRecordCreatePage() {
   const form = useForm<RecordFormValues>({
     resolver: zodResolver(recordSchema),
     defaultValues: {
-      planId: undefined,
       damageReportId: damageReportIdStr ? parseInt(damageReportIdStr) : undefined,
 
       assetId: assetIdStr ? parseInt(assetIdStr) : 0,
       maintenanceDate: new Date().toISOString().slice(0, 10),
-      maintenanceType: damageReportIdStr ? 'AD_HOC' : 'SCHEDULED',
+      maintenanceType: 'AD_HOC',
       content: '',
       resultStatus: 'GOOD',
-      cost: undefined,
-      materialNote: '',
       note: '',
     },
   });
@@ -84,18 +76,16 @@ export function MaintenanceRecordCreatePage() {
   async function loadLookups() {
     setIsLoading(true);
     try {
-      const promises: any[] = [getAssets({ pageSize: 100 }), getMaintenancePlans()];
+      const promises: any[] = [getAssets({ pageSize: 100 })];
       if (damageReportIdStr) {
         promises.push(getDamageReportById(parseInt(damageReportIdStr)));
       }
       
       const results = await Promise.all(promises);
       const assetResponse = results[0];
-      const planList = results[1];
-      const report = results[2];
+      const report = results[1];
 
       setAssets(assetResponse.items.map((a: any) => ({ id: parseInt(a.id), categoryId: 1, assetCode: a.assetCode, assetName: a.assetName, status: a.status, description: a.description, yearInUse: null, createdAt: a.createdAt })));
-      setPlans(planList);
 
       if (report) {
         setDamageReport(report);
@@ -124,7 +114,6 @@ export function MaintenanceRecordCreatePage() {
       } else {
         await createMaintenanceRecord({
           ...values,
-          planId: values.planId || undefined,
           damageReportId: values.damageReportId || undefined,
           note: values.note?.trim() || undefined,
         });
@@ -177,14 +166,6 @@ export function MaintenanceRecordCreatePage() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Kế hoạch bảo trì</label>
-                <Select {...form.register('planId')} className={damageReportIdStr ? "pointer-events-none opacity-60 bg-muted" : ""} tabIndex={damageReportIdStr ? -1 : 0}>
-                  <option value="">Không gắn kế hoạch</option>
-                  {plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.asset.assetCode} - đến hạn {plan.nextDueDate.slice(0, 10)}</option>)}
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted-foreground">Ngày bảo trì <span className="text-destructive">*</span></label>
                 <Input type="date" {...form.register('maintenanceDate')} />
                 {form.formState.errors.maintenanceDate && <p className="text-xs text-destructive mt-1">{form.formState.errors.maintenanceDate.message}</p>}
@@ -192,9 +173,8 @@ export function MaintenanceRecordCreatePage() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-semibold text-muted-foreground">Loại bảo trì <span className="text-destructive">*</span></label>
-                <Select {...form.register('maintenanceType')}>
-                  {maintenanceTypes.map((item) => <option key={item} value={item}>{translateMaintenanceType(item)}</option>)}
-                </Select>
+                <Input value="Sửa chữa phát sinh" disabled />
+                <input type="hidden" {...form.register('maintenanceType')} value="AD_HOC" />
               </div>
 
               <div className="space-y-1.5 xl:col-span-2">
@@ -260,8 +240,9 @@ export function MaintenanceRecordCreatePage() {
             <div ref={printRef} className="p-8 text-black bg-white font-sans text-sm space-y-6" style={{ width: '210mm', minHeight: '297mm' }}>
               <div className="flex justify-between items-start border-b border-gray-300 pb-4">
                 <div>
-                  <h2 className="text-sm font-bold uppercase">KÝ TÚC XÁ MAN THIỆN</h2>
-                  <p className="text-xs text-gray-500">Bộ phận quản lý cơ sở vật chất</p>
+                  <p className="text-sm font-bold">Bộ Khoa học và Công nghệ</p>
+                  <p className="text-sm font-bold">Học viện Công nghệ Bưu chính Viễn thông</p>
+                  <p className="text-sm font-bold">Cơ sở tại Thành phố Hồ Chí Minh</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs font-semibold">Mẫu số: QL_BM3</p>
@@ -279,20 +260,11 @@ export function MaintenanceRecordCreatePage() {
                   <p><strong>Thiết bị sửa chữa:</strong> {createdRecord?.asset?.assetName} ({createdRecord?.asset?.assetCode})</p>
                   <p><strong>Vị trí (Phòng):</strong> {damageReport?.room?.roomCode || 'Kho trung tâm'}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <p><strong>Ngày thực hiện:</strong> {createdRecord?.maintenanceDate ? new Date(createdRecord?.maintenanceDate).toLocaleDateString('vi-VN') : ''}</p>
-                  <p><strong>Loại hình:</strong> Sửa chữa đột xuất (Báo hỏng)</p>
-                </div>
+                <p><strong>Ngày thực hiện:</strong> {createdRecord?.maintenanceDate ? new Date(createdRecord?.maintenanceDate).toLocaleDateString('vi-VN') : ''}</p>
                 <div>
                   <p><strong>Nội dung công việc:</strong> {createdRecord?.content}</p>
                 </div>
-                <div>
-                  <p><strong>Vật tư sử dụng:</strong> {createdRecord?.materialNote || 'Không sử dụng vật tư ngoài'}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <p><strong>Chi phí sửa chữa:</strong> {createdRecord?.cost ? Number(createdRecord.cost).toLocaleString('vi-VN') + ' VNĐ' : 'Miễn phí / Tự sửa'}</p>
-                  <p><strong>Kết quả nghiệm thu:</strong> {createdRecord?.resultStatus === 'GOOD' ? 'Tốt (Đã sửa xong)' : 'Đề nghị thanh lý (Hỏng nặng)'}</p>
-                </div>
+                <p><strong>Kết quả nghiệm thu:</strong> {createdRecord?.resultStatus === 'GOOD' ? 'Tốt (Đã sửa xong)' : 'Đề nghị thanh lý (Hỏng nặng)'}</p>
                 {createdRecord?.note && (
                   <div>
                     <p><strong>Ghi chú bổ sung:</strong> {createdRecord?.note}</p>
@@ -329,12 +301,3 @@ export function MaintenanceRecordCreatePage() {
   );
 }
 
-const maintenanceTypes: MaintenanceType[] = ['SCHEDULED', 'AD_HOC'];
-
-function translateMaintenanceType(type: MaintenanceType) {
-  switch (type) {
-    case 'SCHEDULED': return 'Định kỳ';
-    case 'AD_HOC': return 'Đột xuất';
-    default: return type;
-  }
-}
