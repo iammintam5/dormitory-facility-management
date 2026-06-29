@@ -140,6 +140,10 @@ export class LiquidationRecordsService {
     // FIX 6.1: DRAFT does NOT change asset status - only creates the record
     // FIX 6.2: Check duplicate active liquidation for this asset
     return this.prisma.$transaction(async (tx) => {
+      const asset = await tx.asset.findUnique({ where: { id: body.assetId } });
+      if (!asset) throw new NotFoundException('Tài sản không tồn tại');
+      this.assetTransitionService.validateOperation(asset.status, 'LIQUIDATION');
+
       // Check if asset already has an active liquidation record (DRAFT, PENDING_APPROVAL, APPROVED)
       const activeLiquidations = await tx.liquidationItem.findFirst({
         where: {
@@ -186,7 +190,7 @@ export class LiquidationRecordsService {
           liquidationItems: { include: { asset: true } },
         },
       });
-    }).then((record) => this.mapRecord(record));
+    }, { timeout: 30000 }).then((record) => this.mapRecord(record));
   }
 
   async transition(id: number, action: string, userId: number) {
@@ -375,7 +379,7 @@ export class LiquidationRecordsService {
       }
 
       throw new BadRequestException(`Invalid action: ${action}`);
-    });
+    }, { timeout: 30000 });
   }
 
   private actionToNewStatus(action: string): LiquidationStatus | null {

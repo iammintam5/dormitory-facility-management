@@ -33,7 +33,7 @@ import {
   WarningCircle,
   FloppyDisk
 } from '@phosphor-icons/react';
-import { getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, completeMaintenanceRecord, getMaintenancePlans } from '../../services/maintenance';
+import { getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, completeMaintenanceRecord, getMaintenancePlans, startMaintenanceRecord, cancelMaintenanceRecord } from '../../services/maintenance';
 import { getAssets } from '../../services/assets';
 import { getApiErrorMessage } from '../../lib/api-client';
 import type { MaintenanceRecord, MaintenancePlan } from '../../types/maintenance';
@@ -69,6 +69,7 @@ export function MaintenanceManagementPage() {
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
+  const [completeResultStatus, setCompleteResultStatus] = useState('GOOD');
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
   
   const [activeTab, setActiveTab] = useState('Tất cả');
@@ -282,6 +283,32 @@ export function MaintenanceManagementPage() {
     }
   };
 
+  const handleStart = async (id: number) => {
+    try {
+      await startMaintenanceRecord(id);
+      showToast('Bắt đầu bảo trì thành công.', 'success');
+      loadRecords();
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Thao tác thất bại.'), 'error');
+    }
+  };
+
+  const handleCancel = async (id: number) => {
+    const reason = window.prompt('Vui lòng nhập lý do hủy phiếu bảo trì:');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      showToast('Lý do hủy không được để trống.', 'error');
+      return;
+    }
+    try {
+      await cancelMaintenanceRecord(id, { reason });
+      showToast('Đã hủy phiếu bảo trì.', 'success');
+      loadRecords();
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Thao tác thất bại.'), 'error');
+    }
+  };
+
   function translateType(type: string) {
     switch (type) {
       case 'SCHEDULED': return 'Định kỳ';
@@ -465,9 +492,14 @@ export function MaintenanceManagementPage() {
                             ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
                             actions={[
                               { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
-                              { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
+                              ...(record.status === 'PENDING' ? [
+                                { id: 'start', label: 'Bắt đầu', icon: <Gear size={16} />, onClick: () => handleStart(record.id) },
+                                { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
+                                { id: 'cancel', label: 'Hủy phiếu', icon: <WarningCircle size={16} />, variant: 'destructive' as const, onClick: () => handleCancel(record.id) }
+                              ] : []),
                               ...(record.status === 'IN_PROGRESS' ? [
-                                { id: 'complete', label: 'Hoàn tất', icon: <CheckCircle size={16} />, onClick: () => { setSelectedRecord(record); setIsCompleteModalOpen(true); } }
+                                { id: 'complete', label: 'Hoàn tất', icon: <CheckCircle size={16} />, onClick: () => { setSelectedRecord(record); setIsCompleteModalOpen(true); } },
+                                { id: 'cancel', label: 'Hủy phiếu', icon: <WarningCircle size={16} />, variant: 'destructive' as const, onClick: () => handleCancel(record.id) }
                               ] : [])
                             ]}
                           />
@@ -489,9 +521,14 @@ export function MaintenanceManagementPage() {
                         ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
                         actions={[
                           { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
-                          { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
+                          ...(record.status === 'PENDING' ? [
+                            { id: 'start', label: 'Bắt đầu', icon: <Gear size={16} />, onClick: () => handleStart(record.id) },
+                            { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
+                            { id: 'cancel', label: 'Hủy phiếu', icon: <WarningCircle size={16} />, variant: 'destructive' as const, onClick: () => handleCancel(record.id) }
+                          ] : []),
                           ...(record.status === 'IN_PROGRESS' ? [
-                            { id: 'complete', label: 'Hoàn tất', icon: <CheckCircle size={16} />, onClick: () => { setSelectedRecord(record); setIsCompleteModalOpen(true); } }
+                            { id: 'complete', label: 'Hoàn tất', icon: <CheckCircle size={16} />, onClick: () => { setSelectedRecord(record); setIsCompleteModalOpen(true); } },
+                            { id: 'cancel', label: 'Hủy phiếu', icon: <WarningCircle size={16} />, variant: 'destructive' as const, onClick: () => handleCancel(record.id) }
                           ] : [])
                         ]}
                       />
@@ -711,7 +748,21 @@ export function MaintenanceManagementPage() {
           )}
         </ModalBody>
         <ModalFooter>
-          <Button onClick={() => setIsDetailModalOpen(false)}>Đóng</Button>
+          <div className="flex w-full justify-end gap-3">
+            <Button variant="outline" onClick={() => setIsDetailModalOpen(false)}>Đóng</Button>
+            {selectedRecord && selectedRecord.status === 'PENDING' && (
+              <>
+                <Button variant="destructive" onClick={() => { handleCancel(selectedRecord.id); setIsDetailModalOpen(false); }}>Hủy phiếu</Button>
+                <Button onClick={() => { handleStart(selectedRecord.id); setIsDetailModalOpen(false); }}>Bắt đầu bảo trì</Button>
+              </>
+            )}
+            {selectedRecord && selectedRecord.status === 'IN_PROGRESS' && (
+              <>
+                <Button variant="destructive" onClick={() => { handleCancel(selectedRecord.id); setIsDetailModalOpen(false); }}>Hủy phiếu</Button>
+                <Button onClick={() => { setSelectedRecord(selectedRecord); setIsCompleteModalOpen(true); setIsDetailModalOpen(false); }} className="bg-emerald-600 hover:bg-emerald-500 text-white">Xác nhận hoàn tất</Button>
+              </>
+            )}
+          </div>
         </ModalFooter>
       </Modal>
 
@@ -724,7 +775,7 @@ export function MaintenanceManagementPage() {
             <p className="text-sm text-muted-foreground">Vui lòng chọn kết quả sau khi bảo trì để hệ thống tự động mở khóa tài sản.</p>
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground">Kết quả <span className="text-destructive">*</span></label>
-              <Select name="resultStatus" required>
+              <Select name="resultStatus" required value={completeResultStatus} onChange={(e) => setCompleteResultStatus(e.target.value)}>
                 <option value="GOOD">Tốt (Đã sửa xong)</option>
                 <option value="RECOMMEND_LIQUIDATION">Đề nghị thanh lý (Hỏng nặng)</option>
               </Select>

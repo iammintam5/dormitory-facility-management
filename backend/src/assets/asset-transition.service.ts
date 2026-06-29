@@ -15,6 +15,28 @@ export type TransitionContext = {
 export class AssetTransitionService {
   constructor(private readonly prisma: PrismaService) {}
 
+  validateOperation(
+    assetStatus: AssetStatus,
+    operation: 'ALLOCATE' | 'RECLAIM' | 'TRANSFER' | 'EXPORT' | 'DELETE' | 'DAMAGE_REPORT' | 'MAINTENANCE' | 'LIQUIDATION'
+  ) {
+    if (assetStatus === AssetStatus.DAMAGED) {
+      if (operation !== 'MAINTENANCE' && operation !== 'RECLAIM') {
+        throw new ConflictException(`Không thể thực hiện nghiệp vụ ${operation} trên thiết bị đang bị hỏng (DAMAGED).`);
+      }
+    }
+    if (assetStatus === AssetStatus.UNDER_MAINTENANCE) {
+      throw new ConflictException(`Không thể thực hiện nghiệp vụ ${operation} trên thiết bị đang bảo trì (UNDER_MAINTENANCE).`);
+    }
+    if (assetStatus === AssetStatus.PENDING_LIQUIDATION) {
+      if (operation !== 'LIQUIDATION') {
+        throw new ConflictException(`Không thể thực hiện nghiệp vụ ${operation} trên thiết bị đang chờ thanh lý (PENDING_LIQUIDATION).`);
+      }
+    }
+    if (assetStatus === AssetStatus.LIQUIDATED) {
+      throw new ConflictException(`Không thể thực hiện nghiệp vụ trên thiết bị đã thanh lý.`);
+    }
+  }
+
   // Centralized Matrix - xuất kho/thanh lý được thực hiện qua phiếu xuất.
   private readonly ALLOWED_TRANSITIONS: Record<AssetStatus, AssetStatus[]> = {
     [AssetStatus.AVAILABLE]: [AssetStatus.IN_USE, AssetStatus.PENDING_LIQUIDATION, AssetStatus.DAMAGED, AssetStatus.UNDER_MAINTENANCE, AssetStatus.LIQUIDATED],
@@ -40,6 +62,14 @@ export class AssetTransitionService {
     if (!asset) throw new NotFoundException(`Tài sản ID ${assetId} không tồn tại.`);
 
     const currentStatus = asset.status;
+
+    if (context.action === 'ĐIỀU_CHUYỂN') {
+      this.validateOperation(currentStatus, 'TRANSFER');
+    } else if (context.action === 'CẤP_PHÁT') {
+      this.validateOperation(currentStatus, 'ALLOCATE');
+    } else if (context.action === 'THU_HỒI') {
+      this.validateOperation(currentStatus, 'RECLAIM');
+    }
     
     // Check matrix
     if (currentStatus !== newStatus && !this.ALLOWED_TRANSITIONS[currentStatus].includes(newStatus)) {

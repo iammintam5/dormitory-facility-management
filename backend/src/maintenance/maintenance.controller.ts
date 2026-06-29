@@ -4,12 +4,21 @@ import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CreateMaintenanceRecordDto, UpdateMaintenanceRecordDto, CompleteMaintenanceRecordDto } from './dto/maintenance-record.dto';
+import { CreateMaintenanceRecordDto, UpdateMaintenanceRecordDto, CompleteMaintenanceRecordDto, CreateDirectCompletedRecordDto } from './dto/maintenance-record.dto';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('maintenance')
 export class MaintenanceController {
   constructor(private readonly maintenanceService: MaintenanceService) {}
+
+  @Roles('MANAGER')
+  @Post('records/complete-direct')
+  async createDirectCompletedRecord(
+    @CurrentUser('sub') userId: number,
+    @Body() body: CreateDirectCompletedRecordDto,
+  ) {
+    return this.maintenanceService.createDirectCompletedRecord(userId, body);
+  }
 
   @Roles('MANAGER')
   @Get('plans')
@@ -52,6 +61,15 @@ export class MaintenanceController {
   }
 
   @Roles('MANAGER')
+  @Patch('records/:id/start')
+  async startRecord(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: number,
+  ) {
+    return this.maintenanceService.startRecord(parseInt(id, 10), userId);
+  }
+
+  @Roles('MANAGER')
   @Patch('records/:id/complete')
   async completeRecord(
     @Param('id') id: string,
@@ -59,6 +77,16 @@ export class MaintenanceController {
     @Body() body: CompleteMaintenanceRecordDto,
   ) {
     return this.maintenanceService.completeRecord(parseInt(id, 10), userId, body);
+  }
+
+  @Roles('MANAGER')
+  @Patch('records/:id/cancel')
+  async cancelRecord(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: number,
+    @Body() body: { reason: string; nextAssetStatus: 'DAMAGED' | 'PENDING_LIQUIDATION' },
+  ) {
+    return this.maintenanceService.cancelRecord(parseInt(id, 10), userId, body);
   }
 
   @Roles('MANAGER')

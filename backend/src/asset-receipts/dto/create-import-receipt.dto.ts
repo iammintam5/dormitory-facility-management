@@ -22,8 +22,7 @@ export class ImportReceiptItemDto {
   unitPrice?: number;
 
   @IsOptional()
-  @IsString()
-  warranty?: string;
+  warranty?: any;
 
   @IsOptional()
   @IsString()
@@ -50,6 +49,10 @@ export class CreateImportReceiptDto {
   @IsOptional()
   @IsString()
   contractNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  contractDate?: string;
 
   @IsOptional()
   @IsString()

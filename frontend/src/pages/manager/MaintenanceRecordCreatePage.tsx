@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { z } from 'zod';
@@ -8,15 +8,17 @@ import { Card, CardContent } from '../../components/ui/Card';
 import { Input } from '../../components/ui/Input';
 import { Select } from '../../components/ui/Select';
 import { PageHeader } from '../../components/ui/PageHeader';
+import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '../../components/ui/Modal';
 import { useAuth } from '../../auth/auth-context';
-import { createMaintenanceRecord, getMaintenancePlans } from '../../services/maintenance';
+import { createMaintenanceRecord, getMaintenancePlans, createDirectCompletedRecord } from '../../services/maintenance';
 import { getDamageReportById } from '../../services/damage-reports';
 import { getAssets } from '../../services/assets';
 import { useToast } from '../../toast/toast-context';
 import { Asset } from '../../types/assets';
 import { DamageReport } from '../../types/damage-reports';
 import { MaintenancePlan, MaintenanceResultStatus, MaintenanceType } from '../../types/maintenance';
-import { FloppyDisk, CaretLeft } from '@phosphor-icons/react';
+import { FloppyDisk, CaretLeft, Printer, CheckCircle } from '@phosphor-icons/react';
+import { useReactToPrint } from 'react-to-print';
 
 const recordSchema = z.object({
   planId: z.coerce.number().optional(),
@@ -26,8 +28,7 @@ const recordSchema = z.object({
   maintenanceDate: z.string().min(1, 'Vui lòng chọn ngày bảo trì.'),
   maintenanceType: z.enum(['SCHEDULED', 'AD_HOC']),
   content: z.string().min(1, 'Nội dung không được để trống.'),
-  resultStatus: z.enum(['GOOD', 'RECOMMEND_LIQUIDATION']),
-  nextMaintenanceDate: z.string().optional(),
+  resultStatus: z.enum(['GOOD', 'RECOMMEND_LIQUIDATION']).optional(),
   cost: z.union([z.coerce.number().min(0), z.nan()]).optional(),
   materialNote: z.string().optional(),
   note: z.string().optional(),
@@ -46,9 +47,16 @@ export function MaintenanceRecordCreatePage() {
   const [damageReport, setDamageReport] = useState<DamageReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [createdRecord, setCreatedRecord] = useState<any>(null);
+
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+  });
 
   const [searchParams] = useSearchParams();
   const damageReportIdStr = searchParams.get('damageReportId');
+  const isDirectCompleteMode = !!damageReportIdStr;
 
   const assetIdStr = searchParams.get('assetId');
 
@@ -63,7 +71,7 @@ export function MaintenanceRecordCreatePage() {
       maintenanceType: damageReportIdStr ? 'AD_HOC' : 'SCHEDULED',
       content: '',
       resultStatus: 'GOOD',
-      nextMaintenanceDate: '',
+      cost: undefined,
       materialNote: '',
       note: '',
     },
@@ -103,20 +111,30 @@ export function MaintenanceRecordCreatePage() {
   const onSubmit = async (values: RecordFormValues) => {
     setIsSubmitting(true);
     try {
-      const response = await createMaintenanceRecord({
-        ...values,
-        planId: values.planId || undefined,
-        damageReportId: values.damageReportId || undefined,
-
-        nextMaintenanceDate: values.nextMaintenanceDate || undefined,
-        cost: Number.isNaN(values.cost) ? undefined : values.cost,
-        materialNote: values.materialNote?.trim() || undefined,
-        note: values.note?.trim() || undefined,
-      });
-      showToast('Tạo phiếu bảo trì thành công.', 'success');
-      navigate(`${basePath}/maintenance`);
+      if (isDirectCompleteMode) {
+        const response = await createDirectCompletedRecord({
+          damageReportId: values.damageReportId!,
+          maintenanceDate: values.maintenanceDate,
+          content: values.content,
+          resultStatus: values.resultStatus || 'GOOD',
+          cost: Number.isNaN(values.cost) ? undefined : values.cost,
+          materialNote: values.materialNote?.trim() || undefined,
+          note: values.note?.trim() || undefined,
+        });
+        showToast('Nghiệm thu và tạo phiếu bảo trì thành công.', 'success');
+        setCreatedRecord(response);
+      } else {
+        await createMaintenanceRecord({
+          ...values,
+          planId: values.planId || undefined,
+          damageReportId: values.damageReportId || undefined,
+          note: values.note?.trim() || undefined,
+        });
+        showToast('Tạo phiếu bảo trì thành công.', 'success');
+        navigate(`${basePath}/maintenance`);
+      }
     } catch (error) {
-      showToast('Không thể tạo phiếu bảo trì.', 'error');
+      showToast('Thao tác thất bại.', 'error');
     } finally {
       setIsSubmitting(false);
     }
@@ -191,43 +209,44 @@ export function MaintenanceRecordCreatePage() {
                 {form.formState.errors.content && <p className="text-xs text-destructive mt-1">{form.formState.errors.content.message}</p>}
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Kết quả <span className="text-destructive">*</span></label>
-                <Select {...form.register('resultStatus')}>
-                  {resultStatuses.map((item) => <option key={item} value={item}>{translateResultStatus(item)}</option>)}
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Ngày bảo trì tiếp theo</label>
-                <Input type="date" {...form.register('nextMaintenanceDate')} />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Chi phí (VNĐ)</label>
-                <Input type="number" min={0} placeholder="VD: 500000" {...form.register('cost', { valueAsNumber: true })} />
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">Vật tư / ghi chú kỹ thuật</label>
-                <Input placeholder="Các vật tư đã sử dụng hoặc cần lưu ý" {...form.register('materialNote')} />
-              </div>
-
               <div className="space-y-1.5 xl:col-span-2">
                 <label className="text-xs font-semibold text-muted-foreground">Ghi chú chung</label>
                 <textarea 
                   className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none" 
                   placeholder="Thông tin bổ sung khác..."
                   {...form.register('note')} 
+                  
                 />
               </div>
 
+              {isDirectCompleteMode && (
+                <>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground">Kết quả <span className="text-destructive">*</span></label>
+                    <Select {...form.register('resultStatus')} required>
+                      <option value="GOOD">Tốt (Đã sửa xong)</option>
+                      <option value="RECOMMEND_LIQUIDATION">Đề nghị thanh lý (Hỏng nặng)</option>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-muted-foreground">Chi phí (VNĐ)</label>
+                    <Input type="number" min={0} placeholder="VD: 500000" {...form.register('cost', { valueAsNumber: true })} />
+                  </div>
+
+                  <div className="space-y-1.5 xl:col-span-2">
+                    <label className="text-xs font-semibold text-muted-foreground">Vật tư / ghi chú kỹ thuật</label>
+                    <Input placeholder="Các vật tư đã sử dụng hoặc cần lưu ý" {...form.register('materialNote')} />
+                  </div>
+                </>
+              )}
+
               <div className="flex items-center gap-3 xl:col-span-2 pt-6 mt-2 border-t border-border/50">
-                <Button type="submit" disabled={isSubmitting} className="w-40 gap-2">
+                <Button type="submit" disabled={isSubmitting} className="w-44 gap-2">
                   <FloppyDisk size={16} weight="bold" />
-                  {isSubmitting ? 'Đang tạo...' : 'Tạo phiếu bảo trì'}
+                  {isSubmitting ? 'Đang lưu...' : (isDirectCompleteMode ? 'Nghiệm thu & Lưu' : 'Tạo phiếu bảo trì')}
                 </Button>
-                <Button type="button" variant="outline" onClick={() => navigate(`${basePath}/maintenance`)} className="gap-2">
+                <Button type="button" variant="outline" onClick={() => navigate(isDirectCompleteMode ? `${basePath}/damage-reports` : `${basePath}/maintenance`)} className="gap-2">
                   <CaretLeft size={16} weight="bold" />
                   Quay lại
                 </Button>
@@ -236,26 +255,98 @@ export function MaintenanceRecordCreatePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal in phiếu */}
+      <Modal isOpen={!!createdRecord} onClose={() => navigate(`${basePath}/damage-reports`)} size="md">
+        <ModalHeader onClose={() => navigate(`${basePath}/damage-reports`)}>
+          <ModalTitle className="flex items-center gap-2 text-emerald-600">
+            <CheckCircle size={24} weight="fill" />
+            Nghiệm thu thành công
+          </ModalTitle>
+        </ModalHeader>
+        <ModalBody className="space-y-4">
+          <p className="text-sm">Phiếu sửa chữa thiết bị đã được lưu thành công vào hệ thống. Bạn có muốn in phiếu nghiệm thu bàn giao này không?</p>
+          
+          {/* Printable Template (hidden from screen, used by react-to-print) */}
+          <div className="hidden">
+            <div ref={printRef} className="p-8 text-black bg-white font-sans text-sm space-y-6" style={{ width: '210mm', minHeight: '297mm' }}>
+              <div className="flex justify-between items-start border-b border-gray-300 pb-4">
+                <div>
+                  <h2 className="text-sm font-bold uppercase">KÝ TÚC XÁ MAN THIỆN</h2>
+                  <p className="text-xs text-gray-500">Bộ phận quản lý cơ sở vật chất</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold">Mẫu số: QL_BM3</p>
+                  <p className="text-xs text-gray-500">Mã phiếu: {createdRecord?.maintenanceCode}</p>
+                </div>
+              </div>
+
+              <div className="text-center my-6">
+                <h1 className="text-xl font-bold uppercase tracking-wider">BIÊN BẢN NGHIỆM THU SỬA CHỮA</h1>
+                <p className="text-xs italic text-gray-500 mt-1">Ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+              </div>
+
+              <div className="space-y-3 text-black">
+                <div className="grid grid-cols-2 gap-4">
+                  <p><strong>Thiết bị sửa chữa:</strong> {createdRecord?.asset?.assetName} ({createdRecord?.asset?.assetCode})</p>
+                  <p><strong>Vị trí (Phòng):</strong> {damageReport?.room?.roomCode || 'Kho trung tâm'}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <p><strong>Ngày thực hiện:</strong> {createdRecord?.maintenanceDate ? new Date(createdRecord?.maintenanceDate).toLocaleDateString('vi-VN') : ''}</p>
+                  <p><strong>Loại hình:</strong> Sửa chữa đột xuất (Báo hỏng)</p>
+                </div>
+                <div>
+                  <p><strong>Nội dung công việc:</strong> {createdRecord?.content}</p>
+                </div>
+                <div>
+                  <p><strong>Vật tư sử dụng:</strong> {createdRecord?.materialNote || 'Không sử dụng vật tư ngoài'}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <p><strong>Chi phí sửa chữa:</strong> {createdRecord?.cost ? Number(createdRecord.cost).toLocaleString('vi-VN') + ' VNĐ' : 'Miễn phí / Tự sửa'}</p>
+                  <p><strong>Kết quả nghiệm thu:</strong> {createdRecord?.resultStatus === 'GOOD' ? 'Tốt (Đã sửa xong)' : 'Đề nghị thanh lý (Hỏng nặng)'}</p>
+                </div>
+                {createdRecord?.note && (
+                  <div>
+                    <p><strong>Ghi chú bổ sung:</strong> {createdRecord?.note}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-12 grid grid-cols-2 text-center gap-12 text-black">
+                <div>
+                  <p className="font-semibold">Đại diện bộ phận nghiệm thu</p>
+                  <p className="text-xs text-gray-400 italic mt-1">(Ký và ghi rõ họ tên)</p>
+                  <div className="h-20"></div>
+                  <p className="font-semibold">{user?.fullName}</p>
+                </div>
+                <div>
+                  <p className="font-semibold">Người thực hiện sửa chữa</p>
+                  <p className="text-xs text-gray-400 italic mt-1">(Ký và ghi rõ họ tên)</p>
+                  <div className="h-20"></div>
+                  <p className="border-b border-dashed border-gray-300 w-32 mx-auto mt-12"></p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="outline" onClick={() => navigate(`${basePath}/damage-reports`)}>Đóng & Quay lại</Button>
+          <Button onClick={handlePrint} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+            <Printer size={16} />
+            In phiếu PDF
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }
 
 const maintenanceTypes: MaintenanceType[] = ['SCHEDULED', 'AD_HOC'];
-const resultStatuses: MaintenanceResultStatus[] = ['GOOD', 'RECOMMEND_LIQUIDATION'];
 
 function translateMaintenanceType(type: MaintenanceType) {
   switch (type) {
     case 'SCHEDULED': return 'Định kỳ';
     case 'AD_HOC': return 'Đột xuất';
-
     default: return type;
-  }
-}
-
-function translateResultStatus(status: MaintenanceResultStatus) {
-  switch (status) {
-    case 'GOOD': return 'Tốt';
-    case 'RECOMMEND_LIQUIDATION': return 'Đề nghị thanh lý';
-    default: return status;
   }
 }

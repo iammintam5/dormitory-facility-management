@@ -1,6 +1,6 @@
 import { IsString, IsOptional, IsInt, IsEnum, IsNumber, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MaintenanceType as PrismaMaintenanceType, MaintenanceResultStatus } from '@prisma/client';
+import { MaintenanceType as PrismaMaintenanceType, MaintenanceResultStatus, MaintenanceReturnMode } from '@prisma/client';
 
 export class CreateMaintenanceRecordDto {
   @IsOptional()
@@ -55,6 +55,10 @@ export class CompleteMaintenanceRecordDto {
   resultStatus!: MaintenanceResultStatus;
 
   @IsOptional()
+  @IsEnum(MaintenanceReturnMode)
+  returnMode?: MaintenanceReturnMode;
+
+  @IsOptional()
   @IsString()
   content?: string;
 
@@ -92,6 +96,40 @@ export class UpdateMaintenanceRecordDto {
   @IsOptional()
   @IsDateString()
   nextMaintenanceDate?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  cost?: number;
+
+  @IsOptional()
+  @IsString()
+  materialNote?: string;
+
+  @IsOptional()
+  @IsString()
+  note?: string;
+}
+
+export class CreateDirectCompletedRecordDto {
+  @IsInt()
+  @Type(() => Number)
+  damageReportId!: number;
+
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  performedBy?: number;
+
+  @IsOptional()
+  @IsDateString()
+  maintenanceDate?: string;
+
+  @IsString()
+  content!: string;
+
+  @IsEnum(MaintenanceResultStatus)
+  resultStatus!: MaintenanceResultStatus;
 
   @IsOptional()
   @IsNumber()

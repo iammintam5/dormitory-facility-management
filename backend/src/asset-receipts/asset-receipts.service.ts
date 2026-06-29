@@ -102,7 +102,7 @@ export class AssetReceiptsService {
                 assetId: asset.id,
                 quantity: 1,
                 unitPrice: item.unitPrice ? item.unitPrice : null,
-                warrantyMonths: item.warranty ? parseInt(item.warranty, 10) : 0,
+                warrantyMonths: item.warranty ? parseInt(item.warranty.toString(), 10) : 0,
                 note: item.note ?? null,
               },
             });
@@ -179,6 +179,11 @@ export class AssetReceiptsService {
       }
 
       for (const assetId of uniqueAssetIds) {
+        const asset = await prisma.asset.findUnique({ where: { id: assetId } });
+        if (asset) {
+          this.assetTransitionService.validateOperation(asset.status, 'ALLOCATE');
+        }
+
         await this.assetTransitionService.transition(prisma, assetId, AssetStatus.IN_USE, {
           action: 'CẤP_PHÁT',
           userId,
@@ -222,6 +227,8 @@ export class AssetReceiptsService {
         if (!asset || asset.roomId !== parseInt(fromRoomId, 10)) {
           throw new BadRequestException(`Tài sản ID ${assetId} không thuộc phòng ID ${fromRoomId}`);
         }
+
+        this.assetTransitionService.validateOperation(asset.status, 'RECLAIM');
 
         // Keep current status if it's DAMAGED or UNDER_MAINTENANCE.
         // If IN_USE, revert to AVAILABLE.
@@ -292,6 +299,8 @@ export class AssetReceiptsService {
         if (!asset) {
           throw new BadRequestException(`Tài sản ID ${assetId} không tồn tại.`);
         }
+
+        this.assetTransitionService.validateOperation(asset.status, 'EXPORT');
 
         if (asset.status === AssetStatus.LIQUIDATED) {
           throw new BadRequestException(`Tài sản ${asset.assetCode} đã được xuất/thanh lý trước đó.`);
