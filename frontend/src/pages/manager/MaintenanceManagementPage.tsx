@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -31,24 +31,24 @@ import {
   Eye,
   PencilSimple,
   WarningCircle,
-  FloppyDisk
+  FloppyDisk,
+  Printer
 } from '@phosphor-icons/react';
-import { getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, completeMaintenanceRecord, getMaintenancePlans, startMaintenanceRecord, cancelMaintenanceRecord } from '../../services/maintenance';
+import { useReactToPrint } from 'react-to-print';
+import { getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, completeMaintenanceRecord, startMaintenanceRecord, cancelMaintenanceRecord } from '../../services/maintenance';
 import { getAssets } from '../../services/assets';
 import { getApiErrorMessage } from '../../lib/api-client';
-import type { MaintenanceRecord, MaintenancePlan } from '../../types/maintenance';
+import type { MaintenanceRecord } from '../../types/maintenance';
 import type { Asset } from '../../types/assets';
 
 const recordSchema = z.object({
   planId: z.coerce.number().optional(),
   assetId: z.coerce.number().int().positive('Chọn tài sản.'),
   maintenanceDate: z.string().min(1, 'Chọn ngày bảo trì.'),
-  maintenanceType: z.enum(['SCHEDULED', 'AD_HOC']),
+  maintenanceType: z.literal('AD_HOC'),
   content: z.string().min(1, 'Nhập nội dung thực hiện.'),
   resultStatus: z.enum(['GOOD', 'RECOMMEND_LIQUIDATION']).optional(),
   nextMaintenanceDate: z.string().optional(),
-  cost: z.union([z.coerce.number().min(0), z.nan()]).optional(),
-  materialNote: z.string().optional(),
   note: z.string().optional(),
 });
 
@@ -63,14 +63,18 @@ export function MaintenanceManagementPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [plans, setPlans] = useState<MaintenancePlan[]>([]);
-  
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [completeResultStatus, setCompleteResultStatus] = useState('GOOD');
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+  const [printRecord, setPrintRecord] = useState<MaintenanceRecord | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printRecord?.maintenanceCode ?? 'phieu-bao-tri',
+  });
   
   const [activeTab, setActiveTab] = useState('Tất cả');
   
@@ -80,7 +84,6 @@ export function MaintenanceManagementPage() {
   const [searchKeyword, setSearchKeyword] = useState(initialSearch);
   const debouncedKeyword = useDebounce(searchKeyword, 400);
   const [statusFilter, setStatusFilter] = useState('Tất cả');
-  const [typeFilter, setTypeFilter] = useState('Tất cả');
 
   const form = useForm<RecordFormValues>({
     resolver: zodResolver(recordSchema),
@@ -88,11 +91,10 @@ export function MaintenanceManagementPage() {
       planId: undefined,
       assetId: 0,
       maintenanceDate: new Date().toISOString().slice(0, 10),
-      maintenanceType: 'SCHEDULED',
+      maintenanceType: 'AD_HOC',
       content: '',
       resultStatus: 'GOOD',
       nextMaintenanceDate: '',
-      materialNote: '',
       note: '',
     },
   });
@@ -116,10 +118,7 @@ export function MaintenanceManagementPage() {
 
   const loadLookups = useCallback(async () => {
     try {
-      const [assetResponse, planList] = await Promise.all([
-        getAssets({ pageSize: 100 }),
-        getMaintenancePlans(),
-      ]);
+      const assetResponse = await getAssets({ pageSize: 100 });
       setAssets(assetResponse.items.map((a: any) => ({
         id: parseInt(a.id),
         categoryId: 1,
@@ -130,7 +129,6 @@ export function MaintenanceManagementPage() {
         yearInUse: null,
         createdAt: a.createdAt,
       })));
-      setPlans(planList);
     } catch {
       // Non-critical, will handle on open
     }
@@ -152,11 +150,6 @@ export function MaintenanceManagementPage() {
         if (record.resultStatus !== statusFilter) return false;
       }
       
-      // Type filter
-      if (typeFilter !== 'Tất cả') {
-        if (record.maintenanceType !== typeFilter) return false;
-      }
-      
       // Search keyword
       if (debouncedKeyword) {
         const kw = debouncedKeyword.toLowerCase();
@@ -170,7 +163,7 @@ export function MaintenanceManagementPage() {
       
       return true;
     });
-  }, [records, activeTab, debouncedKeyword, statusFilter, typeFilter]);
+  }, [records, activeTab, debouncedKeyword, statusFilter]);
 
   const summaryCounts = useMemo(() => {
     return {
@@ -183,7 +176,6 @@ export function MaintenanceManagementPage() {
   const handleResetFilters = () => {
     setSearchKeyword('');
     setStatusFilter('Tất cả');
-    setTypeFilter('Tất cả');
     setActiveTab('Tất cả');
     setPagination(prev => ({ ...prev, page: 1 }));
   };
@@ -193,11 +185,10 @@ export function MaintenanceManagementPage() {
       planId: undefined,
       assetId: 0,
       maintenanceDate: new Date().toISOString().slice(0, 10),
-      maintenanceType: 'SCHEDULED',
+      maintenanceType: 'AD_HOC',
       content: '',
       resultStatus: 'GOOD',
       nextMaintenanceDate: '',
-      materialNote: '',
       note: '',
     });
     setIsEditMode(false);
@@ -217,12 +208,10 @@ export function MaintenanceManagementPage() {
       planId: record.planId ?? undefined,
       assetId: record.assetId,
       maintenanceDate: record.maintenanceDate.slice(0, 10),
-      maintenanceType: record.maintenanceType,
+      maintenanceType: 'AD_HOC',
       content: record.content,
       resultStatus: record.resultStatus,
       nextMaintenanceDate: record.nextMaintenanceDate?.slice(0, 10) ?? '',
-      cost: record.cost ? Number(record.cost) : undefined,
-      materialNote: record.materialNote ?? '',
       note: record.note ?? '',
     });
     setIsCreateModalOpen(true);
@@ -238,8 +227,6 @@ export function MaintenanceManagementPage() {
           maintenanceType: data.maintenanceType,
           content: data.content,
           nextMaintenanceDate: data.nextMaintenanceDate || undefined,
-          cost: Number.isNaN(data.cost) ? undefined : data.cost,
-          materialNote: data.materialNote?.trim() || undefined,
           note: data.note?.trim() || undefined,
         });
         showToast('Cập nhật phiếu bảo trì thành công.', 'success');
@@ -248,8 +235,6 @@ export function MaintenanceManagementPage() {
           ...data,
           planId: data.planId || undefined,
           nextMaintenanceDate: data.nextMaintenanceDate || undefined,
-          cost: Number.isNaN(data.cost) ? undefined : data.cost,
-          materialNote: data.materialNote?.trim() || undefined,
           note: data.note?.trim() || undefined,
         });
         showToast('Tạo phiếu bảo trì thành công.', 'success');
@@ -309,14 +294,10 @@ export function MaintenanceManagementPage() {
     }
   };
 
-  function translateType(type: string) {
-    switch (type) {
-      case 'SCHEDULED': return 'Định kỳ';
-      case 'AD_HOC': return 'Đột xuất';
-
-      default: return type;
-    }
-  }
+  const printMaintenanceRecord = (record: MaintenanceRecord) => {
+    setPrintRecord(record);
+    window.setTimeout(() => handlePrint(), 0);
+  };
 
   function translateStatus(status: string) {
     switch (status) {
@@ -331,15 +312,6 @@ export function MaintenanceManagementPage() {
       case 'GOOD': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-700">Tốt</span>;
       case 'RECOMMEND_LIQUIDATION': return <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-bold bg-purple-100 text-purple-700">Đề nghị thanh lý</span>;
       default: return null;
-    }
-  };
-
-  const renderTypeBadge = (type: string) => {
-    switch (type) {
-      case 'SCHEDULED': return <span className="text-xs font-semibold text-emerald-600">Định kỳ</span>;
-      case 'AD_HOC': return <span className="text-xs font-semibold text-amber-600">Đột xuất</span>;
-
-      default: return <span className="text-xs">{type}</span>;
     }
   };
 
@@ -415,25 +387,16 @@ export function MaintenanceManagementPage() {
           />
         }
         filterNode={
-          <>
-            <Select className="w-full bg-background border-border/50 text-foreground" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Lọc theo kết quả">
-              {['Tất cả', 'Tốt', 'Đề nghị thanh lý'].map(s => <option key={s} value={s === 'Tất cả' ? 'Tất cả' : (s === 'Tốt' ? 'GOOD' : 'RECOMMEND_LIQUIDATION')}>{s}</option>)}
-            </Select>
-            <Select value={typeFilter} onChange={e => setTypeFilter(e.target.value)} aria-label="Lọc theo loại bảo trì">
-              <option>Tất cả</option>
-              <option value="SCHEDULED">Định kỳ</option>
-              <option value="AD_HOC">Đột xuất</option>
-            </Select>
-          </>
+          <Select className="w-full bg-background border-border/50 text-foreground" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} aria-label="Lọc theo kết quả">
+            {['Tất cả', 'Tốt', 'Đề nghị thanh lý'].map(s => <option key={s} value={s === 'Tất cả' ? 'Tất cả' : (s === 'Tốt' ? 'GOOD' : 'RECOMMEND_LIQUIDATION')}>{s}</option>)}
+          </Select>
         }
         appliedFilterCount={[
           statusFilter !== 'Tất cả' ? statusFilter : '',
-          typeFilter !== 'Tất cả' ? typeFilter : ''
         ].filter(Boolean).length}
         onResetFilters={handleResetFilters}
         filterChips={[
           ...(statusFilter !== 'Tất cả' ? [{ id: 'status', label: `Kết quả: ${statusFilter === 'GOOD' ? 'Tốt' : 'Đề nghị thanh lý'}`, onRemove: () => setStatusFilter('Tất cả') }] : []),
-          ...(typeFilter !== 'Tất cả' ? [{ id: 'type', label: `Loại: ${typeFilter === 'SCHEDULED' ? 'Định kỳ' : 'Đột xuất'}`, onRemove: () => setTypeFilter('Tất cả') }] : []),
         ]}
       />
 
@@ -462,7 +425,6 @@ export function MaintenanceManagementPage() {
                       <th className="px-4 py-4 font-semibold text-left">Thiết bị</th>
                       <th className="px-4 py-4 text-center font-semibold">Phòng</th>
                       <th className="px-4 py-4 text-center font-semibold">Khu nhà</th>
-                      <th className="px-4 py-4 text-center font-semibold">Loại</th>
                       <th className="px-4 py-4 text-center font-semibold">Kết quả</th>
                       <th className="px-4 py-4 text-center font-semibold">Người thực hiện</th>
                       <th className="px-4 py-4 text-center font-semibold">Ngày bảo trì</th>
@@ -479,7 +441,6 @@ export function MaintenanceManagementPage() {
                         <td className="px-4 py-3.5">{record.asset?.assetName ?? '--'}</td>
                         <td className="px-4 py-3.5 text-center">{record.asset?.room?.roomCode ?? '--'}</td>
                         <td className="px-4 py-3.5 text-center">{record.asset?.room?.floor?.building?.name ?? '--'}</td>
-                        <td className="px-4 py-3.5 text-center">{renderTypeBadge(record.maintenanceType)}</td>
                         <td className="px-4 py-3.5 text-center">{renderStatusBadge(record.resultStatus)}</td>
                         <td className="px-4 py-3.5 text-center font-medium">
                           {record.performedByUser?.fullName ?? `#${record.performedBy}`}
@@ -492,6 +453,7 @@ export function MaintenanceManagementPage() {
                             ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
                             actions={[
                               { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
+                              { id: 'print', label: 'In phiếu PDF', icon: <Printer size={16} />, onClick: () => printMaintenanceRecord(record) },
                               ...(record.status === 'PENDING' ? [
                                 { id: 'start', label: 'Bắt đầu', icon: <Gear size={16} />, onClick: () => handleStart(record.id) },
                                 { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
@@ -521,6 +483,7 @@ export function MaintenanceManagementPage() {
                         ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
                         actions={[
                           { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
+                              { id: 'print', label: 'In phiếu PDF', icon: <Printer size={16} />, onClick: () => printMaintenanceRecord(record) },
                           ...(record.status === 'PENDING' ? [
                             { id: 'start', label: 'Bắt đầu', icon: <Gear size={16} />, onClick: () => handleStart(record.id) },
                             { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
@@ -535,7 +498,6 @@ export function MaintenanceManagementPage() {
                     }
                   >
                     <DataLabel label="Phòng/Khu" value={`${record.asset?.room?.roomCode ?? '--'} / ${record.asset?.room?.floor?.building?.name ?? '--'}`} />
-                    <DataLabel label="Loại" value={renderTypeBadge(record.maintenanceType)} />
                     <DataLabel label="Người thực hiện" value={record.performedByUser?.fullName ?? `#${record.performedBy}`} />
                     <DataLabel label="Ngày bảo trì" value={new Date(record.maintenanceDate).toLocaleDateString('vi-VN')} />
                   </MobileDataCard>
@@ -553,6 +515,66 @@ export function MaintenanceManagementPage() {
           onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
         />
       </Card>
+
+      <div className="fixed -left-[9999px] top-0 bg-white text-black">
+        <div ref={printRef} className="p-8 font-sans text-sm text-black" style={{ width: '210mm', minHeight: '297mm' }}>
+          {printRecord && (
+            <div className="space-y-6">
+              <div className="flex justify-between border-b border-gray-300 pb-4">
+                <div>
+                  <p className="text-sm font-bold uppercase">Bộ Khoa học và Công nghệ</p>
+                  <p className="text-sm font-bold uppercase">Học viện Công nghệ Bưu chính Viễn thông</p>
+                  <p className="text-sm font-bold uppercase">Cơ sở tại Thành phố Hồ Chí Minh</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold">Mẫu số: QL_BM3</p>
+                  <p className="text-xs">Mã phiếu: {printRecord.maintenanceCode}</p>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <h1 className="text-xl font-bold uppercase">Phiếu sửa chữa - bảo trì thiết bị</h1>
+                <p className="mt-1 text-xs italic">
+                  Ngày {new Date(printRecord.maintenanceDate).getDate()} tháng {new Date(printRecord.maintenanceDate).getMonth() + 1} năm {new Date(printRecord.maintenanceDate).getFullYear()}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <p><strong>Thiết bị:</strong> {printRecord.asset?.assetName ?? '--'} ({printRecord.asset?.assetCode ?? '--'})</p>
+                <p><strong>Vị trí:</strong> {printRecord.asset?.room?.roomCode ?? 'Kho'} - {printRecord.asset?.room?.floor?.building?.name ?? '--'}</p>
+                <p><strong>Kết quả:</strong> {translateStatus(printRecord.resultStatus ?? '')}</p>
+                <p><strong>Người thực hiện:</strong> {printRecord.performedByUser?.fullName ?? `#${printRecord.performedBy}`}</p>
+                <p><strong>Ngày lập:</strong> {new Date(printRecord.createdAt).toLocaleDateString('vi-VN')}</p>
+              </div>
+
+              <div>
+                <p className="mb-2 font-semibold">Nội dung thực hiện</p>
+                <div className="min-h-24 rounded border border-gray-300 p-3 whitespace-pre-wrap">{printRecord.content}</div>
+              </div>
+
+              {printRecord.note && (
+                <div>
+                  <p className="mb-2 font-semibold">Ghi chú</p>
+                  <div className="rounded border border-gray-300 p-3 whitespace-pre-wrap">{printRecord.note}</div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-16 pt-12 text-center">
+                <div>
+                  <p className="font-semibold">Người thực hiện</p>
+                  <p className="mt-1 text-xs italic">(Ký và ghi rõ họ tên)</p>
+                  <div className="h-24"></div>
+                </div>
+                <div>
+                  <p className="font-semibold">Đại diện quản lý CSVC</p>
+                  <p className="mt-1 text-xs italic">(Ký và ghi rõ họ tên)</p>
+                  <div className="h-24"></div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} size="lg">
         <ModalHeader>
@@ -573,17 +595,6 @@ export function MaintenanceManagementPage() {
                   </Select>
                   {form.formState.errors.assetId && <p className="text-xs text-destructive mt-1">{form.formState.errors.assetId.message}</p>}
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Kế hoạch bảo trì</label>
-                  <Select {...form.register('planId', { valueAsNumber: true })} disabled={isEditMode}>
-                    <option value="">Không gắn kế hoạch</option>
-                    {plans.map((plan) => (
-                      <option key={plan.id} value={plan.id}>
-                        {plan.asset?.assetCode ?? '#'}{plan.id} - đến hạn {plan.nextDueDate?.slice(0, 10) ?? '--'}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
               </div>
             </div>
 
@@ -596,12 +607,9 @@ export function MaintenanceManagementPage() {
                   {form.formState.errors.maintenanceDate && <p className="text-xs text-destructive mt-1">{form.formState.errors.maintenanceDate.message}</p>}
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-muted-foreground">Loại bảo trì <span className="text-destructive">*</span></label>
-                  <Select {...form.register('maintenanceType')} disabled={isEditMode}>
-                    <option value="SCHEDULED">Định kỳ</option>
-                    <option value="AD_HOC">Đột xuất</option>
-
-                  </Select>
+                  <label className="text-xs font-semibold text-muted-foreground">Loại phiếu</label>
+                  <Input value="Sửa chữa phát sinh" disabled />
+                  <input type="hidden" {...form.register('maintenanceType')} value="AD_HOC" />
                 </div>
                 {!isEditMode && (
                   <div className="space-y-1.5">
@@ -616,7 +624,7 @@ export function MaintenanceManagementPage() {
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider border-b border-border/50 pb-2">NỘI DUNG & CHI PHÍ</h3>
+              <h3 className="text-sm font-bold text-foreground uppercase tracking-wider border-b border-border/50 pb-2">NỘI DUNG THỰC HIỆN</h3>
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-muted-foreground">Nội dung thực hiện <span className="text-destructive">*</span></label>
@@ -628,18 +636,10 @@ export function MaintenanceManagementPage() {
                   />
                   {form.formState.errors.content && <p className="text-xs text-destructive mt-1">{form.formState.errors.content.message}</p>}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-muted-foreground">Ngày bảo trì tiếp theo</label>
                     <Input type="date" {...form.register('nextMaintenanceDate')} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground">Chi phí (VNĐ)</label>
-                    <Input type="number" min={0} placeholder="VD: 500000" {...form.register('cost', { valueAsNumber: true })} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground">Vật tư</label>
-                    <Input placeholder="Vật tư đã sử dụng" {...form.register('materialNote')} />
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -692,10 +692,6 @@ export function MaintenanceManagementPage() {
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Loại bảo trì</p>
-                  <p className="font-medium">{translateType(selectedRecord.maintenanceType)}</p>
-                </div>
-                <div>
                   <p className="text-xs text-muted-foreground mb-1">Ngày thực hiện</p>
                   <p className="font-medium">{new Date(selectedRecord.maintenanceDate).toLocaleDateString('vi-VN')}</p>
                 </div>
@@ -703,23 +699,12 @@ export function MaintenanceManagementPage() {
                   <p className="text-xs text-muted-foreground mb-1">Người thực hiện</p>
                   <p className="font-medium">{selectedRecord.performedByUser?.fullName ?? `#${selectedRecord.performedBy}`}</p>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Chi phí</p>
-                  <p className="font-medium">{selectedRecord.cost ? Number(selectedRecord.cost).toLocaleString('vi-VN') + ' VNĐ' : '--'}</p>
-                </div>
               </div>
 
               <div className="rounded-xl bg-muted/30 p-4 ring-1 ring-inset ring-border">
                 <p className="text-xs font-bold text-foreground mb-2">Nội dung thực hiện</p>
                 <p className="text-sm text-foreground whitespace-pre-wrap">{selectedRecord.content}</p>
               </div>
-
-              {selectedRecord.materialNote && (
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Vật tư</p>
-                  <p className="text-sm font-medium">{selectedRecord.materialNote}</p>
-                </div>
-              )}
 
               {selectedRecord.note && (
                 <div>

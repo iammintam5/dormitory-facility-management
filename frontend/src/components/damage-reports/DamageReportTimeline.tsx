@@ -22,7 +22,7 @@ export function DamageReportTimeline({ logs }: { logs: DamageReportLog[] }) {
             </div>
             <p className="mt-3 text-sm text-foreground">{log.note || 'Không có ghi chú bổ sung.'}</p>
             <p className="mt-2 text-xs text-muted-foreground">
-              Thực hiện bởi {log.createdByUser.fullName} ({log.createdByUser.userCode})
+              Thực hiện bởi {log.createdByUser.fullName}
             </p>
           </div>
         </div>

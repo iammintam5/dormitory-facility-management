@@ -181,6 +181,7 @@ export function RoomStudentsManagementPage() {
   const [activeTab, setActiveTab] = useState<'new' | 'transfer'>('new');
   const [selectedStudent, setSelectedStudent] = useState<RoomStudent | null>(null);
   const [detailStudent, setDetailStudent] = useState<RoomStudent | null>(null);
+  const [isLookingUpStudent, setIsLookingUpStudent] = useState(false);
 
   const form = useForm<StudentRoomFormValues>({
     resolver: zodResolver(studentRoomSchema),
@@ -260,6 +261,36 @@ export function RoomStudentsManagementPage() {
     setIsModalOpen(true);
   };
 
+  const lookupStudentByCode = async () => {
+    const studentCode = form.getValues('studentId').trim().toUpperCase();
+    if (!studentCode) {
+      form.setError('studentId', { message: 'Nhập mã sinh viên trước khi tìm.' });
+      return;
+    }
+
+    setIsLookingUpStudent(true);
+    try {
+      const usersRes = await getUsers({ studentCode, roleCode: 'STUDENT', status: 'ACTIVE', pageSize: 1 });
+      const user = usersRes.items[0];
+      if (!user) {
+        form.setError('studentId', { message: `Không tìm thấy sinh viên mã ${studentCode}.` });
+        return;
+      }
+
+      form.clearErrors('studentId');
+      form.setValue('studentId', user.studentCode || user.username, { shouldValidate: true });
+      form.setValue('fullName', user.fullName, { shouldValidate: true });
+      form.setValue('faculty', user.profile?.faculty ?? '');
+      form.setValue('course', user.profile?.course ?? '');
+      form.setValue('phone', user.phone ?? '');
+      showToast(`Đã tìm thấy sinh viên ${user.fullName}.`, 'success');
+    } catch {
+      showToast('Không thể tìm sinh viên. Vui lòng thử lại.', 'error');
+    } finally {
+      setIsLookingUpStudent(false);
+    }
+  };
+
   const onSubmit = async (data: StudentRoomFormValues) => {
     setIsLoading(true);
     try {
@@ -296,7 +327,7 @@ export function RoomStudentsManagementPage() {
         }
       } else {
         // Thêm sinh viên mới: tìm user theo studentCode rồi gán phòng
-        const usersRes = await getUsers({ studentCode: data.studentId, status: 'ACTIVE' });
+        const usersRes = await getUsers({ studentCode: data.studentId.trim().toUpperCase(), roleCode: 'STUDENT', status: 'ACTIVE', pageSize: 1 });
         const user = usersRes.items[0];
         if (!user) throw new Error(`Không tìm thấy sinh viên với mã "${data.studentId}".`);
         const targetRoom = findTargetRoom(data);
@@ -554,7 +585,7 @@ export function RoomStudentsManagementPage() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        title={selectedStudent ? (activeTab === 'transfer' ? 'Chuyển phòng' : 'Cập nhật thông tin') : 'Thêm sinh viên / Chuyển phòng'}
+        title={selectedStudent ? (activeTab === 'transfer' ? 'Chuyển phòng' : 'Cập nhật thông tin') : 'Thêm sinh viên'}
         size="3xl"
         footer={
           <>
@@ -566,22 +597,6 @@ export function RoomStudentsManagementPage() {
           </>
         }
       >
-        {!selectedStudent && (
-          <div className="flex border-b border-border/50 mb-4 px-2">
-            <button 
-              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'new' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setActiveTab('new')}
-            >
-              Thêm sinh viên mới
-            </button>
-            <button 
-              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'transfer' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setActiveTab('transfer')}
-            >
-              Chuyển phòng cho sinh viên
-            </button>
-          </div>
-        )}
 
         <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-2 pb-4">
           <form id="student-room-form" className="space-y-6">
@@ -599,7 +614,30 @@ export function RoomStudentsManagementPage() {
                           {...form.register('studentId')}
                           placeholder="Nhập mã sinh viên"
                           error={!!form.formState.errors.studentId}
+                          onBlur={() => {
+                            if (!selectedStudent && activeTab === 'new' && form.getValues('studentId').trim()) {
+                              void lookupStudentByCode();
+                            }
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') {
+                              event.preventDefault();
+                              void lookupStudentByCode();
+                            }
+                          }}
+                          className="pr-24"
                         />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => void lookupStudentByCode()}
+                          disabled={isLookingUpStudent || !!selectedStudent}
+                          className="absolute right-1 top-1 h-8 gap-1 px-2"
+                        >
+                          {isLookingUpStudent ? <Spinner size={14} className="animate-spin" /> : <MagnifyingGlass size={14} />}
+                          Tìm
+                        </Button>
                       </div>
                       {form.formState.errors.studentId && (
                         <p className="mt-1 text-xs text-destructive">{form.formState.errors.studentId.message}</p>

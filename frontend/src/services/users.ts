@@ -26,6 +26,7 @@ export type ManagedUser = {
     address: string | null;
     faculty: string | null;
     className: string | null;
+    course: string | null;
     emergencyName: string | null;
     emergencyPhone: string | null;
     notes: string | null;
