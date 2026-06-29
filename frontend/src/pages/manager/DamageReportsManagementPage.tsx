@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useToast } from '../../toast/toast-context';
 
-import { getDamageReports, createDamageReport, acceptDamageReport, rejectDamageReport, cancelReport } from '../../services/damage-reports';
+import { getDamageReports, createDamageReport, reviewDamageReport, approveDamageReport, rejectDamageReport, cancelReport } from '../../services/damage-reports';
 import { getApiErrorMessage } from '../../lib/api-client';
 import { DamageReport, DamageReportPriority } from '../../types/damage-reports';
 import { getBuildings, getRooms, BuildingRecord, RoomRecord } from '../../services/locations';
@@ -185,11 +185,29 @@ export function DamageReportsManagementPage() {
     }
   };
 
-  const handleAction = async (reportId: number, action: 'accept' | 'reject' | 'start' | 'complete' | 'cancel') => {
+  const handleAction = async (reportId: number, action: 'review' | 'approve' | 'reject' | 'cancel') => {
     try {
-      if (action === 'accept') await acceptDamageReport(reportId);
-      if (action === 'reject') await rejectDamageReport(reportId);
-      if (action === 'cancel') await cancelReport(reportId);
+      if (action === 'review') {
+        await reviewDamageReport(reportId);
+      } else if (action === 'approve') {
+        await approveDamageReport(reportId);
+      } else if (action === 'reject') {
+        const reason = window.prompt('Vui lòng nhập lý do từ chối:');
+        if (reason === null) return;
+        if (!reason.trim()) {
+          showToast('Lý do từ chối không được để trống.', 'error');
+          return;
+        }
+        await rejectDamageReport(reportId, reason);
+      } else if (action === 'cancel') {
+        const reason = window.prompt('Vui lòng nhập lý do hủy:');
+        if (reason === null) return;
+        if (!reason.trim()) {
+          showToast('Lý do hủy không được để trống.', 'error');
+          return;
+        }
+        await cancelReport(reportId, reason);
+      }
       showToast('Cập nhật trạng thái thành công', 'success');
       loadReports();
     } catch (error) {
@@ -420,14 +438,19 @@ export function DamageReportsManagementPage() {
                             actions={[
                               { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => setActiveReportDetail(report) },
                               ...(report.status === 'SUBMITTED' ? [
-                                { id: 'accept', label: 'Duyệt', icon: <Check size={16} />, onClick: () => handleAction(report.id, 'accept') },
+                                { id: 'review', label: 'Tiếp nhận xử lý', icon: <Play size={16} />, onClick: () => handleAction(report.id, 'review') },
+                                { id: 'approve', label: 'Duyệt & Sửa ngay', icon: <Check size={16} />, onClick: () => handleAction(report.id, 'approve') },
                                 { id: 'reject', label: 'Từ chối', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'reject') },
                               ] : []),
-                              ...((report.status === 'APPROVED' || report.status === 'REVIEWING') ? [
-                                { id: 'start', label: 'Tạo lệnh bảo trì', icon: <Wrench size={16} />, onClick: () => navigate(`/manager/maintenance/records/new?damageReportId=${report.id}&assetId=${report.assetId}`) },
+                              ...(report.status === 'REVIEWING' ? [
+                                { id: 'approve', label: 'Duyệt & Sửa ngay', icon: <Check size={16} />, onClick: () => handleAction(report.id, 'approve') },
                                 { id: 'reject', label: 'Từ chối', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'reject') },
                               ] : []),
-                              ...(report.status === 'IN_PROGRESS' && report.maintenanceRecords && report.maintenanceRecords.length > 0 ? [
+                              ...(report.status === 'IN_PROGRESS' ? [
+                                { id: 'complete', label: 'Nghiệm thu & Tạo phiếu', icon: <Wrench size={16} />, onClick: () => navigate(`/manager/maintenance/records/new?damageReportId=${report.id}&assetId=${report.assetId}`) },
+                                { id: 'cancel', label: 'Hủy phiếu', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'cancel') },
+                              ] : []),
+                              ...(report.status === 'COMPLETED' && report.maintenanceRecords && report.maintenanceRecords.length > 0 ? [
                                 { id: 'view-maint', label: 'Xem phiếu bảo trì', icon: <ArrowRight size={16} />, onClick: () => navigate(`/manager/maintenance?search=${report.maintenanceRecords![0].maintenanceCode}`) },
                               ] : [])
                             ]}
@@ -451,14 +474,19 @@ export function DamageReportsManagementPage() {
                         actions={[
                           { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => setActiveReportDetail(report) },
                           ...(report.status === 'SUBMITTED' ? [
-                            { id: 'accept', label: 'Duyệt', icon: <Check size={16} />, onClick: () => handleAction(report.id, 'accept') },
+                            { id: 'review', label: 'Tiếp nhận xử lý', icon: <Play size={16} />, onClick: () => handleAction(report.id, 'review') },
+                            { id: 'approve', label: 'Duyệt & Sửa ngay', icon: <Check size={16} />, onClick: () => handleAction(report.id, 'approve') },
                             { id: 'reject', label: 'Từ chối', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'reject') },
                           ] : []),
-                          ...((report.status === 'APPROVED' || report.status === 'REVIEWING') ? [
-                            { id: 'start', label: 'Tạo lệnh bảo trì', icon: <Wrench size={16} />, onClick: () => navigate(`/manager/maintenance/records/new?damageReportId=${report.id}&assetId=${report.assetId}`) },
+                          ...(report.status === 'REVIEWING' ? [
+                            { id: 'approve', label: 'Duyệt & Sửa ngay', icon: <Check size={16} />, onClick: () => handleAction(report.id, 'approve') },
                             { id: 'reject', label: 'Từ chối', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'reject') },
                           ] : []),
-                          ...(report.status === 'IN_PROGRESS' && report.maintenanceRecords && report.maintenanceRecords.length > 0 ? [
+                          ...(report.status === 'IN_PROGRESS' ? [
+                            { id: 'complete', label: 'Nghiệm thu & Tạo phiếu', icon: <Wrench size={16} />, onClick: () => navigate(`/manager/maintenance/records/new?damageReportId=${report.id}&assetId=${report.assetId}`) },
+                            { id: 'cancel', label: 'Hủy phiếu', icon: <X size={16} />, variant: 'destructive' as const, onClick: () => handleAction(report.id, 'cancel') },
+                          ] : []),
+                          ...(report.status === 'COMPLETED' && report.maintenanceRecords && report.maintenanceRecords.length > 0 ? [
                             { id: 'view-maint', label: 'Xem phiếu bảo trì', icon: <ArrowRight size={16} />, onClick: () => navigate(`/manager/maintenance?search=${report.maintenanceRecords![0].maintenanceCode}`) },
                           ] : [])
                         ]}
@@ -627,13 +655,22 @@ export function DamageReportsManagementPage() {
                 {activeReportDetail.status === 'SUBMITTED' && (
                   <>
                     <Button variant="destructive" onClick={() => { handleAction(activeReportDetail.id, 'reject'); setActiveReportDetail(null); }}>Từ chối</Button>
-                    <Button onClick={() => { handleAction(activeReportDetail.id, 'accept'); setActiveReportDetail(null); }}>Duyệt phiếu</Button>
+                    <Button onClick={() => { handleAction(activeReportDetail.id, 'review'); setActiveReportDetail(null); }}>Tiếp nhận xử lý</Button>
+                  </>
+                )}
+                {activeReportDetail.status === 'REVIEWING' && (
+                  <>
+                    <Button variant="destructive" onClick={() => { handleAction(activeReportDetail.id, 'reject'); setActiveReportDetail(null); }}>Từ chối</Button>
+                    <Button onClick={() => { handleAction(activeReportDetail.id, 'approve'); setActiveReportDetail(null); }}>Duyệt phiếu</Button>
                   </>
                 )}
                 {activeReportDetail.status === 'APPROVED' && (
-                  <Button className="bg-amber-600 hover:bg-amber-500" onClick={() => navigate(`/manager/maintenance/records/new?damageReportId=${activeReportDetail.id}&assetId=${activeReportDetail.assetId}`)}>
-                    Tạo Phiếu bảo trì
-                  </Button>
+                  <>
+                    <Button variant="destructive" onClick={() => { handleAction(activeReportDetail.id, 'cancel'); setActiveReportDetail(null); }}>Hủy phiếu</Button>
+                    <Button className="bg-amber-600 hover:bg-amber-500" onClick={() => navigate(`/manager/maintenance/records/new?damageReportId=${activeReportDetail.id}&assetId=${activeReportDetail.assetId}`)}>
+                      Tạo Phiếu bảo trì
+                    </Button>
+                  </>
                 )}
                 {activeReportDetail.status === 'IN_PROGRESS' && activeReportDetail.maintenanceRecords && activeReportDetail.maintenanceRecords.length > 0 && (
                   <Button className="bg-sky-600 hover:bg-sky-500" onClick={() => navigate(`/manager/maintenance?search=${activeReportDetail.maintenanceRecords![0].maintenanceCode}`)}>

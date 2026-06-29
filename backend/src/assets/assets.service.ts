@@ -233,6 +233,10 @@ export class AssetsService {
     });
     if (!existing) throw new NotFoundException('Asset not found');
 
+    if (existing.status === AssetStatus.DAMAGED || existing.status === AssetStatus.UNDER_MAINTENANCE || existing.status === AssetStatus.PENDING_LIQUIDATION) {
+      throw new ConflictException(`Không thể xóa tài sản đang ở trạng thái ${existing.status}.`);
+    }
+
     // If asset has business history, prevent deletion entirely
     // Asset must go through the liquidation workflow instead
     const hasHistory =

@@ -90,6 +90,11 @@ enum LiquidationSourceType {
   MAINTENANCE
 }
 
+enum MaintenanceReturnMode {
+  PREVIOUS_ROOM
+  WAREHOUSE
+}
+
 // ===========================
 // AUTH & USERS
 // ===========================
@@ -259,13 +264,13 @@ model Asset {
   checkedByUserId Int?
   checkedByUser   User? @relation("AssetCheckedByUser", fields: [checkedByUserId], references: [id])
 
-  assetHistories      AssetHistory[]
-  damageReports       DamageReport[]
-  maintenancePlans    MaintenancePlan[]
-  maintenanceRecords  MaintenanceRecord[]
-  liquidationItems    LiquidationItem[]
-  receiptItems        AssetReceiptItem[]
-  normalizedSearch    NormalizedSearch?
+  assetHistories     AssetHistory[]
+  damageReports      DamageReport[]
+  maintenancePlans   MaintenancePlan[]
+  maintenanceRecords MaintenanceRecord[]
+  liquidationItems   LiquidationItem[]
+  receiptItems       AssetReceiptItem[]
+  normalizedSearch   NormalizedSearch?
 
   @@index([status, roomId], map: "idx_assets_status_room_id")
   @@map("assets")
@@ -298,14 +303,25 @@ model AssetHistory {
 // ===========================
 
 model DamageReport {
-  id          Int                  @id @default(autoincrement())
-  reportCode  String               @unique
-  description String
-  location    String?
-  priority    DamageReportPriority @default(MEDIUM)
-  status      DamageReportStatus   @default(SUBMITTED)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  id            Int                  @id @default(autoincrement())
+  reportCode    String               @unique
+  description   String
+  location      String?
+  priority      DamageReportPriority @default(MEDIUM)
+  status        DamageReportStatus   @default(SUBMITTED)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  reviewedAt    DateTime?
+  reviewedById  Int?
+  approvedAt    DateTime?
+  approvedById  Int?
+  rejectedAt    DateTime?
+  rejectedById  Int?
+  rejectReason  String?
+  cancelledAt   DateTime?
+  cancelledById Int?
+  cancelReason  String?
+  resolvedAt    DateTime?
 
   reporterId Int
   reporter   User @relation("Reporter", fields: [reporterId], references: [id])
@@ -367,7 +383,7 @@ model MaintenanceRecord {
   id                  Int                      @id @default(autoincrement())
   maintenanceCode     String                   @unique
   maintenanceDate     DateTime
-  status              MaintenanceOrderStatus   @default(IN_PROGRESS)
+  status              MaintenanceOrderStatus   @default(PENDING)
   maintenanceType     MaintenanceType
   content             String
   resultStatus        MaintenanceResultStatus?
@@ -379,9 +395,17 @@ model MaintenanceRecord {
   note                String?
   createdAt           DateTime                 @default(now())
   updatedAt           DateTime                 @updatedAt
+  startedAt           DateTime?
+  startedById         Int?
+  completedAt         DateTime?
+  completedById       Int?
+  cancelledAt         DateTime?
+  cancelledById       Int?
+  cancelReason        String?
+  returnMode          MaintenanceReturnMode?
 
-  damageReportId  Int?
-  damageReport    DamageReport?       @relation(fields: [damageReportId], references: [id])
+  damageReportId Int?
+  damageReport   DamageReport? @relation(fields: [damageReportId], references: [id])
 
   planId Int?
   plan   MaintenancePlan? @relation(fields: [planId], references: [id])
@@ -451,7 +475,6 @@ model CouncilMember {
   liquidationRecord   LiquidationRecord @relation(fields: [liquidationRecordId], references: [id], onDelete: Cascade)
 
   @@unique([liquidationRecordId, userId])
-
   @@map("council_members")
 }
 

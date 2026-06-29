@@ -43,6 +43,7 @@ export async function updateMaintenanceRecord(id: number, payload: {
 
 export async function completeMaintenanceRecord(id: number, payload: {
   resultStatus: string;
+  returnMode?: string;
   content?: string;
   nextMaintenanceDate?: string;
   cost?: number;
@@ -79,4 +80,28 @@ export async function getMaintenanceDashboard() {
 export async function getMaintenanceHistory(assetId: number) {
   const response = await apiClient.get(`/maintenance/history/${assetId}`);
   return unwrapApiResponse<MaintenanceRecord[]>(response.data);
+}
+
+export async function startMaintenanceRecord(id: number) {
+  const response = await apiClient.patch(`/maintenance/records/${id}/start`);
+  return unwrapApiResponse<MaintenanceRecord>(response.data);
+}
+
+export async function cancelMaintenanceRecord(id: number, payload?: { reason?: string }) {
+  const response = await apiClient.patch(`/maintenance/records/${id}/cancel`, payload);
+  return unwrapApiResponse<MaintenanceRecord>(response.data);
+}
+
+export async function createDirectCompletedRecord(payload: {
+  damageReportId: number;
+  performedBy?: number;
+  maintenanceDate?: string;
+  content: string;
+  resultStatus: string;
+  cost?: number;
+  materialNote?: string;
+  note?: string;
+}) {
+  const response = await apiClient.post('/maintenance/records/complete-direct', payload);
+  return unwrapApiResponse<MaintenanceRecord>(response.data);
 }

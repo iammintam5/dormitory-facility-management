@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException, ConflictException }
 import { PrismaService } from '../prisma/prisma.service';
 import { generateCode } from '../common/utils/code-generator';
 import { AssetTransitionService } from '../assets/asset-transition.service';
-import { AssetStatus, MaintenanceType, MaintenanceResultStatus, MaintenanceOrderStatus, DamageReportStatus } from '@prisma/client';
+import { AssetStatus, MaintenanceType, MaintenanceResultStatus, MaintenanceOrderStatus, DamageReportStatus, MaintenanceReturnMode, LiquidationStatus } from '@prisma/client';
 
 @Injectable()
 export class MaintenanceService {
@@ -123,10 +123,15 @@ export class MaintenanceService {
     const record = await this.prisma.$transaction(async (tx) => {
       const asset = await tx.asset.findUnique({ where: { id: body.assetId } });
       if (!asset) throw new NotFoundException('Tài sản không tồn tại');
+
+      // Validate operation based on current asset status
+      this.assetTransitionService.validateOperation(asset.status, 'MAINTENANCE');
+
       if (asset.status === AssetStatus.LIQUIDATED) {
         throw new BadRequestException('Không thể bảo trì tài sản đã thanh lý');
       }
 
+      // Check if asset already has an active maintenance record
       const activeMaintenance = await tx.maintenanceRecord.findFirst({
         where: { assetId: body.assetId, status: { in: ['PENDING', 'IN_PROGRESS'] } }
       });
@@ -134,18 +139,24 @@ export class MaintenanceService {
         throw new ConflictException('Tài sản này đang có lệnh bảo trì chưa hoàn tất');
       }
 
-      let expectedReportStatus: DamageReportStatus | undefined;
       if (body.damageReportId) {
         const dr = await tx.damageReport.findUnique({ where: { id: body.damageReportId } });
         if (!dr) throw new NotFoundException('Phiếu báo hỏng không tồn tại');
         if (dr.assetId !== body.assetId) throw new BadRequestException('Tài sản không khớp với phiếu báo hỏng');
-        if (dr.status === 'REJECTED' || dr.status === 'CANCELLED' || dr.status === 'COMPLETED') {
-          throw new BadRequestException(`Không thể tạo lệnh bảo trì từ báo hỏng trạng thái ${dr.status}`);
+        
+        // Only allow creation from APPROVED damage reports
+        if (dr.status !== 'APPROVED') {
+          throw new BadRequestException(`Chỉ phiếu báo hỏng đã được duyệt (APPROVED) mới được lập lệnh sửa chữa. Trạng thái hiện tại: ${dr.status}`);
         }
-        expectedReportStatus = dr.status;
+
+        // Only one active maintenance per damage report
+        const activeReportMaintenance = await tx.maintenanceRecord.findFirst({
+          where: { damageReportId: body.damageReportId, status: { in: ['PENDING', 'IN_PROGRESS'] } }
+        });
+        if (activeReportMaintenance) {
+          throw new ConflictException('Phiếu báo hỏng này đã có lệnh bảo trì đang hoạt động.');
+        }
       }
-
-
 
       const rec = await tx.maintenanceRecord.create({
         data: {
@@ -153,10 +164,10 @@ export class MaintenanceService {
           assetId: body.assetId,
           performedBy: userId,
           maintenanceDate: new Date(body.maintenanceDate),
-          status: MaintenanceOrderStatus.IN_PROGRESS,
+          status: MaintenanceOrderStatus.PENDING,
           maintenanceType: body.maintenanceType,
           content: body.content,
-          resultStatus: body.resultStatus ?? null,
+          resultStatus: null, // Always null on creation
           previousAssetStatus: asset.status,
           previousRoomId: asset.roomId,
           planId: body.planId ?? null,
@@ -175,42 +186,231 @@ export class MaintenanceService {
         },
       });
 
-      if (body.damageReportId && expectedReportStatus) {
-        const updateResult = await tx.damageReport.updateMany({
-          where: { id: body.damageReportId, status: expectedReportStatus },
+      return rec;
+    }, { timeout: 30000 });
+
+    return this.mapRecord(record);
+  }
+
+  async createDirectCompletedRecord(
+    userId: number,
+    body: {
+      damageReportId: number;
+      performedBy?: number;
+      maintenanceDate?: string;
+      content: string;
+      resultStatus: MaintenanceResultStatus;
+      cost?: number;
+      materialNote?: string;
+      note?: string;
+    }
+  ) {
+    const code = generateCode('BT-');
+
+    const record = await this.prisma.$transaction(async (tx) => {
+      // 1. Fetch the damage report and its asset
+      const dr = await tx.damageReport.findUnique({
+        where: { id: body.damageReportId },
+        include: { asset: true }
+      });
+      if (!dr) throw new NotFoundException('Phiếu báo hỏng không tồn tại');
+      
+      // The damage report must be IN_PROGRESS (meaning it has been approved and is currently under repair)
+      if (dr.status !== 'IN_PROGRESS') {
+        throw new BadRequestException(`Phiếu báo hỏng phải ở trạng thái đang sửa (IN_PROGRESS) mới có thể nghiệm thu. Trạng thái hiện tại: ${dr.status}`);
+      }
+
+      const asset = dr.asset;
+      if (!asset) throw new NotFoundException('Tài sản của phiếu báo hỏng không tồn tại');
+
+      // 2. Determine Performer
+      const performerId = body.performedBy ?? userId;
+
+      // 3. Create the MaintenanceRecord directly in COMPLETED status
+      const rec = await tx.maintenanceRecord.create({
+        data: {
+          maintenanceCode: code,
+          assetId: asset.id,
+          performedBy: performerId,
+          maintenanceDate: body.maintenanceDate ? new Date(body.maintenanceDate) : new Date(),
+          status: MaintenanceOrderStatus.COMPLETED,
+          maintenanceType: 'AD_HOC',
+          content: body.content,
+          resultStatus: body.resultStatus,
+          previousAssetStatus: 'IN_USE',
+          previousRoomId: dr.roomId,
+          damageReportId: dr.id,
+          cost: body.cost ?? null,
+          materialNote: body.materialNote ?? null,
+          note: body.note ?? null,
+          completedAt: new Date(),
+          completedById: userId,
+          startedAt: new Date(),
+          startedById: userId,
+        },
+        include: {
+          asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
+          plan: true,
+          performer: true,
+          damageReport: true,
+        }
+      });
+
+      // 4. Update the DamageReport to COMPLETED
+      await tx.damageReport.update({
+        where: { id: dr.id },
+        data: {
+          status: 'COMPLETED',
+          resolvedAt: new Date(),
+          damageReportLogs: {
+            create: {
+              action: 'Nghiệm thu bảo trì',
+              oldStatus: 'IN_PROGRESS',
+              newStatus: 'COMPLETED',
+              note: `Đã hoàn tất sửa chữa. Kết quả: ${body.resultStatus === 'GOOD' ? 'Tốt' : 'Đề nghị thanh lý'}. Chi phí: ${body.cost ?? 0} VNĐ.`,
+              createdByUserId: userId,
+            }
+          }
+        }
+      });
+
+      // 5. Update Asset status and room based on resultStatus
+      let nextStatus: AssetStatus;
+      let nextRoomId: number | null = null;
+
+      if (body.resultStatus === MaintenanceResultStatus.GOOD) {
+        // Default to PREVIOUS_ROOM
+        // Verify room still exists
+        const room = await tx.room.findUnique({ where: { id: dr.roomId } });
+        if (!room) {
+          // If the room was deleted, default to warehouse
+          nextStatus = AssetStatus.AVAILABLE;
+          nextRoomId = null;
+        } else {
+          nextStatus = AssetStatus.IN_USE;
+          nextRoomId = dr.roomId;
+        }
+      } else {
+        // RECOMMEND_LIQUIDATION
+        nextStatus = AssetStatus.PENDING_LIQUIDATION;
+        nextRoomId = null;
+      }
+
+      await this.assetTransitionService.transition(tx, asset.id, nextStatus, {
+        action: 'HOÀN_TẤT_BẢO_TRÌ',
+        userId,
+        newRoomId: nextRoomId,
+        note: `Hoàn tất sửa chữa từ phiếu báo hỏng #${dr.reportCode}. Kết quả: ${body.resultStatus}.`,
+      });
+
+      // 6. If RECOMMEND_LIQUIDATION, automatically create a DRAFT Liquidation record
+      if (body.resultStatus === MaintenanceResultStatus.RECOMMEND_LIQUIDATION) {
+        const liqCode = generateCode('TL-');
+        await tx.liquidationRecord.create({
+          data: {
+            liquidationCode: liqCode,
+            liquidationDate: new Date(),
+            status: LiquidationStatus.DRAFT,
+            note: `Tự động tạo từ phiếu bảo trì hoàn tất bảo trì hỏng nặng của thiết bị ${asset.assetCode}`,
+            sourceType: 'MAINTENANCE',
+            sourceMaintenanceRecordId: rec.id,
+            createdBy: userId,
+            liquidationItems: {
+              create: {
+                assetId: asset.id,
+                assetCondition: 'Hỏng nặng không thể sửa chữa',
+                reason: `Đề nghị thanh lý sau khi bảo trì không thành công từ phiếu báo hỏng #${dr.reportCode}`,
+                estimatedRemainingValue: 0,
+              }
+            }
+          }
+        });
+      }
+
+      return rec;
+    }, { timeout: 30000 });
+
+    return this.mapRecord(record);
+  }
+
+  async startRecord(id: number, userId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const record = await tx.maintenanceRecord.findUnique({
+        where: { id },
+        include: { asset: true, damageReport: true }
+      });
+
+      if (!record) {
+        throw new NotFoundException('Phiếu sửa chữa không tồn tại.');
+      }
+
+      if (record.status !== MaintenanceOrderStatus.PENDING) {
+        throw new BadRequestException('Phiếu sửa chữa phải ở trạng thái PENDING trước khi bắt đầu.');
+      }
+
+      const asset = record.asset;
+      if (record.damageReportId) {
+        const dr = record.damageReport;
+        if (!dr) throw new NotFoundException('Phiếu báo hỏng không tồn tại');
+        if (dr.status !== 'APPROVED') {
+          throw new BadRequestException('Phiếu báo hỏng phải ở trạng thái APPROVED mới được bắt đầu sửa chữa.');
+        }
+        if (asset.status !== AssetStatus.DAMAGED) {
+          throw new BadRequestException('Thiết bị phải ở trạng thái DAMAGED mới được bắt đầu sửa chữa.');
+        }
+      }
+
+      // Transition asset to UNDER_MAINTENANCE and set roomId to null
+      await this.assetTransitionService.transition(tx, record.assetId, AssetStatus.UNDER_MAINTENANCE, {
+        action: 'BẮT_ĐẦU_BẢO_TRÌ',
+        userId,
+        newRoomId: null,
+        note: `Bắt đầu sửa chữa cho lệnh ${record.maintenanceCode}`,
+      });
+
+      // Update DamageReport if exists
+      if (record.damageReportId) {
+        const updateDr = await tx.damageReport.updateMany({
+          where: { id: record.damageReportId, status: 'APPROVED' },
           data: { status: 'IN_PROGRESS', updatedAt: new Date() }
         });
-        if (updateResult.count === 0) {
-          throw new ConflictException('Phiếu báo hỏng đã bị thay đổi bởi giao dịch khác');
+        if (updateDr.count === 0) {
+          throw new ConflictException('Trạng thái báo hỏng đã thay đổi.');
         }
+
         await tx.damageReportLog.create({
           data: {
-            damageReportId: body.damageReportId,
+            damageReportId: record.damageReportId,
             action: 'Bắt đầu sửa chữa',
-            oldStatus: expectedReportStatus,
+            oldStatus: 'APPROVED',
             newStatus: 'IN_PROGRESS',
-            note: `Đã tạo lệnh bảo trì: ${code}`,
+            note: `Bắt đầu sửa chữa theo lệnh ${record.maintenanceCode}`,
             createdByUserId: userId
           }
         });
       }
 
+      // Update MaintenanceRecord
+      const updated = await tx.maintenanceRecord.update({
+        where: { id },
+        data: {
+          status: MaintenanceOrderStatus.IN_PROGRESS,
+          startedAt: new Date(),
+          startedById: userId,
+          previousAssetStatus: asset.status,
+          previousRoomId: asset.roomId,
+          updatedAt: new Date()
+        },
+        include: {
+          asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
+          plan: true,
+          performer: true,
+          damageReport: true,
+        }
+      });
 
-
-      if (asset.status !== AssetStatus.UNDER_MAINTENANCE) {
-        await this.assetTransitionService.transition(tx, body.assetId, AssetStatus.UNDER_MAINTENANCE, {
-          action: 'BẮT_ĐẦU_BẢO_TRÌ',
-          userId,
-          note: `Lệnh bảo trì: ${code}`,
-          sourceTable: 'maintenance_records',
-          sourceId: rec.id
-        });
-      }
-
-      return rec;
-    });
-
-    return this.mapRecord(record);
+      return updated;
+    }, { timeout: 30000 }).then((record) => this.mapRecord(record));
   }
 
   async completeRecord(
@@ -223,6 +423,7 @@ export class MaintenanceService {
       cost?: number;
       materialNote?: string;
       note?: string;
+      returnMode?: MaintenanceReturnMode;
     }
   ) {
     const recordUpdate = await this.prisma.$transaction(async (tx) => {
@@ -231,13 +432,21 @@ export class MaintenanceService {
         include: { asset: true }
       });
       if (!record) throw new NotFoundException('Maintenance record not found');
-      if (record.status !== 'IN_PROGRESS') {
-        throw new BadRequestException('Chỉ có thể hoàn tất lệnh bảo trì đang IN_PROGRESS');
+      if (record.status !== MaintenanceOrderStatus.IN_PROGRESS) {
+        throw new BadRequestException('Phiếu sửa chữa phải ở trạng thái IN_PROGRESS trước khi hoàn tất.');
+      }
+
+      let returnMode = body.returnMode;
+      if (body.resultStatus === MaintenanceResultStatus.GOOD && !returnMode) {
+        returnMode = MaintenanceReturnMode.PREVIOUS_ROOM;
       }
 
       const updateData: any = {
         status: MaintenanceOrderStatus.COMPLETED,
         resultStatus: body.resultStatus,
+        returnMode: returnMode ?? null,
+        completedAt: new Date(),
+        completedById: userId,
         updatedAt: new Date()
       };
       if (body.content !== undefined) updateData.content = body.content;
@@ -246,6 +455,43 @@ export class MaintenanceService {
       if (body.materialNote !== undefined) updateData.materialNote = body.materialNote;
       if (body.note !== undefined) updateData.note = body.note;
 
+      // Check asset state transitions
+      let nextStatus: AssetStatus;
+      let nextRoomId: number | null = null;
+
+      if (body.resultStatus === MaintenanceResultStatus.GOOD) {
+        if (returnMode === MaintenanceReturnMode.PREVIOUS_ROOM) {
+          if (!record.previousRoomId) {
+            throw new BadRequestException('Không tìm thấy thông tin phòng cũ của thiết bị.');
+          }
+          // Verify room still exists and is not deleted
+          const room = await tx.room.findUnique({ where: { id: record.previousRoomId } });
+          if (!room) {
+            throw new BadRequestException('Phòng cũ không hợp lệ hoặc đã bị xóa. Vui lòng chọn đưa về kho.');
+          }
+          nextStatus = AssetStatus.IN_USE;
+          nextRoomId = record.previousRoomId;
+        } else {
+          nextStatus = AssetStatus.AVAILABLE;
+          nextRoomId = null;
+        }
+      } else {
+        // RECOMMEND_LIQUIDATION
+        nextStatus = AssetStatus.PENDING_LIQUIDATION;
+        nextRoomId = null;
+      }
+
+      // Transition the asset
+      await this.assetTransitionService.transition(tx, record.assetId, nextStatus, {
+        action: 'HOÀN_TẤT_BẢO_TRÌ',
+        userId,
+        newRoomId: nextRoomId,
+        note: `Kết quả: ${body.resultStatus}`,
+        sourceTable: 'maintenance_records',
+        sourceId: record.id
+      });
+
+      // Update the MaintenanceRecord itself
       const updatedRec = await tx.maintenanceRecord.update({
         where: { id },
         data: updateData,
@@ -257,23 +503,7 @@ export class MaintenanceService {
         },
       });
 
-      let nextStatus: AssetStatus | null = null;
-      if (body.resultStatus === 'RECOMMEND_LIQUIDATION') {
-        nextStatus = AssetStatus.DAMAGED;
-      } else if (body.resultStatus === 'GOOD') {
-        nextStatus = record.previousAssetStatus ?? AssetStatus.IN_USE;
-      }
-
-      if (nextStatus && nextStatus !== record.asset.status) {
-        await this.assetTransitionService.transition(tx, record.assetId, nextStatus, {
-          action: 'HOÀN_TẤT_BẢO_TRÌ',
-          userId,
-          note: `Kết quả: ${body.resultStatus}`,
-          sourceTable: 'maintenance_records',
-          sourceId: record.id
-        });
-      }
-
+      // Update linked DamageReport status to COMPLETED
       if (record.damageReportId) {
         const dr = await tx.damageReport.findUnique({ where: { id: record.damageReportId } });
         if (dr && dr.status === 'IN_PROGRESS') {
@@ -294,19 +524,25 @@ export class MaintenanceService {
         }
       }
 
-
-
-      if (body.resultStatus === 'RECOMMEND_LIQUIDATION') {
+      // Handle RECOMMEND_LIQUIDATION
+      if (body.resultStatus === MaintenanceResultStatus.RECOMMEND_LIQUIDATION) {
+        // Check duplicate active liquidation
         const activeLiq = await tx.liquidationItem.findFirst({
-          where: { assetId: record.assetId, liquidationRecord: { status: { in: ['DRAFT', 'PENDING_APPROVAL'] } } }
+          where: {
+            assetId: record.assetId,
+            liquidationRecord: {
+              status: { in: [LiquidationStatus.DRAFT, LiquidationStatus.PENDING_APPROVAL, LiquidationStatus.APPROVED] }
+            }
+          }
         });
+
         if (!activeLiq) {
           const liqCode = generateCode('TL-');
           await tx.liquidationRecord.create({
             data: {
               liquidationCode: liqCode,
               liquidationDate: new Date(),
-              status: 'DRAFT',
+              status: LiquidationStatus.DRAFT,
               sourceType: 'MAINTENANCE',
               sourceMaintenanceRecordId: record.id,
               note: `Đề xuất thanh lý từ Lệnh bảo trì ${record.maintenanceCode}`,
@@ -320,11 +556,140 @@ export class MaintenanceService {
               }
             }
           });
+        } else {
+          throw new ConflictException('Thiết bị đã có hồ sơ thanh lý đang hoạt động.');
         }
       }
 
       return updatedRec;
-    });
+    }, { timeout: 30000 });
+    return this.mapRecord(recordUpdate);
+  }
+
+  async cancelRecord(
+    id: number,
+    userId: number,
+    body: {
+      reason: string;
+      nextAssetStatus: 'DAMAGED' | 'PENDING_LIQUIDATION';
+    }
+  ) {
+    if (!body.reason) {
+      throw new BadRequestException('Bắt buộc nhập lý do hủy.');
+    }
+    if (!body.nextAssetStatus || !['DAMAGED', 'PENDING_LIQUIDATION'].includes(body.nextAssetStatus)) {
+      throw new BadRequestException('Trạng thái tài sản tiếp theo không hợp lệ.');
+    }
+
+    const recordUpdate = await this.prisma.$transaction(async (tx) => {
+      const record = await tx.maintenanceRecord.findUnique({
+        where: { id },
+        include: { asset: true }
+      });
+      if (!record) throw new NotFoundException('Maintenance record not found');
+
+      if (record.status === MaintenanceOrderStatus.COMPLETED || record.status === MaintenanceOrderStatus.CANCELLED) {
+        throw new BadRequestException('Không thể hủy phiếu bảo trì đã hoàn tất hoặc đã hủy');
+      }
+
+      const isPending = record.status === MaintenanceOrderStatus.PENDING;
+
+      let targetAssetStatus: AssetStatus;
+      let targetReportStatus: DamageReportStatus | null = null;
+
+      if (isPending) {
+        targetAssetStatus = AssetStatus.DAMAGED;
+      } else {
+        if (body.nextAssetStatus === 'DAMAGED') {
+          targetAssetStatus = AssetStatus.DAMAGED;
+          targetReportStatus = 'APPROVED';
+        } else {
+          targetAssetStatus = AssetStatus.PENDING_LIQUIDATION;
+          targetReportStatus = 'COMPLETED';
+        }
+      }
+
+      if (record.asset.status !== targetAssetStatus) {
+        await this.assetTransitionService.transition(tx, record.assetId, targetAssetStatus, {
+          action: 'HỦY_BẢO_TRÌ',
+          userId,
+          newRoomId: null,
+          note: `Hủy lệnh bảo trì: ${body.reason}`,
+          sourceTable: 'maintenance_records',
+          sourceId: record.id
+        });
+      }
+
+      if (record.damageReportId && targetReportStatus) {
+        await tx.damageReport.updateMany({
+          where: { id: record.damageReportId },
+          data: { status: targetReportStatus, updatedAt: new Date() }
+        });
+        await tx.damageReportLog.create({
+          data: {
+            damageReportId: record.damageReportId,
+            action: 'Hủy sửa chữa',
+            oldStatus: 'IN_PROGRESS',
+            newStatus: targetReportStatus,
+            note: `Hủy lệnh bảo trì. Lý do: ${body.reason}`,
+            createdByUserId: userId
+          }
+        });
+      }
+
+      if (targetAssetStatus === AssetStatus.PENDING_LIQUIDATION) {
+        const activeLiq = await tx.liquidationItem.findFirst({
+          where: {
+            assetId: record.assetId,
+            liquidationRecord: {
+              status: { in: [LiquidationStatus.DRAFT, LiquidationStatus.PENDING_APPROVAL, LiquidationStatus.APPROVED] }
+            }
+          }
+        });
+
+        if (!activeLiq) {
+          const liqCode = generateCode('TL-');
+          await tx.liquidationRecord.create({
+            data: {
+              liquidationCode: liqCode,
+              liquidationDate: new Date(),
+              status: LiquidationStatus.DRAFT,
+              sourceType: 'MAINTENANCE',
+              sourceMaintenanceRecordId: record.id,
+              note: `Đề xuất thanh lý từ hủy Lệnh bảo trì ${record.maintenanceCode}`,
+              createdBy: userId,
+              liquidationItems: {
+                create: {
+                  assetId: record.assetId,
+                  assetCondition: 'Hỏng không sửa được - hủy sửa chữa',
+                  reason: body.reason,
+                }
+              }
+            }
+          });
+        }
+      }
+
+      const updated = await tx.maintenanceRecord.update({
+        where: { id },
+        data: {
+          status: MaintenanceOrderStatus.CANCELLED,
+          cancelledAt: new Date(),
+          cancelledById: userId,
+          cancelReason: body.reason,
+          updatedAt: new Date()
+        },
+        include: {
+          asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
+          plan: true,
+          performer: true,
+          damageReport: true,
+        }
+      });
+
+      return updated;
+    }, { timeout: 30000 });
+
     return this.mapRecord(recordUpdate);
   }
 

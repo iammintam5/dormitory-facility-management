@@ -53,15 +53,25 @@ export class DamageReportsController {
   }
 
   @Roles('MANAGER')
-  @Post(':id/accept')
-  async accept(@Param('id') id: string, @CurrentUser('sub') userId: number) {
-    return this.service.transition(parseInt(id, 10), 'accept', userId);
+  @Patch(':id/review')
+  async review(@Param('id') id: string, @CurrentUser('sub') userId: number) {
+    return this.service.transition(parseInt(id, 10), 'review', userId, { role: 'MANAGER' });
   }
 
   @Roles('MANAGER')
-  @Post(':id/reject')
-  async reject(@Param('id') id: string, @CurrentUser('sub') userId: number) {
-    return this.service.transition(parseInt(id, 10), 'reject', userId);
+  @Patch(':id/approve')
+  async approve(@Param('id') id: string, @CurrentUser('sub') userId: number) {
+    return this.service.transition(parseInt(id, 10), 'approve', userId, { role: 'MANAGER' });
+  }
+
+  @Roles('MANAGER')
+  @Patch(':id/reject')
+  async reject(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: number,
+    @Body() body: { reason: string },
+  ) {
+    return this.service.transition(parseInt(id, 10), 'reject', userId, { reason: body.reason, role: 'MANAGER' });
   }
 
   @Roles('STUDENT')
@@ -79,9 +89,14 @@ export class DamageReportsController {
     return this.service.update(parseInt(id, 10), userId, body);
   }
 
-  @Roles('STUDENT')
-  @Post(':id/cancel')
-  async cancel(@Param('id') id: string, @CurrentUser('sub') userId: number) {
-    return this.service.transition(parseInt(id, 10), 'cancel', userId);
+  @Roles('MANAGER', 'STUDENT')
+  @Patch(':id/cancel')
+  async cancel(
+    @Param('id') id: string,
+    @CurrentUser('sub') userId: number,
+    @CurrentUser('role') role: string,
+    @Body() body?: { reason?: string },
+  ) {
+    return this.service.transition(parseInt(id, 10), 'cancel', userId, { reason: body?.reason, role });
   }
 }

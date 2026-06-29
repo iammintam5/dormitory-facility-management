@@ -41,17 +41,22 @@ export async function createDamageReport(payload: {
   return unwrapApiResponse<DamageReport>(response.data);
 }
 
-export async function acceptDamageReport(id: string | number) {
-  const response = await apiClient.post(`/damage-reports/${id}/accept`);
+export async function reviewDamageReport(id: string | number) {
+  const response = await apiClient.patch(`/damage-reports/${id}/review`);
   return unwrapApiResponse<DamageReport>(response.data);
 }
 
-export async function rejectDamageReport(id: string | number) {
-  const response = await apiClient.post(`/damage-reports/${id}/reject`);
+export async function approveDamageReport(id: string | number) {
+  const response = await apiClient.patch(`/damage-reports/${id}/approve`);
   return unwrapApiResponse<DamageReport>(response.data);
 }
 
-export async function cancelReport(id: string | number) {
-  const response = await apiClient.post(`/damage-reports/${id}/cancel`);
+export async function rejectDamageReport(id: string | number, reason?: string) {
+  const response = await apiClient.patch(`/damage-reports/${id}/reject`, { reason });
+  return unwrapApiResponse<DamageReport>(response.data);
+}
+
+export async function cancelReport(id: string | number, reason?: string) {
+  const response = await apiClient.patch(`/damage-reports/${id}/cancel`, { reason });
   return unwrapApiResponse<DamageReport>(response.data);
 }

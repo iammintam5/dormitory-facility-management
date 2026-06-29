@@ -6,18 +6,20 @@ import { AssetTransitionService } from '../assets/asset-transition.service';
 import { AssetStatus } from '@prisma/client';
 
 const WORKFLOW_MAP: Record<string, { newStatus: string; action: string }> = {
-  accept: { newStatus: 'APPROVED', action: 'Tiếp nhận' },
+  review: { newStatus: 'REVIEWING', action: 'Tiếp nhận' },
+  approve: { newStatus: 'IN_PROGRESS', action: 'Duyệt' },
   reject: { newStatus: 'REJECTED', action: 'Từ chối' },
   cancel: { newStatus: 'CANCELLED', action: 'Hủy phiếu' },
 };
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  SUBMITTED: ['accept', 'reject', 'cancel'],
-  REVIEWING: ['reject'],
-  APPROVED: ['reject'],
-  IN_PROGRESS: [],
+  SUBMITTED: ['review', 'approve', 'reject', 'cancel'],
+  REVIEWING: ['approve', 'reject'],
+  APPROVED: ['cancel'],
+  IN_PROGRESS: ['cancel'],
   REJECTED: [],
   COMPLETED: [],
+  CANCELLED: [],
 };
 
 @Injectable()
@@ -206,12 +208,14 @@ export class DamageReportsService {
     const asset = await this.prisma.asset.findUnique({ where: { id: body.assetId } });
     if (!asset) throw new NotFoundException('Tài sản không tồn tại');
 
+    this.assetTransitionService.validateOperation(asset.status, 'DAMAGE_REPORT');
+
     if (asset.roomId !== assignment.roomId) {
       throw new BadRequestException('Tài sản không thuộc phòng hiện tại của sinh viên');
     }
 
     const existingReport = await this.prisma.damageReport.findFirst({
-      where: { assetId: body.assetId, status: { in: ['SUBMITTED', 'REVIEWING', 'IN_PROGRESS'] } }
+      where: { assetId: body.assetId, status: { in: ['SUBMITTED', 'REVIEWING', 'APPROVED', 'IN_PROGRESS'] } }
     });
     if (existingReport) {
       throw new BadRequestException('Tài sản này đang có phiếu báo hỏng chưa hoàn tất');
@@ -364,36 +368,96 @@ export class DamageReportsService {
 
     return updated;
   }
-
-  async transition(id: number, action: string, userId: number) {
+  async transition(id: number, action: string, userId: number, payload?: { reason?: string; role?: string }) {
     const report = await this.prisma.damageReport.findUnique({
       where: { id },
       include: { asset: true },
     });
     if (!report) throw new NotFoundException('Damage report not found');
 
-    if (action === 'cancel' && report.reporterId !== userId) {
-      throw new NotFoundException('Damage report not found');
+    const role = payload?.role ?? 'MANAGER';
+
+    if (action === 'cancel') {
+      if (role === 'STUDENT') {
+        if (report.reporterId !== userId) {
+          throw new NotFoundException('Damage report not found');
+        }
+        if (report.status !== 'SUBMITTED') {
+          throw new BadRequestException('Sinh viên chỉ có thể hủy phiếu của chính mình khi trạng thái là SUBMITTED.');
+        }
+      } else {
+        if (!payload?.reason) {
+          throw new BadRequestException('Quản lý hủy phiếu sau duyệt bắt buộc phải nhập lý do hủy.');
+        }
+      }
+    }
+
+    if (action === 'reject') {
+      if (!payload?.reason) {
+        throw new BadRequestException('Từ chối báo hỏng bắt buộc phải nhập lý do từ chối.');
+      }
     }
 
     const allowed = VALID_TRANSITIONS[report.status] ?? [];
     if (!allowed.includes(action)) {
-      throw new BadRequestException(`Cannot ${action} a report with status ${report.status}`);
+      throw new BadRequestException(`Không thể thực hiện hành động ${action} khi phiếu ở trạng thái ${report.status}`);
     }
 
     const workflow = WORKFLOW_MAP[action];
-    if (!workflow) throw new BadRequestException(`Invalid action: ${action}`);
+    if (!workflow) throw new BadRequestException(`Hành động không hợp lệ: ${action}`);
 
     const expectedStatus = report.status;
 
     return this.prisma.$transaction(async (tx) => {
-      // Conditional update – prevents lost-update race
+      // 1. Update asset status if approving or cancelling
+      if (action === 'approve') {
+        await this.assetTransitionService.transition(tx, report.assetId, 'UNDER_MAINTENANCE', {
+          action: 'DUYỆT_BÁO_HỎNG',
+          userId,
+          newRoomId: null,
+          note: `Duyệt báo hỏng #${report.reportCode}. Thiết bị chuyển sang bảo trì.`,
+        });
+      } else if (action === 'cancel') {
+        const hasActiveRoom = !!report.roomId;
+        const targetStatus = hasActiveRoom ? 'IN_USE' : 'AVAILABLE';
+        await this.assetTransitionService.transition(tx, report.assetId, targetStatus as any, {
+          action: 'HUY_BÁO_HỎNG',
+          userId,
+          newRoomId: report.roomId || null,
+          note: `Hủy báo hỏng #${report.reportCode}. Khôi phục trạng thái tài sản.`,
+        });
+      }
+
+      // 2. Set tracking fields
+      const updateData: any = {
+        status: workflow.newStatus as any,
+        updatedAt: new Date(),
+      };
+
+      if (action === 'review') {
+        updateData.reviewedAt = new Date();
+        updateData.reviewedById = userId;
+      } else if (action === 'approve') {
+        updateData.approvedAt = new Date();
+        updateData.approvedById = userId;
+        // Tự động set reviewed nếu duyệt thẳng từ SUBMITTED
+        if (report.status === 'SUBMITTED') {
+          updateData.reviewedAt = new Date();
+          updateData.reviewedById = userId;
+        }
+      } else if (action === 'reject') {
+        updateData.rejectedAt = new Date();
+        updateData.rejectedById = userId;
+        updateData.rejectReason = payload?.reason;
+      } else if (action === 'cancel') {
+        updateData.cancelledAt = new Date();
+        updateData.cancelledById = userId;
+        updateData.cancelReason = payload?.reason ?? 'Hủy phiếu báo hỏng';
+      }
+
       const updateResult = await tx.damageReport.updateMany({
         where: { id, status: expectedStatus as any },
-        data: {
-          status: workflow.newStatus as any,
-          ...(action === 'complete' ? { updatedAt: new Date() } : {}),
-        },
+        data: updateData,
       });
 
       if (updateResult.count === 0) {
@@ -426,7 +490,7 @@ export class DamageReportsService {
           action: workflow.action,
           oldStatus: report.status as any,
           newStatus: workflow.newStatus as any,
-          note: `${workflow.action} bởi người dùng #${userId}`,
+          note: payload?.reason ?? `${workflow.action} bởi người dùng #${userId}`,
           createdByUserId: userId,
           damageReportId: id,
         },
@@ -439,7 +503,7 @@ export class DamageReportsService {
             assetId: report.assetId,
             action: 'TỪ_CHỐI_BÁO_HỎNG',
             newStatus: report.asset?.status,
-            note: `Từ chối báo hỏng #${report.reportCode}`,
+            note: `Từ chối báo hỏng #${report.reportCode}. Lý do: ${payload?.reason}`,
             performedById: userId,
           },
         });
@@ -470,6 +534,6 @@ export class DamageReportsService {
       }
 
       return updatedReport;
-    });
+    }, { timeout: 30000 });
   }
 }
