@@ -74,6 +74,7 @@ export class UsersService {
         address: u.profile.address,
         faculty: u.profile.faculty,
         className: u.profile.className,
+        course: u.profile.course,
         emergencyName: u.profile.emergencyName,
         emergencyPhone: u.profile.emergencyPhone,
         notes: u.profile.notes,

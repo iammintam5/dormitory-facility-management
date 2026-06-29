@@ -522,11 +522,29 @@ export class DamageReportsService {
 
       // Bắn Notification cho sinh viên (reporter)
       if (report.reporterId) {
+        const statusLabelMap: Record<string, string> = {
+          REVIEWING: 'Đang tiếp nhận',
+          IN_PROGRESS: 'Đã duyệt, đang xử lý',
+          REJECTED: 'Từ chối',
+          CANCELLED: 'Đã hủy',
+          COMPLETED: 'Hoàn tất',
+        };
+        const notificationNote =
+          action === 'reject'
+            ? `Lý do: ${payload?.reason}`
+            : action === 'approve'
+              ? 'Ghi chú: Phiếu đã được duyệt, thiết bị được chuyển sang quy trình sửa chữa/bảo trì.'
+              : action === 'review'
+                ? 'Ghi chú: Quản lý đã tiếp nhận phiếu và đang kiểm tra.'
+                : action === 'cancel'
+                  ? `Lý do: ${payload?.reason ?? 'Phiếu đã được hủy.'}`
+                  : `Ghi chú: ${workflow.action}.`;
+
         await tx.notification.create({
           data: {
             userId: report.reporterId,
             title: `Cập nhật báo hỏng ${report.reportCode}`,
-            content: `Phiếu báo hỏng của bạn đã được ${workflow.action.toLowerCase()}. Trạng thái mới: ${workflow.newStatus}`,
+            content: `Phiếu báo hỏng của bạn đã được ${workflow.action.toLowerCase()}. Trạng thái mới: ${statusLabelMap[workflow.newStatus] ?? workflow.newStatus}. ${notificationNote}`,
             relatedTable: 'damage_reports',
             relatedId: id,
           }

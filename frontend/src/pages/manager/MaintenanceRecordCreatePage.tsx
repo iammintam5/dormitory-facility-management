@@ -117,8 +117,6 @@ export function MaintenanceRecordCreatePage() {
           maintenanceDate: values.maintenanceDate,
           content: values.content,
           resultStatus: values.resultStatus || 'GOOD',
-          cost: Number.isNaN(values.cost) ? undefined : values.cost,
-          materialNote: values.materialNote?.trim() || undefined,
           note: values.note?.trim() || undefined,
         });
         showToast('Nghiệm thu và tạo phiếu bảo trì thành công.', 'success');
@@ -227,16 +225,6 @@ export function MaintenanceRecordCreatePage() {
                       <option value="GOOD">Tốt (Đã sửa xong)</option>
                       <option value="RECOMMEND_LIQUIDATION">Đề nghị thanh lý (Hỏng nặng)</option>
                     </Select>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground">Chi phí (VNĐ)</label>
-                    <Input type="number" min={0} placeholder="VD: 500000" {...form.register('cost', { valueAsNumber: true })} />
-                  </div>
-
-                  <div className="space-y-1.5 xl:col-span-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Vật tư / ghi chú kỹ thuật</label>
-                    <Input placeholder="Các vật tư đã sử dụng hoặc cần lưu ý" {...form.register('materialNote')} />
                   </div>
                 </>
               )}

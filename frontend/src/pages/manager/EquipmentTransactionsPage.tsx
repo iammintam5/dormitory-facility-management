@@ -124,8 +124,6 @@ export function EquipmentTransactionsPage() {
         typeLabel[receipt.type],
         receipt.supplierName,
         receipt.supplierPhone,
-        receipt.contractNumber,
-        receipt.documentNumber,
         receipt.note,
         receipt.creator?.fullName,
       ].filter(Boolean).join(' ').toLowerCase();
@@ -399,14 +397,6 @@ export function EquipmentTransactionsPage() {
                   <p className="font-semibold text-foreground">{activeReceipt.creator?.fullName || '-'}</p>
                 </div>
                 <div>
-                  <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Số chứng từ</p>
-                  <p className="font-semibold text-foreground">{activeReceipt.documentNumber || '-'}</p>
-                </div>
-                <div>
-                  <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Hợp đồng / Quyết định</p>
-                  <p className="font-semibold text-foreground">{activeReceipt.contractNumber || '-'}</p>
-                </div>
-                <div>
                   <p className="mb-1 text-xs uppercase tracking-wider text-muted-foreground">Tổng giá trị</p>
                   <p className="font-semibold text-foreground">{formatCurrency(activeReceipt.totalAmount)}</p>
                 </div>
@@ -434,7 +424,6 @@ export function EquipmentTransactionsPage() {
                         <TableHead>Mã tài sản</TableHead>
                         <TableHead>Tên tài sản</TableHead>
                         <TableHead>Loại</TableHead>
-                        <TableHead>Phòng</TableHead>
                         <TableHead className="text-center">SL</TableHead>
                         <TableHead className="text-right">Đơn giá</TableHead>
                         <TableHead>Ghi chú</TableHead>
@@ -448,7 +437,6 @@ export function EquipmentTransactionsPage() {
                             <TableCell className="font-semibold">{item.asset?.assetCode || '-'}</TableCell>
                             <TableCell>{item.asset?.assetName || '-'}</TableCell>
                             <TableCell>{item.asset?.category?.name || item.asset?.categoryName || '-'}</TableCell>
-                            <TableCell>{item.asset?.room?.roomCode || item.asset?.roomCode || '-'}</TableCell>
                             <TableCell className="text-center tabular-nums">{item.quantity || 1}</TableCell>
                             <TableCell className="text-right tabular-nums">{formatCurrency(item.unitPrice)}</TableCell>
                             <TableCell className="max-w-[180px] truncate text-muted-foreground" title={item.note || ''}>{item.note || '-'}</TableCell>
@@ -456,7 +444,7 @@ export function EquipmentTransactionsPage() {
                         ))
                       ) : (
                         <TableRow>
-                          <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                          <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
                             Chưa có dữ liệu chi tiết thiết bị.
                           </TableCell>
                         </TableRow>

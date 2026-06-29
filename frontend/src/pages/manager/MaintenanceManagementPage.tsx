@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -31,8 +31,10 @@ import {
   Eye,
   PencilSimple,
   WarningCircle,
-  FloppyDisk
+  FloppyDisk,
+  Printer
 } from '@phosphor-icons/react';
+import { useReactToPrint } from 'react-to-print';
 import { getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, completeMaintenanceRecord, getMaintenancePlans, startMaintenanceRecord, cancelMaintenanceRecord } from '../../services/maintenance';
 import { getAssets } from '../../services/assets';
 import { getApiErrorMessage } from '../../lib/api-client';
@@ -71,6 +73,12 @@ export function MaintenanceManagementPage() {
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false);
   const [completeResultStatus, setCompleteResultStatus] = useState('GOOD');
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceRecord | null>(null);
+  const [printRecord, setPrintRecord] = useState<MaintenanceRecord | null>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+    documentTitle: printRecord?.maintenanceCode ?? 'phieu-bao-tri',
+  });
   
   const [activeTab, setActiveTab] = useState('Tất cả');
   
@@ -238,8 +246,6 @@ export function MaintenanceManagementPage() {
           maintenanceType: data.maintenanceType,
           content: data.content,
           nextMaintenanceDate: data.nextMaintenanceDate || undefined,
-          cost: Number.isNaN(data.cost) ? undefined : data.cost,
-          materialNote: data.materialNote?.trim() || undefined,
           note: data.note?.trim() || undefined,
         });
         showToast('Cập nhật phiếu bảo trì thành công.', 'success');
@@ -248,8 +254,6 @@ export function MaintenanceManagementPage() {
           ...data,
           planId: data.planId || undefined,
           nextMaintenanceDate: data.nextMaintenanceDate || undefined,
-          cost: Number.isNaN(data.cost) ? undefined : data.cost,
-          materialNote: data.materialNote?.trim() || undefined,
           note: data.note?.trim() || undefined,
         });
         showToast('Tạo phiếu bảo trì thành công.', 'success');
@@ -307,6 +311,11 @@ export function MaintenanceManagementPage() {
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Thao tác thất bại.'), 'error');
     }
+  };
+
+  const printMaintenanceRecord = (record: MaintenanceRecord) => {
+    setPrintRecord(record);
+    window.setTimeout(() => handlePrint(), 0);
   };
 
   function translateType(type: string) {
@@ -492,6 +501,7 @@ export function MaintenanceManagementPage() {
                             ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
                             actions={[
                               { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
+                              { id: 'print', label: 'In phiếu PDF', icon: <Printer size={16} />, onClick: () => printMaintenanceRecord(record) },
                               ...(record.status === 'PENDING' ? [
                                 { id: 'start', label: 'Bắt đầu', icon: <Gear size={16} />, onClick: () => handleStart(record.id) },
                                 { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
@@ -521,6 +531,7 @@ export function MaintenanceManagementPage() {
                         ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
                         actions={[
                           { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
+                              { id: 'print', label: 'In phiếu PDF', icon: <Printer size={16} />, onClick: () => printMaintenanceRecord(record) },
                           ...(record.status === 'PENDING' ? [
                             { id: 'start', label: 'Bắt đầu', icon: <Gear size={16} />, onClick: () => handleStart(record.id) },
                             { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
@@ -553,6 +564,67 @@ export function MaintenanceManagementPage() {
           onPageChange={(p) => setPagination(prev => ({ ...prev, page: p }))}
         />
       </Card>
+
+      <div className="fixed -left-[9999px] top-0 bg-white text-black">
+        <div ref={printRef} className="p-8 font-sans text-sm text-black" style={{ width: '210mm', minHeight: '297mm' }}>
+          {printRecord && (
+            <div className="space-y-6">
+              <div className="flex justify-between border-b border-gray-300 pb-4">
+                <div>
+                  <p className="text-sm font-bold uppercase">Bộ Khoa học và Công nghệ</p>
+                  <p className="text-sm font-bold uppercase">Học viện Công nghệ Bưu chính Viễn thông</p>
+                  <p className="text-sm font-bold uppercase">Cơ sở tại Thành phố Hồ Chí Minh</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-semibold">Mẫu số: QL_BM3</p>
+                  <p className="text-xs">Mã phiếu: {printRecord.maintenanceCode}</p>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <h1 className="text-xl font-bold uppercase">Phiếu sửa chữa - bảo trì thiết bị</h1>
+                <p className="mt-1 text-xs italic">
+                  Ngày {new Date(printRecord.maintenanceDate).getDate()} tháng {new Date(printRecord.maintenanceDate).getMonth() + 1} năm {new Date(printRecord.maintenanceDate).getFullYear()}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <p><strong>Thiết bị:</strong> {printRecord.asset?.assetName ?? '--'} ({printRecord.asset?.assetCode ?? '--'})</p>
+                <p><strong>Vị trí:</strong> {printRecord.asset?.room?.roomCode ?? 'Kho'} - {printRecord.asset?.room?.floor?.building?.name ?? '--'}</p>
+                <p><strong>Loại phiếu:</strong> {translateType(printRecord.maintenanceType)}</p>
+                <p><strong>Kết quả:</strong> {translateStatus(printRecord.resultStatus ?? '')}</p>
+                <p><strong>Người thực hiện:</strong> {printRecord.performedByUser?.fullName ?? `#${printRecord.performedBy}`}</p>
+                <p><strong>Ngày lập:</strong> {new Date(printRecord.createdAt).toLocaleDateString('vi-VN')}</p>
+              </div>
+
+              <div>
+                <p className="mb-2 font-semibold">Nội dung thực hiện</p>
+                <div className="min-h-24 rounded border border-gray-300 p-3 whitespace-pre-wrap">{printRecord.content}</div>
+              </div>
+
+              {printRecord.note && (
+                <div>
+                  <p className="mb-2 font-semibold">Ghi chú</p>
+                  <div className="rounded border border-gray-300 p-3 whitespace-pre-wrap">{printRecord.note}</div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-16 pt-12 text-center">
+                <div>
+                  <p className="font-semibold">Người thực hiện</p>
+                  <p className="mt-1 text-xs italic">(Ký và ghi rõ họ tên)</p>
+                  <div className="h-24"></div>
+                </div>
+                <div>
+                  <p className="font-semibold">Đại diện quản lý CSVC</p>
+                  <p className="mt-1 text-xs italic">(Ký và ghi rõ họ tên)</p>
+                  <div className="h-24"></div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
 
       <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} size="lg">
         <ModalHeader>
@@ -628,18 +700,10 @@ export function MaintenanceManagementPage() {
                   />
                   {form.formState.errors.content && <p className="text-xs text-destructive mt-1">{form.formState.errors.content.message}</p>}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-muted-foreground">Ngày bảo trì tiếp theo</label>
                     <Input type="date" {...form.register('nextMaintenanceDate')} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground">Chi phí (VNĐ)</label>
-                    <Input type="number" min={0} placeholder="VD: 500000" {...form.register('cost', { valueAsNumber: true })} />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground">Vật tư</label>
-                    <Input placeholder="Vật tư đã sử dụng" {...form.register('materialNote')} />
                   </div>
                 </div>
                 <div className="space-y-1.5">
