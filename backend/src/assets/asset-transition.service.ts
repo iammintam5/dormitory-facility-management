@@ -28,7 +28,7 @@ export class AssetTransitionService {
       throw new ConflictException(`Không thể thực hiện nghiệp vụ ${operation} trên thiết bị đang bảo trì (UNDER_MAINTENANCE).`);
     }
     if (assetStatus === AssetStatus.PENDING_LIQUIDATION) {
-      if (operation !== 'LIQUIDATION') {
+      if (operation !== 'LIQUIDATION' && operation !== 'EXPORT') {
         throw new ConflictException(`Không thể thực hiện nghiệp vụ ${operation} trên thiết bị đang chờ thanh lý (PENDING_LIQUIDATION).`);
       }
     }

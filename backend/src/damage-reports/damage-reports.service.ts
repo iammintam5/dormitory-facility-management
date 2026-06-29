@@ -82,6 +82,8 @@ export class DamageReportsService {
       status: r.status,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt?.toISOString() ?? null,
+      rejectReason: r.rejectReason ?? null,
+      cancelReason: r.cancelReason ?? null,
       reporter: r.reporter
         ? {
             id: r.reporter.id,
@@ -182,6 +184,8 @@ export class DamageReportsService {
       status: report.status,
       createdAt: report.createdAt.toISOString(),
       updatedAt: report.updatedAt?.toISOString() ?? null,
+      rejectReason: report.rejectReason ?? null,
+      cancelReason: report.cancelReason ?? null,
       reporter: report.reporter,
       asset: report.asset,
       room: report.room,
@@ -490,7 +494,7 @@ export class DamageReportsService {
           action: workflow.action,
           oldStatus: report.status as any,
           newStatus: workflow.newStatus as any,
-          note: payload?.reason ?? `${workflow.action} bởi người dùng #${userId}`,
+          note: payload?.reason ?? `${workflow.action} thành công.`,
           createdByUserId: userId,
           damageReportId: id,
         },

@@ -54,6 +54,8 @@ type UserFormState = {
   studentCode: string;
   password: string;
   status: 'ACTIVE' | 'LOCKED';
+  faculty: string;
+  course: string;
 };
 
 const emptyForm: UserFormState = {
@@ -65,6 +67,8 @@ const emptyForm: UserFormState = {
   studentCode: '',
   password: '',
   status: 'ACTIVE',
+  faculty: '',
+  course: '',
 };
 
 const roleLabel: Record<UserRoleOption['code'], string> = {
@@ -167,6 +171,8 @@ export function UsersManagementPage() {
       studentCode: user.studentCode ?? '',
       password: '',
       status: user.status === 'LOCKED' ? 'LOCKED' : 'ACTIVE',
+      faculty: user.profile?.faculty ?? '',
+      course: (user.profile?.course ?? '').replace(/^K/, 'D'),
     });
     setIsCreateModalOpen(true);
   };
@@ -207,6 +213,8 @@ export function UsersManagementPage() {
           phone: form.phone.trim() || null,
           studentCode: normalizedStudentCode,
           password: form.password.trim() || undefined,
+          faculty: selectedRole?.code === 'STUDENT' ? form.faculty || null : null,
+          course: selectedRole?.code === 'STUDENT' ? form.course || null : null,
         });
 
         if (form.status === 'LOCKED' && updated.status !== 'LOCKED') {
@@ -226,6 +234,8 @@ export function UsersManagementPage() {
           email: form.email.trim() || undefined,
           phone: form.phone.trim() || undefined,
           studentCode: normalizedStudentCode ?? undefined,
+          faculty: selectedRole?.code === 'STUDENT' ? form.faculty || undefined : undefined,
+          course: selectedRole?.code === 'STUDENT' ? form.course || undefined : undefined,
         });
 
         if (form.status === 'LOCKED') {
@@ -554,6 +564,7 @@ export function UsersManagementPage() {
                     ...current,
                     roleId: e.target.value,
                     studentCode: nextRole?.code === 'STUDENT' ? current.studentCode : '',
+                    username: nextRole?.code === 'STUDENT' ? current.studentCode : current.username,
                   }));
                 }}
               >
@@ -587,6 +598,7 @@ export function UsersManagementPage() {
               <Input 
                 value={form.fullName} 
                 onChange={(e) => setForm((current) => ({ ...current, fullName: e.target.value }))} 
+                autoComplete="new-password"
               />
             </div>
             
@@ -595,6 +607,8 @@ export function UsersManagementPage() {
               <Input 
                 value={form.username} 
                 onChange={(e) => setForm((current) => ({ ...current, username: e.target.value }))} 
+                disabled={selectedRole?.code === 'STUDENT'}
+                autoComplete="new-password"
               />
             </div>
 
@@ -603,6 +617,7 @@ export function UsersManagementPage() {
               <Input 
                 value={form.email} 
                 onChange={(e) => setForm((current) => ({ ...current, email: e.target.value }))} 
+                autoComplete="new-password"
               />
             </div>
             
@@ -611,6 +626,7 @@ export function UsersManagementPage() {
               <Input 
                 value={form.phone} 
                 onChange={(e) => setForm((current) => ({ ...current, phone: e.target.value }))} 
+                autoComplete="new-password"
               />
             </div>
 
@@ -618,11 +634,64 @@ export function UsersManagementPage() {
               <label className="mb-1.5 block text-sm font-medium text-foreground">Mã sinh viên</label>
               <Input 
                 value={form.studentCode} 
-                onChange={(e) => setForm((current) => ({ ...current, studentCode: e.target.value.toUpperCase() }))}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  const match = val.match(/^[a-zA-Z](2[0-9])/);
+                  let detectedCourse = form.course;
+                  if (match && match[1]) {
+                    detectedCourse = 'D' + match[1];
+                  }
+                  let detectedFaculty = form.faculty;
+                  if (val.includes('DCCN')) detectedFaculty = 'CNTT';
+                  else if (val.includes('DCMR') || val.includes('DCQT')) detectedFaculty = 'Kinh tế';
+                  else if (val.includes('DCDT')) detectedFaculty = 'Điện tử';
+
+                  setForm((current) => ({ 
+                    ...current, 
+                    studentCode: val,
+                    course: detectedCourse,
+                    faculty: detectedFaculty,
+                    username: selectedRole?.code === 'STUDENT' ? val : current.username
+                  }));
+                }}
                 disabled={selectedRole?.code !== 'STUDENT'}
                 placeholder={selectedRole?.code === 'STUDENT' ? 'VD: N21DCCN001' : 'Chỉ dùng cho Sinh viên'}
+                autoComplete="new-password"
               />
             </div>
+
+            {selectedRole?.code === 'STUDENT' && (
+              <>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">Khoa</label>
+                  <Select
+                    value={form.faculty || ''}
+                    onChange={(e) => setForm((current) => ({ ...current, faculty: e.target.value }))}
+                  >
+                    <option value="">Chọn khoa</option>
+                    <option value="CNTT">CNTT</option>
+                    <option value="Kinh tế">Kinh tế</option>
+                    <option value="Điện tử">Điện tử</option>
+                    <option value="Viễn thông">Viễn thông</option>
+                    <option value="Quản trị kinh doanh">Quản trị kinh doanh</option>
+                  </Select>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-foreground">Khóa</label>
+                  <Select
+                    value={form.course || ''}
+                    onChange={(e) => setForm((current) => ({ ...current, course: e.target.value }))}
+                  >
+                    <option value="">Chọn khóa</option>
+                    <option value="D20">D20</option>
+                    <option value="D21">D21</option>
+                    <option value="D22">D22</option>
+                    <option value="D23">D23</option>
+                    <option value="D24">D24</option>
+                  </Select>
+                </div>
+              </>
+            )}
             
             <div>
               <label className="mb-1.5 block text-sm font-medium text-foreground">
@@ -632,6 +701,7 @@ export function UsersManagementPage() {
                 type="password" 
                 value={form.password} 
                 onChange={(e) => setForm((current) => ({ ...current, password: e.target.value }))} 
+                autoComplete="new-password"
               />
             </div>
           </div>

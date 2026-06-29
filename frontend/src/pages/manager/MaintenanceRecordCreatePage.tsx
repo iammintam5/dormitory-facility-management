@@ -78,8 +78,13 @@ export function MaintenanceRecordCreatePage() {
   });
 
   useEffect(() => {
+    if (!damageReportIdStr) {
+      showToast('Phiếu bảo trì phải được lập từ một báo hỏng.', 'error');
+      navigate(user?.role === 'ADMIN' ? '/admin/damage-reports' : '/manager/damage-reports');
+      return;
+    }
     void loadLookups();
-  }, []);
+  }, [damageReportIdStr, navigate, showToast, user?.role]);
 
   async function loadLookups() {
     setIsLoading(true);
@@ -117,8 +122,6 @@ export function MaintenanceRecordCreatePage() {
           maintenanceDate: values.maintenanceDate,
           content: values.content,
           resultStatus: values.resultStatus || 'GOOD',
-          cost: Number.isNaN(values.cost) ? undefined : values.cost,
-          materialNote: values.materialNote?.trim() || undefined,
           note: values.note?.trim() || undefined,
         });
         showToast('Nghiệm thu và tạo phiếu bảo trì thành công.', 'success');
@@ -228,16 +231,6 @@ export function MaintenanceRecordCreatePage() {
                       <option value="RECOMMEND_LIQUIDATION">Đề nghị thanh lý (Hỏng nặng)</option>
                     </Select>
                   </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-muted-foreground">Chi phí (VNĐ)</label>
-                    <Input type="number" min={0} placeholder="VD: 500000" {...form.register('cost', { valueAsNumber: true })} />
-                  </div>
-
-                  <div className="space-y-1.5 xl:col-span-2">
-                    <label className="text-xs font-semibold text-muted-foreground">Vật tư / ghi chú kỹ thuật</label>
-                    <Input placeholder="Các vật tư đã sử dụng hoặc cần lưu ý" {...form.register('materialNote')} />
-                  </div>
                 </>
               )}
 
@@ -269,61 +262,54 @@ export function MaintenanceRecordCreatePage() {
           
           {/* Printable Template (hidden from screen, used by react-to-print) */}
           <div className="hidden">
-            <div ref={printRef} className="p-8 text-black bg-white font-sans text-sm space-y-6" style={{ width: '210mm', minHeight: '297mm' }}>
-              <div className="flex justify-between items-start border-b border-gray-300 pb-4">
-                <div>
-                  <h2 className="text-sm font-bold uppercase">KÝ TÚC XÁ MAN THIỆN</h2>
-                  <p className="text-xs text-gray-500">Bộ phận quản lý cơ sở vật chất</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs font-semibold">Mẫu số: QL_BM3</p>
-                  <p className="text-xs text-gray-500">Mã phiếu: {createdRecord?.maintenanceCode}</p>
-                </div>
+            <div ref={printRef} className="bg-white text-black p-8 border" style={{ width: '210mm', minHeight: '297mm' }}>
+              <div className="text-center mb-6">
+                <h2 className="text-xl font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h2>
+                <p className="font-semibold">Độc lập - Tự do - Hạnh phúc</p>
+                <p className="mt-2 italic">---o0o---</p>
+                <h1 className="text-2xl font-bold mt-6 uppercase">
+                  BIÊN BẢN NGHIỆM THU SỬA CHỮA
+                </h1>
+                <p>Số phiếu: {createdRecord?.maintenanceCode}</p>
+              </div>
+              
+              <div className="mb-4 text-sm space-y-1">
+                <p><strong>Ngày lập:</strong> {createdRecord?.maintenanceDate ? new Date(createdRecord.maintenanceDate).toLocaleDateString('vi-VN') : ''}</p>
+                <p><strong>Người nghiệm thu:</strong> {user?.fullName}</p>
+                <p><strong>Vị trí sử dụng:</strong> {damageReport?.room?.roomCode || 'Kho trung tâm'}</p>
               </div>
 
-              <div className="text-center my-6">
-                <h1 className="text-xl font-bold uppercase tracking-wider">BIÊN BẢN NGHIỆM THU SỬA CHỮA</h1>
-                <p className="text-xs italic text-gray-500 mt-1">Ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
-              </div>
+              <table className="w-full border-collapse border border-black mb-8 text-sm">
+                <thead>
+                  <tr>
+                    <th className="border border-black p-2">STT</th>
+                    <th className="border border-black p-2">Mã TB</th>
+                    <th className="border border-black p-2">Tên TB</th>
+                    <th className="border border-black p-2">Nội dung sửa chữa</th>
+                    <th className="border border-black p-2">Kết quả nghiệm thu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-black p-2 text-center">1</td>
+                    <td className="border border-black p-2">{createdRecord?.asset?.assetCode}</td>
+                    <td className="border border-black p-2">{createdRecord?.asset?.assetName}</td>
+                    <td className="border border-black p-2">{createdRecord?.content}</td>
+                    <td className="border border-black p-2">{createdRecord?.resultStatus === 'GOOD' ? 'Tốt (Đã sửa xong)' : 'Đề nghị thanh lý (Hỏng nặng)'}</td>
+                  </tr>
+                </tbody>
+              </table>
 
-              <div className="space-y-3 text-black">
-                <div className="grid grid-cols-2 gap-4">
-                  <p><strong>Thiết bị sửa chữa:</strong> {createdRecord?.asset?.assetName} ({createdRecord?.asset?.assetCode})</p>
-                  <p><strong>Vị trí (Phòng):</strong> {damageReport?.room?.roomCode || 'Kho trung tâm'}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <p><strong>Ngày thực hiện:</strong> {createdRecord?.maintenanceDate ? new Date(createdRecord?.maintenanceDate).toLocaleDateString('vi-VN') : ''}</p>
-                  <p><strong>Loại hình:</strong> Sửa chữa đột xuất (Báo hỏng)</p>
-                </div>
+              <div className="grid grid-cols-2 text-center mt-12 mb-24">
                 <div>
-                  <p><strong>Nội dung công việc:</strong> {createdRecord?.content}</p>
-                </div>
-                <div>
-                  <p><strong>Vật tư sử dụng:</strong> {createdRecord?.materialNote || 'Không sử dụng vật tư ngoài'}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <p><strong>Chi phí sửa chữa:</strong> {createdRecord?.cost ? Number(createdRecord.cost).toLocaleString('vi-VN') + ' VNĐ' : 'Miễn phí / Tự sửa'}</p>
-                  <p><strong>Kết quả nghiệm thu:</strong> {createdRecord?.resultStatus === 'GOOD' ? 'Tốt (Đã sửa xong)' : 'Đề nghị thanh lý (Hỏng nặng)'}</p>
-                </div>
-                {createdRecord?.note && (
-                  <div>
-                    <p><strong>Ghi chú bổ sung:</strong> {createdRecord?.note}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="pt-12 grid grid-cols-2 text-center gap-12 text-black">
-                <div>
-                  <p className="font-semibold">Đại diện bộ phận nghiệm thu</p>
-                  <p className="text-xs text-gray-400 italic mt-1">(Ký và ghi rõ họ tên)</p>
+                  <p className="font-bold">ĐẠI DIỆN BỘ PHẬN NGHIỆM THU</p>
+                  <p className="italic text-sm">(Ký và ghi rõ họ tên)</p>
                   <div className="h-20"></div>
-                  <p className="font-semibold">{user?.fullName}</p>
+                  <p className="font-bold mt-12">{user?.fullName}</p>
                 </div>
                 <div>
-                  <p className="font-semibold">Người thực hiện sửa chữa</p>
-                  <p className="text-xs text-gray-400 italic mt-1">(Ký và ghi rõ họ tên)</p>
-                  <div className="h-20"></div>
-                  <p className="border-b border-dashed border-gray-300 w-32 mx-auto mt-12"></p>
+                  <p className="font-bold">NGƯỜI THỰC HIỆN SỬA CHỮA</p>
+                  <p className="italic text-sm">(Ký và ghi rõ họ tên)</p>
                 </div>
               </div>
             </div>

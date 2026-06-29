@@ -2,8 +2,9 @@ import { IsString, IsOptional, IsArray, ValidateNested, IsInt } from 'class-vali
 import { Type } from 'class-transformer';
 
 export class ExportItemDto {
-  @IsString()
-  id!: string;
+  @IsInt()
+  @Type(() => Number)
+  id!: number;
 
   @IsOptional()
   @IsString()

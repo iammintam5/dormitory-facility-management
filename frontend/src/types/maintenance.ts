@@ -41,6 +41,21 @@ export type MaintenanceRecord = {
   asset: Asset;
   plan?: MaintenancePlan | null;
   performedByUser: User;
+  damageReportId?: number | null;
+  damageReport?: {
+    id: number;
+    room?: {
+      id: number;
+      roomCode: string;
+      floor?: {
+        id: number;
+        building?: {
+          id: number;
+          name: string;
+        };
+      };
+    };
+  } | null;
 };
 
 export type MaintenancePlansResponse = {

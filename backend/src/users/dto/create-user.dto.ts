@@ -25,6 +25,14 @@ export class CreateUserDto {
   @IsOptional()
   @IsString()
   studentCode?: string;
+
+  @IsOptional()
+  @IsString()
+  faculty?: string;
+
+  @IsOptional()
+  @IsString()
+  course?: string;
 }
 
 export class UpdateUserDto {
@@ -56,6 +64,14 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   studentCode?: string | null;
+
+  @IsOptional()
+  @IsString()
+  faculty?: string | null;
+
+  @IsOptional()
+  @IsString()
+  course?: string | null;
 }
 
 export class ResetPasswordDto {

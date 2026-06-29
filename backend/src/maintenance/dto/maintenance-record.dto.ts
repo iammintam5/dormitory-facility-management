@@ -8,10 +8,9 @@ export class CreateMaintenanceRecordDto {
   @Type(() => Number)
   planId?: number;
 
-  @IsOptional()
   @IsInt()
   @Type(() => Number)
-  damageReportId?: number;
+  damageReportId!: number;
 
 
 
@@ -32,18 +31,7 @@ export class CreateMaintenanceRecordDto {
   @IsEnum(MaintenanceResultStatus)
   resultStatus?: MaintenanceResultStatus;
 
-  @IsOptional()
-  @IsDateString()
-  nextMaintenanceDate?: string;
 
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  cost?: number;
-
-  @IsOptional()
-  @IsString()
-  materialNote?: string;
 
   @IsOptional()
   @IsString()
@@ -66,14 +54,7 @@ export class CompleteMaintenanceRecordDto {
   @IsDateString()
   nextMaintenanceDate?: string;
 
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  cost?: number;
 
-  @IsOptional()
-  @IsString()
-  materialNote?: string;
 
   @IsOptional()
   @IsString()
@@ -97,14 +78,7 @@ export class UpdateMaintenanceRecordDto {
   @IsDateString()
   nextMaintenanceDate?: string;
 
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  cost?: number;
 
-  @IsOptional()
-  @IsString()
-  materialNote?: string;
 
   @IsOptional()
   @IsString()
@@ -131,14 +105,7 @@ export class CreateDirectCompletedRecordDto {
   @IsEnum(MaintenanceResultStatus)
   resultStatus!: MaintenanceResultStatus;
 
-  @IsOptional()
-  @IsNumber()
-  @Type(() => Number)
-  cost?: number;
 
-  @IsOptional()
-  @IsString()
-  materialNote?: string;
 
   @IsOptional()
   @IsString()

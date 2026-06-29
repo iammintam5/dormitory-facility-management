@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useReactToPrint } from 'react-to-print';
 import { useAuth } from '../../auth/auth-context';
 import { useToast } from '../../toast/toast-context';
 import { 
@@ -9,6 +10,7 @@ import {
   Trash, 
   Check,
   ArrowsClockwise,
+  Printer,
 } from '@phosphor-icons/react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -55,6 +57,8 @@ export function ExportEquipmentPage() {
   // Export items
   const [exportItems, setExportItems] = useState<ExportItem[]>([]);
 
+  const [exportType, setExportType] = useState('TRANSFER');
+
   // Form state
   const [formData, setFormData] = useState({
     exportDate: new Date().toISOString().split('T')[0],
@@ -63,7 +67,6 @@ export function ExportEquipmentPage() {
     roomId: '',
     recipient: '',
     contactPhone: '',
-    contractNumber: '',
     requestDate: '',
     expectedDate: '',
     note: '',
@@ -79,6 +82,22 @@ export function ExportEquipmentPage() {
   const [filterRooms, setFilterRooms] = useState<RoomRecord[]>([]);
   const [selectedExportIds, setSelectedExportIds] = useState<Set<string>>(new Set());
   const [exportQty, setExportQty] = useState<Record<string, number>>({});
+
+  const [createdReceiptCode, setCreatedReceiptCode] = useState('');
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+  });
+
+  useEffect(() => {
+    if (createdReceiptCode) {
+      handlePrint();
+      const timer = setTimeout(() => {
+        navigate(`${basePath}/asset-transactions`);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [createdReceiptCode, navigate, basePath]);
 
   // Load data on mount
   useEffect(() => {
@@ -141,7 +160,12 @@ export function ExportEquipmentPage() {
       setSaving(true);
 
       const payload = {
-        ...formData,
+        exportDate: formData.exportDate,
+        reason: formData.reason,
+        recipient: formData.recipient,
+        contactPhone: formData.contactPhone,
+        note: formData.note,
+        generalNote: formData.generalNote,
         items: exportItems.map(i => ({
           id: i.id,
           qty: i.qty,
@@ -149,10 +173,10 @@ export function ExportEquipmentPage() {
         }))
       };
 
-      await createExportReceipt(payload);
+      const res = await createExportReceipt(payload);
 
       showToast(`Đã xuất ${exportItems.length} thiết bị thành công`, 'success');
-      navigate(`${basePath}/asset-transactions`);
+      setCreatedReceiptCode(res.receiptCode);
     } catch (err) {
       showToast(getApiErrorMessage(err, 'Lỗi khi xác nhận xuất thiết bị'), 'error');
     } finally {
@@ -174,9 +198,9 @@ export function ExportEquipmentPage() {
       assetName: a.assetName,
       categoryName: a.categoryName,
       unit: 'Cái',
-      qty: exportQty[a.id] || 1,
-      condition: a.condition,
-      conditionLabel: a.conditionLabel || (a.status === 'DAMAGED' ? 'Hư hỏng' : 'Tốt'),
+      qty: 1,
+      condition: a.status === 'PENDING_LIQUIDATION' ? 'PENDING_LIQUIDATION' : a.condition,
+      conditionLabel: a.status === 'PENDING_LIQUIDATION' ? 'Chờ thanh lý' : (a.conditionLabel || (a.status === 'DAMAGED' ? 'Hư hỏng' : 'Tốt')),
       note: '',
       roomCode: a.roomCode,
     }));
@@ -190,13 +214,18 @@ export function ExportEquipmentPage() {
   // Filtered assets for selection
   const filteredAssets = useMemo(() => {
     return allAssets.filter(a => {
+      if (exportType === 'LIQUIDATE') {
+        if (a.status !== 'PENDING_LIQUIDATION') return false;
+      } else {
+        if (a.status === 'PENDING_LIQUIDATION') return false;
+      }
       if (searchKeyword && !a.assetCode.toLowerCase().includes(searchKeyword.toLowerCase()) && !a.assetName.toLowerCase().includes(searchKeyword.toLowerCase())) return false;
       if (filterCategory && a.categoryCode !== filterCategory) return false;
       if (filterBuilding && a.buildingCode !== filterBuilding) return false;
       if (filterRoom && a.roomCode !== filterRoom) return false;
       return true;
     });
-  }, [allAssets, searchKeyword, filterCategory, filterBuilding, filterRoom]);
+  }, [allAssets, searchKeyword, filterCategory, filterBuilding, filterRoom, exportType]);
 
   const toggleSelection = (id: string) => {
     setSelectedExportIds(prev => {
@@ -285,11 +314,18 @@ export function ExportEquipmentPage() {
               <label className="block text-sm font-medium text-foreground mb-1.5">
                 Loại phiếu xuất <span className="text-destructive">*</span>
               </label>
-              <Select defaultValue="Xuất điều chuyển (sang cơ sở khác)">
-                <option>Xuất điều chuyển (sang cơ sở khác)</option>
-                <option>Xuất trả Trường</option>
-                <option>Xuất trả Nhà cung cấp</option>
-                <option>Xuất thanh lý / Hủy bỏ</option>
+              <Select 
+                value={exportType}
+                onChange={(e) => {
+                  setExportType(e.target.value);
+                  setExportItems([]);
+                  setSelectedExportIds(new Set());
+                }}
+              >
+                <option value="TRANSFER">Xuất điều chuyển (sang cơ sở khác)</option>
+                <option value="RETURN_SCHOOL">Xuất trả Trường</option>
+                <option value="RETURN_SUPPLIER">Xuất trả Nhà cung cấp</option>
+                <option value="LIQUIDATE">Xuất thanh lý / Hủy bỏ</option>
               </Select>
             </div>
             <div>
@@ -389,7 +425,6 @@ export function ExportEquipmentPage() {
                     <TableHead className="text-center">ĐVT</TableHead>
                     <TableHead className="text-center w-24">Số lượng</TableHead>
                     <TableHead className="text-center">Tình trạng</TableHead>
-                    <TableHead>Phòng</TableHead>
                     <TableHead>Ghi chú</TableHead>
                     <TableHead className="text-center w-20">Thao tác</TableHead>
                   </TableRow>
@@ -406,7 +441,6 @@ export function ExportEquipmentPage() {
                       <TableCell className="text-center">
                         {conditionBadge(item.conditionLabel, item.condition)}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{item.roomCode || '-'}</TableCell>
                       <TableCell className="text-muted-foreground max-w-[120px] truncate" title={item.note}>
                         {item.note || '-'}
                       </TableCell>
@@ -555,7 +589,6 @@ export function ExportEquipmentPage() {
                   <TableHead>Mã TB</TableHead>
                   <TableHead>Tên thiết bị</TableHead>
                   <TableHead>Loại</TableHead>
-                  <TableHead>Phòng</TableHead>
                   <TableHead>Tình trạng</TableHead>
                   <TableHead className="text-center w-24">SL</TableHead>
                 </TableRow>
@@ -563,7 +596,7 @@ export function ExportEquipmentPage() {
               <TableBody>
                 {filteredAssets.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       Không tìm thấy thiết bị
                     </TableCell>
                   </TableRow>
@@ -585,26 +618,16 @@ export function ExportEquipmentPage() {
                       <TableCell className="font-medium">{a.assetCode}</TableCell>
                       <TableCell>{a.assetName}</TableCell>
                       <TableCell>{a.categoryName}</TableCell>
-                      <TableCell>{a.roomCode || '-'}</TableCell>
                       <TableCell>
                         <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-bold ${
+                          a.status === 'PENDING_LIQUIDATION' ? 'bg-amber-100 text-amber-800' :
                           a.condition === 'GOOD' ? 'bg-emerald-100 text-emerald-700' : 
                           a.condition === 'DAMAGED' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'
                         }`}>
-                          {a.conditionLabel || a.status}
+                          {a.status === 'PENDING_LIQUIDATION' ? 'Chờ thanh lý' : (a.conditionLabel || a.status)}
                         </span>
                       </TableCell>
-                      <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                        {selectedExportIds.has(a.id) ? (
-                          <Input 
-                            type="number" 
-                            min="1"
-                            value={exportQty[a.id] || 1}
-                            onChange={(e) => setExportQty(q => ({ ...q, [a.id]: parseInt(e.target.value) || 1 }))}
-                            className="text-center h-8 w-16"
-                          />
-                        ) : '-'}
-                      </TableCell>
+                      <TableCell className="text-center font-semibold text-foreground">1</TableCell>
                     </TableRow>
                   ))
                 )}
@@ -623,6 +646,94 @@ export function ExportEquipmentPage() {
           </Button>
         </ModalFooter>
       </Modal>
+      {/* Hidden printable Export Receipt */}
+      <div className="hidden">
+        <div className="bg-white text-black p-12" ref={printRef} style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'Times New Roman' }}>
+          <style>{`
+            @page {
+              size: A4;
+              margin: 15mm 20mm;
+            }
+          `}</style>
+          <div className="flex justify-between items-start mb-6 text-[11px] text-black">
+            <div className="text-center font-semibold text-black">
+              <p className="uppercase">Bộ Khoa học và Công nghệ</p>
+              <p className="uppercase font-bold">Học viện Công nghệ Bưu chính Viễn thông</p>
+              <p className="font-bold">Cơ sở tại Thành phố Hồ Chí Minh</p>
+            </div>
+            <div className="text-center text-black">
+              <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+              <p className="font-bold">Độc lập - Tự do - Hạnh phúc</p>
+            </div>
+          </div>
+
+          <div className="text-center my-6">
+            <h1 className="text-xl font-bold uppercase text-black text-center">PHIẾU XUẤT KHO CƠ SỞ VẬT CHẤT</h1>
+            <p className="font-semibold text-xs mt-1 text-black text-center">Số phiếu: PXK/{createdReceiptCode}</p>
+          </div>
+          
+          <div className="mb-6 text-xs space-y-2 text-black text-left">
+            <h3 className="font-bold text-sm">1. Thông tin phiếu</h3>
+            <p>- Ngày lập: <span className="font-semibold">{formData.exportDate ? new Date(formData.exportDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN')}</span></p>
+            <p>- Người thực hiện: <span className="font-semibold">{user?.fullName || '--'}</span></p>
+            <p>- Đơn vị nhận/lý do xuất: <span className="font-semibold">Phòng/Phân ban / {formData.reason || '--'}</span></p>
+            <p>- Số chứng từ/Hợp đồng: <span className="font-semibold">--</span></p>
+          </div>
+
+          <div className="mb-6 text-xs text-black text-left">
+            <h3 className="font-bold text-sm mb-2">2. Danh sách thiết bị</h3>
+            <p className="mb-2 italic text-black">Thiết bị được xuất khỏi kho trung tâm để phục vụ nghiệp vụ đã được phê duyệt:</p>
+            
+            <table className="w-full border-collapse border border-black text-xs text-black">
+              <thead>
+                <tr className="text-center font-bold text-black bg-gray-50">
+                  <th className="border border-black p-2 w-12 text-black">STT</th>
+                  <th className="border border-black p-2 w-28 text-black">Mã tài sản</th>
+                  <th className="border border-black p-2 text-black">Tên tài sản</th>
+                  <th className="border border-black p-2 w-16 text-black">ĐVT</th>
+                  <th className="border border-black p-2 w-16 text-black">Số lượng</th>
+                  <th className="border border-black p-2 w-28 text-black">Đơn giá</th>
+                  <th className="border border-black p-2 w-28 text-black">Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody>
+                {exportItems.map((item, index) => (
+                  <tr key={item.tempId} className="text-black">
+                    <td className="border border-black p-2 text-center text-black">{index + 1}</td>
+                    <td className="border border-black p-2 font-mono text-center text-black">{item.assetCode}</td>
+                    <td className="border border-black p-2 text-black text-left">{item.assetName}</td>
+                    <td className="border border-black p-2 text-center text-black">Cái</td>
+                    <td className="border border-black p-2 text-center text-black">{item.qty}</td>
+                    <td className="border border-black p-2 text-right text-black">--</td>
+                    <td className="border border-black p-2 text-black">{item.note || item.conditionLabel || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mb-6 text-xs text-black space-y-1 pl-1 text-left">
+            <p>- Tổng số lượng: <span className="font-semibold">{exportItems.reduce((sum, i) => sum + i.qty, 0)}</span></p>
+            <p>- Tổng giá trị: <span className="font-semibold">--</span></p>
+            <p>- Ghi chú xuất kho: <span className="font-semibold">{formData.generalNote || formData.note || '--'}</span></p>
+          </div>
+
+          <div className="grid grid-cols-3 text-center mt-8 mb-20 text-[11px] font-semibold text-black">
+            <div>
+              <p className="text-black font-bold">NGƯỜI LẬP PHIẾU</p>
+              <p className="italic text-[10px] font-normal text-black">(Ký, ghi rõ họ tên)</p>
+            </div>
+            <div>
+              <p className="text-black font-bold">THỦ KHO / BỘ PHẬN CSVC</p>
+              <p className="italic text-[10px] font-normal text-black">(Ký, ghi rõ họ tên)</p>
+            </div>
+            <div>
+              <p className="text-black font-bold">ĐẠI DIỆN LIÊN QUAN</p>
+              <p className="italic text-[10px] font-normal text-black">(Ký, ghi rõ họ tên)</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

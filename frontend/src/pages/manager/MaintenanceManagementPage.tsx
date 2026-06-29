@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useReactToPrint } from 'react-to-print';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useToast } from '../../toast/toast-context';
@@ -31,7 +32,8 @@ import {
   Eye,
   PencilSimple,
   WarningCircle,
-  FloppyDisk
+  FloppyDisk,
+  Printer
 } from '@phosphor-icons/react';
 import { getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, completeMaintenanceRecord, getMaintenancePlans, startMaintenanceRecord, cancelMaintenanceRecord } from '../../services/maintenance';
 import { getAssets } from '../../services/assets';
@@ -92,6 +94,19 @@ export function MaintenanceManagementPage() {
       note: '',
     },
   });
+
+  const [printRecord, setPrintRecord] = useState<any>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+  });
+
+  useEffect(() => {
+    if (printRecord) {
+      handlePrint();
+      setPrintRecord(null);
+    }
+  }, [printRecord, handlePrint]);
 
   const loadRecords = useCallback(async () => {
     setIsFetching(true);
@@ -341,12 +356,6 @@ export function MaintenanceManagementPage() {
           { label: 'Nghiệp vụ', href: '#' },
           { label: 'Sửa chữa - Bảo trì' }
         ]}
-        actions={
-          <Button onClick={openCreateModal} className="gap-2">
-            <Plus size={16} weight="bold" />
-            Tạo phiếu bảo trì mới
-          </Button>
-        }
       />
 
       {/* Summary Cards */}
@@ -455,8 +464,8 @@ export function MaintenanceManagementPage() {
                         </td>
                         <td className="px-4 py-3.5 text-center font-bold">{record.maintenanceCode}</td>
                         <td className="px-4 py-3.5">{record.asset?.assetName ?? '--'}</td>
-                        <td className="px-4 py-3.5 text-center">{record.asset?.room?.roomCode ?? '--'}</td>
-                        <td className="px-4 py-3.5 text-center">{record.asset?.room?.floor?.building?.name ?? '--'}</td>
+                        <td className="px-4 py-3.5 text-center">{record.asset?.room?.roomCode ?? record.damageReport?.room?.roomCode ?? '--'}</td>
+                        <td className="px-4 py-3.5 text-center">{record.asset?.room?.floor?.building?.name ?? record.damageReport?.room?.floor?.building?.name ?? '--'}</td>
                         <td className="px-4 py-3.5 text-center">{renderTypeBadge(record.maintenanceType)}</td>
                         <td className="px-4 py-3.5 text-center">{renderStatusBadge(record.resultStatus)}</td>
                         <td className="px-4 py-3.5 text-center font-medium">
@@ -470,6 +479,7 @@ export function MaintenanceManagementPage() {
                             ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
                             actions={[
                               { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
+                              { id: 'print', label: 'In phiếu PDF', icon: <Printer size={16} />, onClick: () => setPrintRecord(record) },
                               ...(record.status === 'PENDING' ? [
                                 { id: 'start', label: 'Bắt đầu', icon: <Gear size={16} />, onClick: () => handleStart(record.id) },
                                 { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
@@ -499,6 +509,7 @@ export function MaintenanceManagementPage() {
                         ariaLabel={`Thao tác bảo trì ${record.maintenanceCode}`}
                         actions={[
                           { id: 'view', label: 'Xem chi tiết', icon: <Eye size={16} />, onClick: () => openDetailModal(record) },
+                          { id: 'print', label: 'In phiếu PDF', icon: <Printer size={16} />, onClick: () => setPrintRecord(record) },
                           ...(record.status === 'PENDING' ? [
                             { id: 'start', label: 'Bắt đầu', icon: <Gear size={16} />, onClick: () => handleStart(record.id) },
                             { id: 'edit', label: 'Sửa', icon: <PencilSimple size={16} />, onClick: () => openEditModal(record) },
@@ -512,7 +523,7 @@ export function MaintenanceManagementPage() {
                       />
                     }
                   >
-                    <DataLabel label="Phòng/Khu" value={`${record.asset?.room?.roomCode ?? '--'} / ${record.asset?.room?.floor?.building?.name ?? '--'}`} />
+                    <DataLabel label="Phòng/Khu" value={`${record.asset?.room?.roomCode ?? record.damageReport?.room?.roomCode ?? '--'} / ${record.asset?.room?.floor?.building?.name ?? record.damageReport?.room?.floor?.building?.name ?? '--'}`} />
                     <DataLabel label="Loại" value={renderTypeBadge(record.maintenanceType)} />
                     <DataLabel label="Người thực hiện" value={getPerformerName(record)} />
                     <DataLabel label="Ngày bảo trì" value={new Date(record.maintenanceDate).toLocaleDateString('vi-VN')} />
@@ -653,7 +664,7 @@ export function MaintenanceManagementPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Phòng</p>
-                  <p className="font-medium">{selectedRecord.asset?.room?.roomCode ?? '--'}</p>
+                  <p className="font-medium">{selectedRecord.asset?.room?.roomCode ?? selectedRecord.damageReport?.room?.roomCode ?? '--'}</p>
                 </div>
               </div>
 
@@ -745,6 +756,64 @@ export function MaintenanceManagementPage() {
           </ModalFooter>
         </form>
       </Modal>
+
+      {/* Hidden printable PDF element */}
+      <div className="hidden">
+        <div ref={printRef} className="bg-white text-black p-8 border animate-none" style={{ width: '210mm', minHeight: '297mm' }}>
+          <div className="text-center mb-6">
+            <h2 className="text-xl font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h2>
+            <p className="font-semibold">Độc lập - Tự do - Hạnh phúc</p>
+            <p className="mt-2 italic">---o0o---</p>
+            <h1 className="text-2xl font-bold mt-6 uppercase">
+              BIÊN BẢN NGHIỆM THU SỬA CHỮA
+            </h1>
+            <p>Số phiếu: {printRecord?.maintenanceCode}</p>
+          </div>
+          
+          <div className="mb-4 text-sm space-y-1">
+            <p><strong>Ngày lập:</strong> {printRecord?.maintenanceDate ? new Date(printRecord.maintenanceDate).toLocaleDateString('vi-VN') : ''}</p>
+            <p><strong>Người nghiệm thu:</strong> {printRecord ? getPerformerName(printRecord) : ''}</p>
+            <p><strong>Vị trí sử dụng:</strong> {printRecord?.asset?.room?.roomCode || 'Kho trung tâm'}</p>
+          </div>
+
+          <table className="w-full border-collapse border border-black mb-8 text-sm">
+            <thead>
+              <tr>
+                <th className="border border-black p-2">STT</th>
+                <th className="border border-black p-2">Mã TB</th>
+                <th className="border border-black p-2">Tên TB</th>
+                <th className="border border-black p-2">Nội dung sửa chữa</th>
+                <th className="border border-black p-2">Kết quả nghiệm thu</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td className="border border-black p-2 text-center">1</td>
+                <td className="border border-black p-2">{printRecord?.asset?.assetCode}</td>
+                <td className="border border-black p-2">{printRecord?.asset?.assetName}</td>
+                <td className="border border-black p-2">{printRecord?.content}</td>
+                <td className="border border-black p-2">
+                  {printRecord?.resultStatus === 'GOOD' ? 'Tốt (Đã sửa xong)' : 
+                   printRecord?.resultStatus === 'RECOMMEND_LIQUIDATION' ? 'Đề nghị thanh lý (Hỏng nặng)' : 'Chưa nghiệm thu'}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div className="grid grid-cols-2 text-center mt-12 mb-24">
+            <div>
+              <p className="font-bold">ĐẠI DIỆN BỘ PHẬN NGHIỆM THU</p>
+              <p className="italic text-sm">(Ký và ghi rõ họ tên)</p>
+              <div className="h-20"></div>
+              <p className="font-bold mt-12">{printRecord ? getPerformerName(printRecord) : ''}</p>
+            </div>
+            <div>
+              <p className="font-bold">NGƯỜI THỰC HIỆN SỬA CHỮA</p>
+              <p className="italic text-sm">(Ký và ghi rõ họ tên)</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

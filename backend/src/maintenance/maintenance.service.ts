@@ -82,7 +82,7 @@ export class MaintenanceService {
           asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
           plan: true,
           performer: true,
-          damageReport: true,
+          damageReport: { include: { room: { include: { floor: { include: { building: true } } } } } },
         },
         orderBy: { createdAt: 'desc' },
         skip: (page - 1) * pageSize,
@@ -139,23 +139,25 @@ export class MaintenanceService {
         throw new ConflictException('Tài sản này đang có lệnh bảo trì chưa hoàn tất');
       }
 
-      if (body.damageReportId) {
-        const dr = await tx.damageReport.findUnique({ where: { id: body.damageReportId } });
-        if (!dr) throw new NotFoundException('Phiếu báo hỏng không tồn tại');
-        if (dr.assetId !== body.assetId) throw new BadRequestException('Tài sản không khớp với phiếu báo hỏng');
-        
-        // Only allow creation from APPROVED damage reports
-        if (dr.status !== 'APPROVED') {
-          throw new BadRequestException(`Chỉ phiếu báo hỏng đã được duyệt (APPROVED) mới được lập lệnh sửa chữa. Trạng thái hiện tại: ${dr.status}`);
-        }
+      if (!body.damageReportId) {
+        throw new BadRequestException('damageReportId là bắt buộc, không được lập phiếu bảo trì ngoài báo hỏng');
+      }
 
-        // Only one active maintenance per damage report
-        const activeReportMaintenance = await tx.maintenanceRecord.findFirst({
-          where: { damageReportId: body.damageReportId, status: { in: ['PENDING', 'IN_PROGRESS'] } }
-        });
-        if (activeReportMaintenance) {
-          throw new ConflictException('Phiếu báo hỏng này đã có lệnh bảo trì đang hoạt động.');
-        }
+      const dr = await tx.damageReport.findUnique({ where: { id: body.damageReportId } });
+      if (!dr) throw new NotFoundException('Phiếu báo hỏng không tồn tại');
+      if (dr.assetId !== body.assetId) throw new BadRequestException('Tài sản không khớp với phiếu báo hỏng');
+      
+      // Only allow creation from APPROVED damage reports
+      if (dr.status !== 'APPROVED') {
+        throw new BadRequestException(`Chỉ phiếu báo hỏng đã được duyệt (APPROVED) mới được lập lệnh sửa chữa. Trạng thái hiện tại: ${dr.status}`);
+      }
+
+      // Only one active maintenance per damage report
+      const activeReportMaintenance = await tx.maintenanceRecord.findFirst({
+        where: { damageReportId: body.damageReportId, status: { in: ['PENDING', 'IN_PROGRESS'] } }
+      });
+      if (activeReportMaintenance) {
+        throw new ConflictException('Phiếu báo hỏng này đã có lệnh bảo trì đang hoạt động.');
       }
 
       const rec = await tx.maintenanceRecord.create({
@@ -182,7 +184,7 @@ export class MaintenanceService {
           asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
           plan: true,
           performer: true,
-          damageReport: true,
+          damageReport: { include: { room: { include: { floor: { include: { building: true } } } } } },
         },
       });
 
@@ -240,8 +242,8 @@ export class MaintenanceService {
           previousAssetStatus: 'IN_USE',
           previousRoomId: dr.roomId,
           damageReportId: dr.id,
-          cost: body.cost ?? null,
-          materialNote: body.materialNote ?? null,
+          cost: null,
+          materialNote: null,
           note: body.note ?? null,
           completedAt: new Date(),
           completedById: userId,
@@ -267,7 +269,7 @@ export class MaintenanceService {
               action: 'Nghiệm thu bảo trì',
               oldStatus: 'IN_PROGRESS',
               newStatus: 'COMPLETED',
-              note: `Đã hoàn tất sửa chữa. Kết quả: ${body.resultStatus === 'GOOD' ? 'Tốt' : 'Đề nghị thanh lý'}. Chi phí: ${body.cost ?? 0} VNĐ.`,
+              note: `Đã hoàn tất sửa chữa. Kết quả: ${body.resultStatus === 'GOOD' ? 'Tốt' : 'Đề nghị thanh lý'}.`,
               createdByUserId: userId,
             }
           }
@@ -302,30 +304,6 @@ export class MaintenanceService {
         newRoomId: nextRoomId,
         note: `Hoàn tất sửa chữa từ phiếu báo hỏng #${dr.reportCode}. Kết quả: ${body.resultStatus}.`,
       });
-
-      // 6. If RECOMMEND_LIQUIDATION, automatically create a DRAFT Liquidation record
-      if (body.resultStatus === MaintenanceResultStatus.RECOMMEND_LIQUIDATION) {
-        const liqCode = generateCode('TL-');
-        await tx.liquidationRecord.create({
-          data: {
-            liquidationCode: liqCode,
-            liquidationDate: new Date(),
-            status: LiquidationStatus.DRAFT,
-            note: `Tự động tạo từ phiếu bảo trì hoàn tất bảo trì hỏng nặng của thiết bị ${asset.assetCode}`,
-            sourceType: 'MAINTENANCE',
-            sourceMaintenanceRecordId: rec.id,
-            createdBy: userId,
-            liquidationItems: {
-              create: {
-                assetId: asset.id,
-                assetCondition: 'Hỏng nặng không thể sửa chữa',
-                reason: `Đề nghị thanh lý sau khi bảo trì không thành công từ phiếu báo hỏng #${dr.reportCode}`,
-                estimatedRemainingValue: 0,
-              }
-            }
-          }
-        });
-      }
 
       return rec;
     }, { timeout: 30000 });
@@ -405,7 +383,7 @@ export class MaintenanceService {
           asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
           plan: true,
           performer: true,
-          damageReport: true,
+          damageReport: { include: { room: { include: { floor: { include: { building: true } } } } } },
         }
       });
 
@@ -497,7 +475,7 @@ export class MaintenanceService {
           asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
           plan: true,
           performer: true,
-          damageReport: true,
+          damageReport: { include: { room: { include: { floor: { include: { building: true } } } } } },
         },
       });
 
@@ -519,43 +497,6 @@ export class MaintenanceService {
               createdByUserId: userId
             }
           });
-        }
-      }
-
-      // Handle RECOMMEND_LIQUIDATION
-      if (body.resultStatus === MaintenanceResultStatus.RECOMMEND_LIQUIDATION) {
-        // Check duplicate active liquidation
-        const activeLiq = await tx.liquidationItem.findFirst({
-          where: {
-            assetId: record.assetId,
-            liquidationRecord: {
-              status: { in: [LiquidationStatus.DRAFT, LiquidationStatus.PENDING_APPROVAL, LiquidationStatus.APPROVED] }
-            }
-          }
-        });
-
-        if (!activeLiq) {
-          const liqCode = generateCode('TL-');
-          await tx.liquidationRecord.create({
-            data: {
-              liquidationCode: liqCode,
-              liquidationDate: new Date(),
-              status: LiquidationStatus.DRAFT,
-              sourceType: 'MAINTENANCE',
-              sourceMaintenanceRecordId: record.id,
-              note: `Đề xuất thanh lý từ Lệnh bảo trì ${record.maintenanceCode}`,
-              createdBy: userId,
-              liquidationItems: {
-                create: {
-                  assetId: record.assetId,
-                  assetCondition: 'Hỏng nặng không thể sửa',
-                  reason: body.note || 'Theo đề xuất của bộ phận bảo trì',
-                }
-              }
-            }
-          });
-        } else {
-          throw new ConflictException('Thiết bị đã có hồ sơ thanh lý đang hoạt động.');
         }
       }
 
@@ -681,7 +622,7 @@ export class MaintenanceService {
           asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
           plan: true,
           performer: true,
-          damageReport: true,
+          damageReport: { include: { room: { include: { floor: { include: { building: true } } } } } },
         }
       });
 
@@ -716,7 +657,7 @@ export class MaintenanceService {
           asset: { include: { category: true, room: { include: { floor: { include: { building: true } } } } } },
           plan: true,
           performer: true,
-          damageReport: true,
+          damageReport: { include: { room: { include: { floor: { include: { building: true } } } } } },
         },
       });
 

@@ -35,6 +35,8 @@ export type DamageReport = {
   status: DamageReportStatus;
   createdAt: string;
   updatedAt?: string | null;
+  rejectReason?: string | null;
+  cancelReason?: string | null;
   reporter?: User;
   asset?: Asset;
   room?: Room;
