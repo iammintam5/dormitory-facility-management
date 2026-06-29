@@ -74,6 +74,7 @@ export class UsersService {
         address: u.profile.address,
         faculty: u.profile.faculty,
         className: u.profile.className,
+        course: u.profile.course,
         emergencyName: u.profile.emergencyName,
         emergencyPhone: u.profile.emergencyPhone,
         notes: u.profile.notes,
@@ -108,6 +109,8 @@ export class UsersService {
     email?: string;
     phone?: string;
     studentCode?: string;
+    faculty?: string;
+    course?: string;
   }, actorUserId?: number, ipAddress?: string | null) {
     const roleId = parseRoleId(payload.roleId);
     const role = await this.prisma.role.findUnique({ where: { id: roleId } });
@@ -140,6 +143,12 @@ export class UsersService {
         phone,
         studentCode,
         roleId,
+        profile: {
+          create: {
+            faculty: payload.faculty || null,
+            course: payload.course || null,
+          }
+        }
       },
       include: { role: true, profile: true },
     });
@@ -171,7 +180,19 @@ export class UsersService {
         code: user.role.code as 'ADMIN' | 'MANAGER' | 'STUDENT',
         name: user.role.name,
       },
-      profile: null,
+      profile: user.profile ? {
+        id: String(user.profile.id),
+        avatarUrl: user.profile.avatarUrl ?? null,
+        gender: user.profile.gender ?? null,
+        dateOfBirth: user.profile.dateOfBirth ?? null,
+        address: user.profile.address ?? null,
+        faculty: user.profile.faculty ?? null,
+        className: user.profile.className ?? null,
+        course: user.profile.course ?? null,
+        emergencyName: user.profile.emergencyName ?? null,
+        emergencyPhone: user.profile.emergencyPhone ?? null,
+        notes: user.profile.notes ?? null,
+      } : null,
     };
   }
 
@@ -183,6 +204,8 @@ export class UsersService {
     email?: string | null;
     phone?: string | null;
     studentCode?: string | null;
+    faculty?: string | null;
+    course?: string | null;
   }, actorUserId?: number, ipAddress?: string | null) {
     const user = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
@@ -232,6 +255,19 @@ export class UsersService {
     if (payload.studentCode !== undefined) { data.studentCode = payload.studentCode; changes.push('mã sinh viên'); }
     if (payload.roleId !== undefined) { data.roleId = parseInt(payload.roleId, 10); changes.push('vai trò'); }
 
+    if (payload.faculty !== undefined || payload.course !== undefined) {
+      const profileData: any = {};
+      if (payload.faculty !== undefined) profileData.faculty = payload.faculty;
+      if (payload.course !== undefined) profileData.course = payload.course;
+      data.profile = {
+        upsert: {
+          create: profileData,
+          update: profileData,
+        }
+      };
+      changes.push('khoa/khóa');
+    }
+
     if (payload.fullName !== undefined) data.fullName = normalizeRequired(payload.fullName, 'Họ tên');
     if (nextUsername !== undefined) data.userCode = nextUsername;
     if (payload.email !== undefined) data.email = normalizeOptional(payload.email);
@@ -276,7 +312,19 @@ export class UsersService {
         code: updated.role.code as 'ADMIN' | 'MANAGER' | 'STUDENT',
         name: updated.role.name,
       },
-      profile: null,
+      profile: updated.profile ? {
+        id: String(updated.profile.id),
+        avatarUrl: updated.profile.avatarUrl ?? null,
+        gender: updated.profile.gender ?? null,
+        dateOfBirth: updated.profile.dateOfBirth ?? null,
+        address: updated.profile.address ?? null,
+        faculty: updated.profile.faculty ?? null,
+        className: updated.profile.className ?? null,
+        course: updated.profile.course ?? null,
+        emergencyName: updated.profile.emergencyName ?? null,
+        emergencyPhone: updated.profile.emergencyPhone ?? null,
+        notes: updated.profile.notes ?? null,
+      } : null,
     };
   }
 

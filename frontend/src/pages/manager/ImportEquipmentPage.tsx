@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useReactToPrint } from 'react-to-print';
 import { useAuth } from '../../auth/auth-context';
 import { useToast } from '../../toast/toast-context';
 import { 
@@ -9,6 +10,7 @@ import {
   Trash, 
   Check,
   ArrowsClockwise,
+  Printer,
 } from '@phosphor-icons/react';
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -60,9 +62,6 @@ export function ImportEquipmentPage() {
     supplierName: '',
     supplierAddress: '',
     supplierPhone: '',
-    contractNumber: '',
-    contractDate: '',
-    documentNumber: '',
     note: '',
   });
 
@@ -79,6 +78,22 @@ export function ImportEquipmentPage() {
     note: '',
   });
 
+
+  const [createdReceiptCode, setCreatedReceiptCode] = useState('');
+  const printRef = useRef<HTMLDivElement>(null);
+  const handlePrint = useReactToPrint({
+    contentRef: printRef,
+  });
+
+  useEffect(() => {
+    if (createdReceiptCode) {
+      handlePrint();
+      const timer = setTimeout(() => {
+        navigate(`${basePath}/asset-transactions`);
+      }, 800);
+      return () => clearTimeout(timer);
+    }
+  }, [createdReceiptCode, navigate, basePath]);
 
   // Load data on mount
   useEffect(() => {
@@ -174,11 +189,11 @@ export function ImportEquipmentPage() {
         }))
       };
 
-      await createImportReceipt(payload);
+      const res = await createImportReceipt(payload);
 
       const totalItems = importItems.reduce((sum, i) => sum + i.qty, 0);
       showToast(`Đã nhập ${totalItems} thiết bị thành công`, 'success');
-      navigate(`${basePath}/asset-transactions`);
+      setCreatedReceiptCode(res.receiptCode);
     } catch (err) {
       showToast(getApiErrorMessage(err, 'Lỗi khi lưu phiếu nhập'), 'error');
     } finally {
@@ -566,6 +581,95 @@ export function ImportEquipmentPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* Hidden printable Import Receipt */}
+      <div className="hidden">
+        <div className="bg-white text-black p-12" ref={printRef} style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'Times New Roman' }}>
+          <style>{`
+            @page {
+              size: A4;
+              margin: 15mm 20mm;
+            }
+          `}</style>
+          <div className="flex justify-between items-start mb-6 text-[11px] text-black">
+            <div className="text-center font-semibold text-black">
+              <p className="uppercase">Bộ Khoa học và Công nghệ</p>
+              <p className="uppercase font-bold">Học viện Công nghệ Bưu chính Viễn thông</p>
+              <p className="font-bold">Cơ sở tại Thành phố Hồ Chí Minh</p>
+            </div>
+            <div className="text-center text-black">
+              <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+              <p className="font-bold">Độc lập - Tự do - Hạnh phúc</p>
+            </div>
+          </div>
+
+          <div className="text-center my-6">
+            <h1 className="text-xl font-bold uppercase text-black text-center">PHIẾU NHẬP KHO CƠ SỞ VẬT CHẤT</h1>
+            <p className="font-semibold text-xs mt-1 text-black text-center">Số phiếu: PNK/{createdReceiptCode}</p>
+          </div>
+          
+          <div className="mb-6 text-xs space-y-2 text-black text-left">
+            <h3 className="font-bold text-sm">1. Thông tin phiếu</h3>
+            <p>- Ngày lập: <span className="font-semibold">{formData.receiptDate ? new Date(formData.receiptDate).toLocaleDateString('vi-VN') : new Date().toLocaleDateString('vi-VN')}</span></p>
+            <p>- Người thực hiện: <span className="font-semibold">{user?.fullName || '--'}</span></p>
+            <p>- Nhà cung cấp/nguồn nhập: <span className="font-semibold">{formData.supplierName || 'Tự do'}</span></p>
+            <p>- Số chứng từ/Hợp đồng: <span className="font-semibold">--</span></p>
+          </div>
+
+          <div className="mb-6 text-xs text-black text-left">
+            <h3 className="font-bold text-sm mb-2">2. Danh sách thiết bị</h3>
+            <p className="mb-2 italic text-black">Thiết bị được nhập vào kho trung tâm để quản lý, theo dõi và chờ cấp phát:</p>
+            
+            <table className="w-full border-collapse border border-black text-xs text-black">
+              <thead>
+                <tr className="text-center font-bold text-black bg-gray-50">
+                  <th className="border border-black p-2 w-12 text-black">STT</th>
+                  <th className="border border-black p-2 w-28 text-black">Mã tài sản</th>
+                  <th className="border border-black p-2 text-black">Tên tài sản</th>
+                  <th className="border border-black p-2 w-16 text-black">ĐVT</th>
+                  <th className="border border-black p-2 w-16 text-black">Số lượng</th>
+                  <th className="border border-black p-2 w-28 text-black">Đơn giá</th>
+                  <th className="border border-black p-2 w-28 text-black">Ghi chú</th>
+                </tr>
+              </thead>
+              <tbody>
+                {importItems.map((item, index) => (
+                  <tr key={item.tempId} className="text-black">
+                    <td className="border border-black p-2 text-center text-black">{index + 1}</td>
+                    <td className="border border-black p-2 font-mono text-center text-black">{item.assetCode}</td>
+                    <td className="border border-black p-2 text-black text-left">{item.assetName}</td>
+                    <td className="border border-black p-2 text-center text-black">Cái</td>
+                    <td className="border border-black p-2 text-center text-black">{item.qty}</td>
+                    <td className="border border-black p-2 text-right text-black">{item.unitPrice.toLocaleString('vi-VN')} đ</td>
+                    <td className="border border-black p-2 text-black">{item.note || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mb-6 text-xs text-black space-y-1 pl-1 text-left">
+            <p>- Tổng số lượng: <span className="font-semibold">{importItems.reduce((sum, i) => sum + i.qty, 0)}</span></p>
+            <p>- Tổng giá trị: <span className="font-semibold">{importItems.reduce((sum, i) => sum + i.total, 0).toLocaleString('vi-VN')} đ</span></p>
+            <p>- Ghi chú nhập kho: <span className="font-semibold">{formData.note || '--'}</span></p>
+          </div>
+
+          <div className="grid grid-cols-3 text-center mt-8 mb-20 text-[11px] font-semibold text-black">
+            <div>
+              <p className="text-black font-bold">NGƯỜI LẬP PHIẾU</p>
+              <p className="italic text-[10px] font-normal text-black">(Ký, ghi rõ họ tên)</p>
+            </div>
+            <div>
+              <p className="text-black font-bold">THỦ KHO / BỘ PHẬN CSVC</p>
+              <p className="italic text-[10px] font-normal text-black">(Ký, ghi rõ họ tên)</p>
+            </div>
+            <div>
+              <p className="text-black font-bold">ĐẠI DIỆN LIÊN QUAN</p>
+              <p className="italic text-[10px] font-normal text-black">(Ký, ghi rõ họ tên)</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

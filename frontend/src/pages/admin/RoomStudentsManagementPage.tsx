@@ -97,7 +97,7 @@ export function RoomStudentsManagementPage() {
             studentId: assignment.student.studentCode || assignment.student.userCode,
             fullName: assignment.student.fullName,
             faculty: assignment.student.profile?.faculty || '',
-            course: assignment.student.profile?.course || '',
+            course: (assignment.student.profile?.course || '').replace(/^K/, 'D'),
             buildingCode: buildingName,
             roomCode: room.roomCode,
             moveInDate: assignment.startDate ? new Date(assignment.startDate).toLocaleDateString('vi-VN') : '',
@@ -334,7 +334,7 @@ export function RoomStudentsManagementPage() {
         actions={
           <Button onClick={openAddModal} className="gap-2">
             <Plus size={16} weight="bold" />
-            Thêm sinh viên / Chuyển phòng
+            Thêm sinh viên
           </Button>
         }
       />
@@ -554,7 +554,7 @@ export function RoomStudentsManagementPage() {
       <Modal 
         isOpen={isModalOpen} 
         onClose={() => setIsModalOpen(false)} 
-        title={selectedStudent ? (activeTab === 'transfer' ? 'Chuyển phòng' : 'Cập nhật thông tin') : 'Thêm sinh viên / Chuyển phòng'}
+        title={selectedStudent ? (activeTab === 'transfer' ? 'Chuyển phòng' : 'Cập nhật thông tin') : 'Thêm sinh viên'}
         size="3xl"
         footer={
           <>
@@ -566,22 +566,6 @@ export function RoomStudentsManagementPage() {
           </>
         }
       >
-        {!selectedStudent && (
-          <div className="flex border-b border-border/50 mb-4 px-2">
-            <button 
-              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'new' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setActiveTab('new')}
-            >
-              Thêm sinh viên mới
-            </button>
-            <button 
-              className={`pb-3 px-4 text-sm font-semibold border-b-2 transition-colors ${activeTab === 'transfer' ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-              onClick={() => setActiveTab('transfer')}
-            >
-              Chuyển phòng cho sinh viên
-            </button>
-          </div>
-        )}
 
         <div className="max-h-[60vh] overflow-y-auto custom-scrollbar pr-2 pb-4">
           <form id="student-room-form" className="space-y-6">
@@ -594,12 +578,68 @@ export function RoomStudentsManagementPage() {
                       <label className="mb-1.5 block text-sm font-medium text-foreground">
                         Mã sinh viên <span className="text-destructive">*</span>
                       </label>
-                      <div className="relative">
+                      <div className="flex gap-2">
                         <Input 
-                          {...form.register('studentId')}
+                          {...form.register('studentId', {
+                            onChange: (e) => {
+                              const val = e.target.value.toUpperCase();
+                              const match = val.match(/^[a-zA-Z](2[0-9])/);
+                              if (match && match[1]) {
+                                form.setValue('course', 'D' + match[1]);
+                              }
+                              if (val.includes('DCCN')) form.setValue('faculty', 'CNTT');
+                              else if (val.includes('DCMR') || val.includes('DCQT')) form.setValue('faculty', 'Kinh tế');
+                              else if (val.includes('DCDT')) form.setValue('faculty', 'Điện tử');
+                            }
+                          })}
                           placeholder="Nhập mã sinh viên"
                           error={!!form.formState.errors.studentId}
+                          className="flex-1"
                         />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={async () => {
+                            const val = form.getValues('studentId')?.trim().toUpperCase();
+                            if (!val) {
+                              showToast('Vui lòng nhập mã sinh viên để tìm kiếm', 'warning');
+                              return;
+                            }
+                            try {
+                              const res = await getUsers({ studentCode: val, roleCode: 'STUDENT' });
+                              if (res && res.items && res.items.length > 0) {
+                                const found = res.items[0];
+                                 form.setValue('fullName', found.fullName);
+                                 form.setValue('phone', found.phone || '');
+                                 
+                                 let detectedFaculty = found.profile?.faculty || '';
+                                 if (!detectedFaculty) {
+                                   if (val.includes('DCCN')) detectedFaculty = 'CNTT';
+                                   else if (val.includes('DCMR') || val.includes('DCQT')) detectedFaculty = 'Kinh tế';
+                                   else if (val.includes('DCDT')) detectedFaculty = 'Điện tử';
+                                 }
+                                 
+                                 let detectedCourse = found.profile?.course || '';
+                                 if (!detectedCourse) {
+                                   const match = val.match(/^[a-zA-Z](2[0-9])/);
+                                   if (match && match[1]) {
+                                     detectedCourse = 'D' + match[1];
+                                   }
+                                 }
+
+                                 form.setValue('faculty', detectedFaculty);
+                                 form.setValue('course', detectedCourse);
+                                showToast('Đã tự động điền thông tin sinh viên!', 'success');
+                              } else {
+                                showToast('Không tìm thấy sinh viên trên hệ thống.', 'warning');
+                              }
+                            } catch (e) {
+                              showToast('Có lỗi xảy ra khi tìm sinh viên.', 'error');
+                            }
+                          }}
+                        >
+                          Tìm kiếm
+                        </Button>
                       </div>
                       {form.formState.errors.studentId && (
                         <p className="mt-1 text-xs text-destructive">{form.formState.errors.studentId.message}</p>
@@ -619,7 +659,7 @@ export function RoomStudentsManagementPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-foreground">Khoa</label>
-                        <Select {...form.register('faculty')}>
+                        <Select {...form.register('faculty')} value={form.watch('faculty') || ''}>
                           <option value="">Chọn khoa</option>
                           <option value="CNTT">CNTT</option>
                           <option value="Kinh tế">Kinh tế</option>
@@ -628,11 +668,13 @@ export function RoomStudentsManagementPage() {
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-foreground">Khóa</label>
-                        <Select {...form.register('course')}>
+                        <Select {...form.register('course')} value={form.watch('course') || ''}>
                           <option value="">Chọn khóa</option>
-                          <option value="K21">K21</option>
-                          <option value="K22">K22</option>
-                          <option value="K23">K23</option>
+                          <option value="D20">D20</option>
+                          <option value="D21">D21</option>
+                          <option value="D22">D22</option>
+                          <option value="D23">D23</option>
+                          <option value="D24">D24</option>
                         </Select>
                       </div>
                     </div>

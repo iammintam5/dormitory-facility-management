@@ -89,7 +89,6 @@ export function MaintenanceAssetHistoryPage() {
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <InfoLine label="Loại bảo trì" value={record.maintenanceType} />
                   <InfoLine label="Lần cập nhật" value={formatDateTime(record.updatedAt ?? record.createdAt)} />
-                  <InfoLine label="Chi phí" value={String(record.cost ?? '--')} />
                   <InfoLine label="Ngày bảo trì tiếp theo" value={formatDateOnly(record.nextMaintenanceDate)} />
                 </div>
                 <div className="mt-4 rounded-2xl bg-muted/30 p-4 text-sm text-foreground">

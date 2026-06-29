@@ -10,10 +10,11 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { Modal } from '../../components/ui/Modal';
 import { getBuildings, getRooms, BuildingRecord, RoomRecord } from '../../services/locations';
 import { getAssets, AssetRecord } from '../../services/assets';
-import { createHandoverReceipt, createReclaimReceipt } from '../../services/asset-receipts';
+import { createHandoverReceipt, createReclaimReceipt, getAssetReceipts, getAssetReceipt, AssetReceiptRecord } from '../../services/asset-receipts';
 import { getApiErrorMessage } from '../../lib/api-client';
 import { useReactToPrint } from 'react-to-print';
-import { FilePdf, MagnifyingGlass } from '@phosphor-icons/react';
+import { FilePdf, MagnifyingGlass, Eye, Printer, ArrowsClockwise } from '@phosphor-icons/react';
+import { RowActionsMenu } from '../../components/ui/RowActionsMenu';
 
 import { SkeletonTable } from '../../components/ui/Skeleton';
 const receiptTemplates = {
@@ -31,11 +32,15 @@ const receiptTemplates = {
 
 export function AssetAllocationPage() {
   const { showToast } = useToast();
-  const [activeTab, setActiveTab] = useState<'handover' | 'reclaim'>('handover');
+  const [activeTab, setActiveTab] = useState<'handover' | 'reclaim' | 'history'>('handover');
   const [buildings, setBuildings] = useState<BuildingRecord[]>([]);
   const [rooms, setRooms] = useState<RoomRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFetchingRoomAssets, setIsFetchingRoomAssets] = useState(false);
+
+  // History state
+  const [historyReceipts, setHistoryReceipts] = useState<AssetReceiptRecord[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   
   // Handover state
   const [availableAssets, setAvailableAssets] = useState<AssetRecord[]>([]);
@@ -52,7 +57,6 @@ export function AssetAllocationPage() {
   const [reclaimNote, setReclaimNote] = useState('');
 
   // Print Handover State
-  const [showPrintModal, setShowPrintModal] = useState(false);
   const [printData, setPrintData] = useState<any>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -60,6 +64,13 @@ export function AssetAllocationPage() {
     contentRef: printRef,
     documentTitle: 'Bien_Ban_Ban_Giao',
   });
+
+  useEffect(() => {
+    if (printData) {
+      handlePrint();
+      setPrintData(null);
+    }
+  }, [printData]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -162,11 +173,29 @@ export function AssetAllocationPage() {
     }
   };
 
-  const switchTab = (tab: 'handover' | 'reclaim') => {
+  const loadHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await getAssetReceipts();
+      setHistoryReceipts(res.filter(r => r.type === 'HANDOVER' || r.type === 'RECLAIM'));
+    } catch (error) {
+      console.error(error);
+      showToast(getApiErrorMessage(error, 'Không thể tải lịch sử cấp phát'), 'error');
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const switchTab = (tab: 'handover' | 'reclaim' | 'history') => {
     setActiveTab(tab);
     setRooms([]);
     setSearchQuery('');
     setSelectedCategory('');
+
+    if (tab === 'history') {
+      loadHistory();
+      return;
+    }
 
     if (tab === 'handover') {
       setFromBuildingId('');
@@ -179,6 +208,31 @@ export function AssetAllocationPage() {
     setTargetBuildingId('');
     setTargetRoomId('');
     setSelectedHandoverAssets(new Set());
+  };
+
+  const handleTriggerPrint = async (receipt: AssetReceiptRecord) => {
+    try {
+      showToast('Đang tải dữ liệu để in...', 'info');
+      const details = await getAssetReceipt(receipt.id);
+      const firstItem = details.items?.[0] as any;
+      const roomName = firstItem?.asset?.room?.roomCode || firstItem?.room?.roomCode || 'KTX';
+
+      setPrintData({
+        type: details.type,
+        receiptCode: details.receiptCode,
+        date: new Date(details.receiptDate).toLocaleDateString('vi-VN'),
+        roomName: roomName,
+        assets: details.items?.map((item: any) => ({
+          id: item.id,
+          assetCode: item.asset?.assetCode || '',
+          assetName: item.asset?.assetName || '',
+          conditionLabel: item.asset?.condition === 'GOOD' ? 'Tốt' : 'Hỏng',
+          statusLabel: item.asset?.statusLabel || '',
+        })) || [],
+      });
+    } catch (err) {
+      showToast(getApiErrorMessage(err, 'Lỗi khi tải chi tiết phiếu để in'), 'error');
+    }
   };
 
   const submitHandover = async () => {
@@ -211,7 +265,6 @@ export function AssetAllocationPage() {
         roomName,
         assets: assetsData,
       });
-      setShowPrintModal(true);
 
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Lỗi khi cấp phát'), 'error');
@@ -248,7 +301,6 @@ export function AssetAllocationPage() {
         roomName,
         assets: assetsData,
       });
-      setShowPrintModal(true);
 
     } catch (error) {
       showToast(getApiErrorMessage(error, 'Lỗi khi thu hồi'), 'error');
@@ -301,6 +353,12 @@ export function AssetAllocationPage() {
           onClick={() => switchTab('reclaim')}
         >
           Lập biên bản thu hồi
+        </button>
+        <button
+          className={`px-6 py-3 font-medium text-sm transition-colors ${activeTab === 'history' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+          onClick={() => switchTab('history')}
+        >
+          Lịch sử cấp phát/thu hồi
         </button>
       </div>
 
@@ -528,95 +586,168 @@ export function AssetAllocationPage() {
         </Card>
       )}
 
-      <Modal 
-        isOpen={showPrintModal} 
-        onClose={() => setShowPrintModal(false)} 
-        size="lg" 
-        title={printData?.type === 'RECLAIM' ? 'In biên bản thu hồi' : 'In biên bản bàn giao'}
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setShowPrintModal(false)}>Đóng</Button>
-            <Button variant="outline" asChild>
-              <a href={printTemplate.href} target="_blank" rel="noreferrer">
-                <FilePdf className="mr-2 h-4 w-4" />
-                {printTemplate.code}
-              </a>
+      {activeTab === 'history' && (
+        <Card className="p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-lg">Lịch sử biên bản cấp phát & thu hồi</h3>
+            <Button variant="outline" onClick={loadHistory} className="gap-2">
+              <ArrowsClockwise size={16} /> Làm mới
             </Button>
-            <Button onClick={() => handlePrint()}>In biên bản</Button>
-          </>
-        }
-      >
-        <div className="bg-white text-black p-8 border" ref={printRef}>
-          <div className="text-center mb-6">
-            <h2 className="text-xl font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h2>
-            <p className="font-semibold">Độc lập - Tự do - Hạnh phúc</p>
-            <p className="mt-2 italic">---o0o---</p>
-            <h1 className="text-2xl font-bold mt-6 uppercase">
-              {printData?.type === 'RECLAIM' ? 'BIÊN BẢN THU HỒI TÀI SẢN' : 'BIÊN BẢN BÀN GIAO TÀI SẢN'}
+          </div>
+
+          <div className="overflow-x-auto rounded-lg border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="pl-6">Mã phiếu</TableHead>
+                  <TableHead>Loại</TableHead>
+                  <TableHead>Ngày lập</TableHead>
+                  <TableHead className="text-center">Số thiết bị</TableHead>
+                  <TableHead>Phòng</TableHead>
+                  <TableHead>Người lập</TableHead>
+                  <TableHead>Ghi chú</TableHead>
+                  <TableHead className="text-center">Thao tác</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loadingHistory ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                      Đang tải lịch sử...
+                    </TableCell>
+                  </TableRow>
+                ) : historyReceipts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-10 text-center text-muted-foreground">
+                      Không tìm thấy biên bản bàn giao/thu hồi nào.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  historyReceipts.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="pl-6 font-medium text-foreground">{item.receiptCode}</TableCell>
+                      <TableCell>
+                        <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold ${item.type === 'HANDOVER' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                          {item.type === 'HANDOVER' ? 'Bàn giao / Cấp phát' : 'Thu hồi'}
+                        </span>
+                      </TableCell>
+                      <TableCell>{new Date(item.receiptDate).toLocaleDateString('vi-VN')}</TableCell>
+                      <TableCell className="text-center font-bold">{item._count?.items ?? item.items?.length ?? 0}</TableCell>
+                      <TableCell>{item.items?.[0]?.asset?.room?.roomCode || 'KTX'}</TableCell>
+                      <TableCell>{item.creator?.fullName || '-'}</TableCell>
+                      <TableCell className="max-w-[200px] truncate" title={item.note || ''}>{item.note || '-'}</TableCell>
+                      <TableCell className="text-center">
+                        <RowActionsMenu
+                          ariaLabel={`Thao tác phiếu ${item.receiptCode}`}
+                          actions={[
+                            { id: 'view-print', label: 'Xem & In', icon: <Eye size={16} />, onClick: () => handleTriggerPrint(item) }
+                          ]}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </Card>
+      )}
+
+      {/* Hidden printable Allocation/Reclaim Receipt */}
+      <div className="hidden">
+        <div className="bg-white text-black p-12" ref={printRef} style={{ width: '100%', boxSizing: 'border-box', fontFamily: 'Times New Roman' }}>
+          <style>{`
+            @page {
+              size: A4;
+              margin: 15mm 20mm;
+            }
+          `}</style>
+          <div className="flex justify-between items-start mb-6 text-[11px] text-black">
+            <div className="text-center font-semibold text-black">
+              <p className="uppercase">Bộ Khoa học và Công nghệ</p>
+              <p className="uppercase font-bold">Học viện Công nghệ Bưu chính Viễn thông</p>
+              <p className="font-bold">Cơ sở tại Thành phố Hồ Chí Minh</p>
+            </div>
+            <div className="text-center text-black">
+              <p className="font-bold uppercase">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</p>
+              <p className="font-bold">Độc lập - Tự do - Hạnh phúc</p>
+            </div>
+          </div>
+
+          <div className="text-center my-6">
+            <h1 className="text-xl font-bold uppercase text-black text-center">
+              {printData?.type === 'RECLAIM' ? 'BIÊN BẢN THU HỒI CƠ SỞ VẬT CHẤT' : 'BIÊN BẢN BÀN GIAO CƠ SỞ VẬT CHẤT'}
             </h1>
-            <p>Số phiếu: {printData?.receiptCode}</p>
-            <p className="mt-2 text-xs italic text-muted-foreground">
-              Biên bản được in từ dữ liệu hệ thống. Có thể đối chiếu mẫu PDF {printTemplate.code} khi cần in mẫu trắng.
+            <p className="font-semibold text-xs mt-1 text-black text-center">Số biên bản: {printTemplate.code}/{printData?.receiptCode || '.......'}</p>
+          </div>
+          
+          <div className="mb-6 text-xs space-y-2 text-black text-left">
+            <h3 className="font-bold text-sm">1. Thông tin chung</h3>
+            <p>- Ngày lập: <span className="font-semibold">{printData?.date || '……/……/……'}</span></p>
+            <p>- Phòng/Khu nhà: <span className="font-semibold">{printData?.roomName || '....................................................................................'}</span></p>
+            <p>- Bên giao (Ban quản lý KTX): <span className="font-semibold">Kho trung tâm KTX Man Thiện</span></p>
+            <p>- Bên nhận (Đại diện phòng/Sinh viên): <span className="font-semibold">Đại diện Sinh viên phòng {printData?.roomName || '.......'}</span></p>
+          </div>
+
+          <div className="mb-6 text-xs text-black text-left">
+            <h3 className="font-bold text-sm mb-2">2. Nội dung biên bản</h3>
+            <p className="mb-2 italic text-black">
+              {printData?.type === 'RECLAIM' 
+                ? 'Hai bên thống nhất thu hồi các tài sản/cơ sở vật chất sau từ phòng ký túc xá về kho:'
+                : 'Hai bên thống nhất bàn giao các tài sản/cơ sở vật chất sau để sử dụng tại phòng ký túc xá:'}
             </p>
-          </div>
-          
-          <div className="mb-4">
-            <p><strong>Ngày lập:</strong> {printData?.date}</p>
-            {printData?.type === 'RECLAIM' ? (
-              <>
-                <p><strong>Bên giao (Sinh viên):</strong> Đại diện phòng {printData?.roomName}</p>
-                <p><strong>Bên nhận (Ban QL KTX):</strong> Kho trung tâm</p>
-              </>
-            ) : (
-              <>
-                <p><strong>Bên giao (Ban QL KTX):</strong> Kho trung tâm</p>
-                <p><strong>Bên nhận (Sinh viên):</strong> Đại diện phòng {printData?.roomName}</p>
-              </>
-            )}
-          </div>
-
-          <p className="mb-2">
-            {printData?.type === 'RECLAIM' 
-              ? `Chúng tôi tiến hành thu hồi các tài sản sau đây từ phòng ${printData?.roomName} về kho:` 
-              : `Chúng tôi tiến hành bàn giao các tài sản sau đây để sử dụng tại phòng ${printData?.roomName}:`}
-          </p>
-          
-          <table className="w-full border-collapse border border-black mb-8 text-sm">
-            <thead>
-              <tr>
-                <th className="border border-black p-2">STT</th>
-                <th className="border border-black p-2">Mã TB</th>
-                <th className="border border-black p-2">Tên TB</th>
-                <th className="border border-black p-2">Số lượng</th>
-                <th className="border border-black p-2">Tình trạng</th>
-              </tr>
-            </thead>
-            <tbody>
-              {printData?.assets?.map((a: any, index: number) => (
-                <tr key={a.id}>
-                  <td className="border border-black p-2 text-center">{index + 1}</td>
-                  <td className="border border-black p-2">{a.assetCode}</td>
-                  <td className="border border-black p-2">{a.assetName}</td>
-                  <td className="border border-black p-2 text-center">1</td>
-                  <td className="border border-black p-2">{a.conditionLabel || a.statusLabel}</td>
+            
+            <table className="w-full border-collapse border border-black text-xs text-black">
+              <thead>
+                <tr className="text-center font-bold text-black bg-gray-50">
+                  <th className="border border-black p-2 w-12 text-black">STT</th>
+                  <th className="border border-black p-2 w-28 text-black">Mã tài sản</th>
+                  <th className="border border-black p-2 text-black">Tên tài sản</th>
+                  <th className="border border-black p-2 w-16 text-black">Số lượng</th>
+                  <th className="border border-black p-2 w-24 text-black">Tình trạng</th>
+                  <th className="border border-black p-2 w-28 text-black">Ghi chú</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {printData?.assets?.map((a: any, index: number) => (
+                  <tr key={a.id} className="text-black">
+                    <td className="border border-black p-2 text-center text-black">{index + 1}</td>
+                    <td className="border border-black p-2 font-mono text-center text-black">{a.assetCode}</td>
+                    <td className="border border-black p-2 text-black text-left">{a.assetName}</td>
+                    <td className="border border-black p-2 text-center text-black">1</td>
+                    <td className="border border-black p-2 text-center text-black">{a.conditionLabel || 'Tốt'}</td>
+                    <td className="border border-black p-2 text-black">{a.note || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-          <div className="grid grid-cols-2 text-center mt-12 mb-24">
+          <div className="mb-6 text-xs text-black text-left">
+            <p>- Ghi chú bàn giao: <span className="font-semibold">...............................................................................................................................</span></p>
+          </div>
+
+          <div className="mb-6 text-xs text-black text-left">
+            <h3 className="font-bold text-sm mb-2">3. Hướng xử lý sau biên bản</h3>
+            <div className="flex gap-8 italic">
+              <label className="flex items-center gap-1.5"><input type="checkbox" defaultChecked /> Tiếp tục sử dụng</label>
+              <label className="flex items-center gap-1.5"><input type="checkbox" /> Đưa vào bảo trì/sửa chữa</label>
+              <label className="flex items-center gap-1.5"><input type="checkbox" /> Đề xuất thanh lý</label>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 text-center mt-8 mb-20 text-[11px] font-semibold text-black">
             <div>
-              <p className="font-bold">ĐẠI DIỆN BÊN GIAO</p>
-              <p className="italic text-sm">(Ký, ghi rõ họ tên)</p>
+              <p className="text-black font-bold">ĐẠI DIỆN BÊN GIAO</p>
+              <p className="italic text-[10px] font-normal text-black">(Ký, ghi rõ họ tên)</p>
             </div>
             <div>
-              <p className="font-bold">ĐẠI DIỆN BÊN NHẬN</p>
-              <p className="italic text-sm">(Ký, ghi rõ họ tên)</p>
+              <p className="text-black font-bold">ĐẠI DIỆN BÊN NHẬN</p>
+              <p className="italic text-[10px] font-normal text-black">(Ký, ghi rõ họ tên)</p>
             </div>
           </div>
         </div>
-      </Modal>
-
+      </div>
     </div>
   );
 }

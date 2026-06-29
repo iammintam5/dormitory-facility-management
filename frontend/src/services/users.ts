@@ -26,6 +26,7 @@ export type ManagedUser = {
     address: string | null;
     faculty: string | null;
     className: string | null;
+    course: string | null;
     emergencyName: string | null;
     emergencyPhone: string | null;
     notes: string | null;
@@ -60,6 +61,8 @@ export async function createUser(payload: {
   email?: string;
   phone?: string;
   studentCode?: string;
+  faculty?: string;
+  course?: string;
 }) {
   const response = await apiClient.post('/users', payload);
   return unwrapApiResponse<ManagedUser>(response.data);
@@ -75,6 +78,8 @@ export async function updateUser(
     email?: string | null;
     phone?: string | null;
     studentCode?: string | null;
+    faculty?: string | null;
+    course?: string | null;
   },
 ) {
   const response = await apiClient.patch(`/users/${id}`, payload);

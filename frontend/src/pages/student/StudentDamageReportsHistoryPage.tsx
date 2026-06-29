@@ -415,6 +415,12 @@ export function StudentDamageReportsHistoryPage() {
                       <span className="text-sm font-semibold text-muted-foreground w-28 shrink-0">Mô tả sự cố</span>
                       <span className="text-sm text-foreground font-medium leading-relaxed">{activeReportDetail.description}</span>
                     </div>
+                    {activeReportDetail.status === 'REJECTED' && activeReportDetail.rejectReason && (
+                      <div className="flex items-start gap-4 pb-3 border-b border-border/50 text-destructive">
+                        <span className="text-sm font-semibold w-28 shrink-0">Lý do từ chối</span>
+                        <span className="text-sm font-medium leading-relaxed">{activeReportDetail.rejectReason}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -533,6 +539,17 @@ export function StudentDamageReportsHistoryPage() {
           </ModalFooter>
         </form>
       </Modal>
+
+      <AlertDialog
+        isOpen={cancelConfirm.isOpen}
+        title="Xác nhận hủy báo hỏng"
+        description="Bạn có chắc chắn muốn hủy phiếu báo hỏng này không?"
+        onClose={() => setCancelConfirm({ isOpen: false, reportId: null })}
+        onConfirm={handleConfirmCancel}
+        isLoading={isCancelling}
+        confirmText="Đồng ý"
+        cancelText="Bỏ qua"
+      />
     </div>
   );
 }
