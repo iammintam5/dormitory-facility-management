@@ -379,6 +379,7 @@ export function RoomsManagementPage() {
     setTransferBuildingCode('');
     setTransferFloor('');
     setTransferRoomId('');
+    setIsDetailOpen(false);
     setIsTransferOpen(true);
   }
 

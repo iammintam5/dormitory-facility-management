@@ -26,13 +26,20 @@ export class LocationsService {
       orderBy: { createdAt: 'desc' },
     });
 
-    return buildings.map((b) => ({
+    return buildings.map((b) => {
+      const totalRooms = b.floors.reduce((sum, floor) => sum + floor.rooms.length, 0);
+      const totalCapacity = b.floors.reduce(
+        (sum, floor) => sum + floor.rooms.reduce((roomSum, room) => roomSum + (room.capacity ?? 0), 0),
+        0,
+      );
+
+      return {
       id: String(b.id),
       code: b.code,
       name: b.name,
       genderZone: null as string | null,
       status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
-      description: null as string | null,
+      description: `${b.floors.length || 0} tầng, ${totalRooms} phòng, sức chứa ${totalCapacity} sinh viên`,
       floors: b.floors.map((f) => ({
         id: String(f.id),
         floorNumber: f.floorNumber,
@@ -55,7 +62,8 @@ export class LocationsService {
           assignments: r.roomStudentAssignments.map((a) => ({ id: String(a.id) })),
         })),
       ),
-    }));
+    };
+    });
   }
 
   async createBuilding(payload: {
@@ -141,7 +149,7 @@ export class LocationsService {
       name: building.name,
       genderZone: null as string | null,
       status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
-      description: payload.description ?? null,
+      description: `${floorsData.length || 0} tầng, ${roomsData.length} phòng, sức chứa ${roomsData.reduce((sum, room) => sum + (room.capacity ?? 0), 0)} sinh viên`,
       floors: floorsData,
       rooms: roomsData,
     };
@@ -192,7 +200,7 @@ export class LocationsService {
       name: fullBuilding!.name,
       genderZone: null as string | null,
       status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
-      description: payload.description ?? null,
+      description: `${fullBuilding!.floors.length || 0} tầng, ${fullBuilding!.floors.reduce((sum, floor) => sum + floor.rooms.length, 0)} phòng, sức chứa ${fullBuilding!.floors.reduce((sum, floor) => sum + floor.rooms.reduce((roomSum, room) => roomSum + (room.capacity ?? 0), 0), 0)} sinh viên`,
       floors: fullBuilding!.floors.map((f) => ({
         id: String(f.id),
         floorNumber: f.floorNumber,

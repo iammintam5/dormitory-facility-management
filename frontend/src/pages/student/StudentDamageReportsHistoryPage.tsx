@@ -451,6 +451,7 @@ export function StudentDamageReportsHistoryPage() {
                   <Button 
                     variant="destructive" 
                     onClick={() => {
+                      setSelectedReportId(null);
                       setCancelConfirm({ isOpen: true, reportId: activeReportDetail.id });
                     }}
                   >

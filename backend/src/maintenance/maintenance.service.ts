@@ -45,8 +45,8 @@ export class MaintenanceService {
       previousAssetStatus: r.previousAssetStatus,
       previousRoomId: r.previousRoomId,
       nextMaintenanceDate: r.nextMaintenanceDate ? (r.nextMaintenanceDate instanceof Date ? r.nextMaintenanceDate.toISOString().split('T')[0] : r.nextMaintenanceDate) : null,
-      cost: r.cost ? Number(r.cost) : null,
-      materialNote: r.materialNote,
+      cost: null,
+      materialNote: null,
       note: r.note,
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
       updatedAt: r.updatedAt ? (r.updatedAt instanceof Date ? r.updatedAt.toISOString() : r.updatedAt) : null,
@@ -174,8 +174,8 @@ export class MaintenanceService {
           damageReportId: body.damageReportId ?? null,
 
           nextMaintenanceDate: body.nextMaintenanceDate ? new Date(body.nextMaintenanceDate) : null,
-          cost: body.cost ?? null,
-          materialNote: body.materialNote ?? null,
+          cost: null,
+          materialNote: null,
           note: body.note ?? null,
         },
         include: {
@@ -451,8 +451,6 @@ export class MaintenanceService {
       };
       if (body.content !== undefined) updateData.content = body.content;
       if (body.nextMaintenanceDate !== undefined) updateData.nextMaintenanceDate = body.nextMaintenanceDate ? new Date(body.nextMaintenanceDate) : null;
-      if (body.cost !== undefined) updateData.cost = body.cost;
-      if (body.materialNote !== undefined) updateData.materialNote = body.materialNote;
       if (body.note !== undefined) updateData.note = body.note;
 
       // Check asset state transitions
@@ -709,8 +707,6 @@ export class MaintenanceService {
 
       if (body.content !== undefined) updateData.content = body.content;
       if (body.nextMaintenanceDate !== undefined) updateData.nextMaintenanceDate = body.nextMaintenanceDate ? new Date(body.nextMaintenanceDate) : null;
-      if (body.cost !== undefined) updateData.cost = body.cost;
-      if (body.materialNote !== undefined) updateData.materialNote = body.materialNote;
       if (body.note !== undefined) updateData.note = body.note;
 
       const updatedRec = await tx.maintenanceRecord.update({
@@ -723,21 +719,6 @@ export class MaintenanceService {
           damageReport: true,
         },
       });
-
-      // Audit Log cho chi phí
-      if (body.cost !== undefined && Number(record.cost) !== Number(body.cost)) {
-        await tx.auditLog.create({
-          data: {
-            userId: userId,
-            action: 'Cập nhật chi phí bảo trì',
-            tableName: 'maintenance_records',
-            recordId: record.id,
-            content: `Cập nhật chi phí từ ${record.cost ?? 0}đ thành ${body.cost}đ`,
-            oldValue: record.cost ? record.cost.toString() : '0',
-            newValue: body.cost.toString()
-          }
-        });
-      }
 
       return updatedRec;
     });
