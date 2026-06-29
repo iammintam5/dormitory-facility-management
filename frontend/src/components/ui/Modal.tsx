@@ -31,10 +31,20 @@ export function Modal({
 }: ModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const previouslyFocusedElement = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  const initialFocusRefRef = useRef(initialFocusRef);
   
   // Create unique IDs for accessibility
   const internalId = useId();
   const titleId = title ? `modal-title-${internalId}` : undefined;
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
+    initialFocusRefRef.current = initialFocusRef;
+  }, [initialFocusRef]);
 
   // Close on Escape & Focus Management
   useEffect(() => {
@@ -46,8 +56,8 @@ export function Modal({
     // Focus the initial element or dialog when opened
     // Use setTimeout to ensure the DOM is painted
     const focusTimeout = setTimeout(() => {
-      if (initialFocusRef && initialFocusRef.current) {
-        initialFocusRef.current.focus();
+      if (initialFocusRefRef.current?.current) {
+        initialFocusRefRef.current.current.focus();
       } else {
         dialogRef.current?.focus();
       }
@@ -56,7 +66,7 @@ export function Modal({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (!preventCloseOnOverlayClick) {
-          onClose();
+          onCloseRef.current();
         }
         return;
       }
@@ -111,7 +121,7 @@ export function Modal({
         }
       }
     };
-  }, [isOpen, onClose, preventCloseOnOverlayClick, initialFocusRef]);
+  }, [isOpen, preventCloseOnOverlayClick]);
 
   // Lock body scroll
   useEffect(() => {

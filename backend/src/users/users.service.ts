@@ -109,22 +109,37 @@ export class UsersService {
     phone?: string;
     studentCode?: string;
   }, actorUserId?: number, ipAddress?: string | null) {
-    const existing = await this.prisma.user.findUnique({ where: { userCode: payload.username } });
+    const roleId = parseRoleId(payload.roleId);
+    const role = await this.prisma.role.findUnique({ where: { id: roleId } });
+    if (!role) throw new BadRequestException('Vai trò không hợp lệ');
+
+    const userCode = normalizeRequired(payload.username, 'Tên đăng nhập');
+    const fullName = normalizeRequired(payload.fullName, 'Họ tên');
+    const email = normalizeOptional(payload.email);
+    const phone = normalizeOptional(payload.phone);
+    const studentCode = await this.resolveStudentCodeForRole(role.code, payload.studentCode);
+
+    const existing = await this.prisma.user.findUnique({ where: { userCode } });
     if (existing) throw new ConflictException('Tên đăng nhập đã tồn tại');
     if (!payload.password || payload.password.length < 6) {
       throw new BadRequestException('Mật khẩu phải có ít nhất 6 ký tự');
     }
 
+    if (studentCode) {
+      const existingStudentCode = await this.prisma.user.findFirst({ where: { studentCode } });
+      if (existingStudentCode) throw new ConflictException('Mã sinh viên đã tồn tại');
+    }
+
     const hashed = await bcrypt.hash(payload.password, 10);
     const user = await this.prisma.user.create({
       data: {
-        fullName: payload.fullName,
-        userCode: payload.username,
+        fullName,
+        userCode,
         password: hashed,
-        email: payload.email ?? null,
-        phone: payload.phone ?? null,
-        studentCode: payload.studentCode ?? null,
-        roleId: parseInt(payload.roleId, 10),
+        email,
+        phone,
+        studentCode,
+        roleId,
       },
       include: { role: true, profile: true },
     });
@@ -172,6 +187,30 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id }, include: { role: true } });
     if (!user) throw new NotFoundException('Không tìm thấy người dùng');
 
+    const nextRoleId = payload.roleId !== undefined ? parseRoleId(payload.roleId) : user.roleId;
+    const nextRole = payload.roleId !== undefined
+      ? await this.prisma.role.findUnique({ where: { id: nextRoleId } })
+      : user.role;
+    if (!nextRole) throw new BadRequestException('Vai trò không hợp lệ');
+
+    const nextUsername = payload.username !== undefined ? normalizeRequired(payload.username, 'Tên đăng nhập') : undefined;
+    const nextStudentCode = await this.resolveStudentCodeForRole(
+      nextRole.code,
+      payload.studentCode !== undefined ? payload.studentCode : user.studentCode,
+    );
+
+    if (nextUsername !== undefined && nextUsername !== user.userCode) {
+      const existing = await this.prisma.user.findUnique({ where: { userCode: nextUsername } });
+      if (existing) throw new ConflictException('Tên đăng nhập đã tồn tại');
+    }
+
+    if (nextStudentCode) {
+      const existingStudentCode = await this.prisma.user.findFirst({
+        where: { studentCode: nextStudentCode, NOT: { id } },
+      });
+      if (existingStudentCode) throw new ConflictException('Mã sinh viên đã tồn tại');
+    }
+
     if (payload.username !== undefined && payload.username !== user.userCode) {
       const existing = await this.prisma.user.findUnique({ where: { userCode: payload.username } });
       if (existing) throw new ConflictException('Tên đăng nhập đã tồn tại');
@@ -192,6 +231,13 @@ export class UsersService {
     if (payload.phone !== undefined) { data.phone = payload.phone; changes.push('số điện thoại'); }
     if (payload.studentCode !== undefined) { data.studentCode = payload.studentCode; changes.push('mã sinh viên'); }
     if (payload.roleId !== undefined) { data.roleId = parseInt(payload.roleId, 10); changes.push('vai trò'); }
+
+    if (payload.fullName !== undefined) data.fullName = normalizeRequired(payload.fullName, 'Họ tên');
+    if (nextUsername !== undefined) data.userCode = nextUsername;
+    if (payload.email !== undefined) data.email = normalizeOptional(payload.email);
+    if (payload.phone !== undefined) data.phone = normalizeOptional(payload.phone);
+    if (payload.studentCode !== undefined || nextRole.code !== user.role.code) data.studentCode = nextStudentCode;
+    if (payload.roleId !== undefined) data.roleId = nextRoleId;
 
     const updated = await this.prisma.user.update({
       where: { id },
@@ -232,6 +278,13 @@ export class UsersService {
       },
       profile: null,
     };
+  }
+
+  private async resolveStudentCodeForRole(roleCode: string, rawStudentCode?: string | null) {
+    if (roleCode !== 'STUDENT') return null;
+
+    const studentCode = normalizeRequired(rawStudentCode ?? '', 'Mã sinh viên').toUpperCase();
+    return studentCode;
   }
 
   async lock(id: number, actorUserId?: number, ipAddress?: string | null) {
@@ -362,4 +415,25 @@ function auditUserSnapshot(user: {
     status: user.status,
     role: user.role ? { code: user.role.code, name: user.role.name } : user.roleId,
   };
+}
+
+function parseRoleId(roleId: string) {
+  const parsed = Number.parseInt(roleId, 10);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new BadRequestException('Vai trò không hợp lệ');
+  }
+  return parsed;
+}
+
+function normalizeRequired(value: string, fieldName: string) {
+  const normalized = value.trim();
+  if (!normalized) {
+    throw new BadRequestException(`${fieldName} không được để trống`);
+  }
+  return normalized;
+}
+
+function normalizeOptional(value?: string | null) {
+  const normalized = value?.trim();
+  return normalized ? normalized : null;
 }

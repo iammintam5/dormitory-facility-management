@@ -4,6 +4,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '.
 import { SkeletonTable, SkeletonStatCard } from '../../components/ui/Skeleton';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { 
   Door, 
   Buildings, 
@@ -73,6 +74,25 @@ export function StudentRoomPage() {
             <SkeletonTable rows={8} cols={6} />
           </div>
         </Card>
+      </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="space-y-6 mx-auto max-w-7xl pb-10">
+        <PageHeader
+          title="Phòng của tôi"
+          breadcrumbs={[
+            { label: 'Trang chủ', href: '/student/dashboard' },
+            { label: 'Phòng của tôi' },
+          ]}
+        />
+        <EmptyState
+          icon={<Door size={48} weight="duotone" />}
+          title="Chưa được phân phòng"
+          description="Tài khoản của bạn hiện chưa có phân phòng đang hoạt động. Vui lòng liên hệ quản lý ký túc xá để được xếp phòng."
+        />
       </div>
     );
   }

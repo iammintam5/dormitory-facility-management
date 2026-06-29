@@ -7,10 +7,23 @@ export type BuildingRecord = {
   genderZone: string | null;
   status: 'ACTIVE' | 'INACTIVE';
   description: string | null;
+  floors: Array<{
+    id: string;
+    floorNumber: number;
+    name: string | null;
+  }>;
   rooms: Array<{
     id: string;
     code: string;
+    floorId: string;
     floorNumber: number;
+    capacity: number;
+    currentStudents: number;
+    assetCount: number;
+    roomType: string | null;
+    areaM2: number | null;
+    condition: string | null;
+    note: string | null;
     beds: Array<{ id: string; bedLabel: string }>;
     assignments: Array<{ id: string }>;
   }>;
@@ -71,6 +84,7 @@ export type RoomRecord = {
   currentStudents: number;
   roomType: string | null;
   areaM2: number | null;
+  note: string | null;
   status: string;
   statusLabel: string;
   condition: string;
@@ -183,6 +197,9 @@ export async function createRoom(payload: {
   roomCode: string;
   floorId: number;
   capacity?: number;
+  roomType?: string | null;
+  areaM2?: number | null;
+  condition?: string | null;
   note?: string;
 }) {
   const response = await apiClient.post('/rooms', payload);
@@ -191,7 +208,14 @@ export async function createRoom(payload: {
 
 export async function updateRoom(
   id: number,
-  payload: { roomCode?: string; capacity?: number; note?: string },
+  payload: {
+    roomCode?: string;
+    capacity?: number;
+    roomType?: string | null;
+    areaM2?: number | null;
+    condition?: string | null;
+    note?: string;
+  },
 ) {
   const response = await apiClient.patch(`/rooms/${id}`, payload);
   return unwrapApiResponse(response.data);

@@ -24,12 +24,23 @@ export class RoomsService {
     });
   }
 
-  async create(body: { roomCode: string; floorId: number; capacity?: number; note?: string }) {
+  async create(body: {
+    roomCode: string;
+    floorId: number;
+    capacity?: number;
+    roomType?: string | null;
+    areaM2?: number | null;
+    condition?: string | null;
+    note?: string;
+  }) {
     return this.prisma.room.create({
       data: {
         roomCode: body.roomCode,
         floorId: body.floorId,
         capacity: body.capacity ?? null,
+        roomType: body.roomType ?? null,
+        areaM2: body.areaM2 ?? null,
+        condition: body.condition ?? null,
         note: body.note ?? null,
       },
       include: {
@@ -38,7 +49,14 @@ export class RoomsService {
     });
   }
 
-  async update(id: number, body: { roomCode?: string; capacity?: number; note?: string }) {
+  async update(id: number, body: {
+    roomCode?: string;
+    capacity?: number;
+    roomType?: string | null;
+    areaM2?: number | null;
+    condition?: string | null;
+    note?: string;
+  }) {
     // FIX 9: Use Serializable transaction to prevent race condition with assignStudent
     return this.prisma.$transaction(async (tx) => {
       const room = await tx.room.findUnique({ where: { id } });
@@ -61,6 +79,9 @@ export class RoomsService {
         data: {
           ...(body.roomCode !== undefined && { roomCode: body.roomCode }),
           ...(body.capacity !== undefined && { capacity: body.capacity }),
+          ...(body.roomType !== undefined && { roomType: body.roomType }),
+          ...(body.areaM2 !== undefined && { areaM2: body.areaM2 }),
+          ...(body.condition !== undefined && { condition: body.condition }),
           ...(body.note !== undefined && { note: body.note }),
         },
         include: {

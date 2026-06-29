@@ -659,8 +659,9 @@ export function RoomStudentsManagementPage() {
                         </label>
                         <Select {...form.register('buildingCode')} error={!!form.formState.errors.buildingCode}>
                           <option value="">Chọn khu nhà</option>
-                          <option value="Khu A">Khu A</option>
-                          <option value="Khu B">Khu B</option>
+                          {[...new Set(allRooms.map(r => r.floor?.building?.name).filter(Boolean))].map(name => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
                         </Select>
                         {form.formState.errors.buildingCode && (
                           <p className="mt-1 text-xs text-destructive">{form.formState.errors.buildingCode.message}</p>
@@ -672,8 +673,14 @@ export function RoomStudentsManagementPage() {
                         </label>
                         <Select {...form.register('roomCode')} error={!!form.formState.errors.roomCode}>
                           <option value="">Chọn phòng</option>
-                          <option value="A101">A101</option>
-                          <option value="A102">A102</option>
+                          {allRooms
+                            .filter(r => r.floor?.building?.name === form.watch('buildingCode'))
+                            .map(r => (
+                              <option key={r.id} value={r.roomCode}>
+                                {r.roomCode} ({r.capacity - r.roomStudentAssignments.length}/{r.capacity} trống)
+                              </option>
+                            ))
+                          }
                         </Select>
                         {form.formState.errors.roomCode && (
                           <p className="mt-1 text-xs text-destructive">{form.formState.errors.roomCode.message}</p>

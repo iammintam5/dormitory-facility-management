@@ -11,6 +11,7 @@ import { MobileDataCard, DataLabel } from '../../components/ui/MobileDataCard';
 import { FilterBar } from '../../components/ui/FilterBar';
 import { SearchInput } from '../../components/ui/SearchInput';
 import { Pagination } from '../../components/ui/Pagination';
+import { EmptyState } from '../../components/ui/EmptyState';
 import { useDebounce } from '../../hooks/useDebounce';
 import { 
   Door, 
@@ -27,12 +28,12 @@ import {
 } from '@phosphor-icons/react';
 import { studentsApi } from '../../services/students';
 import { Asset } from '../../types/assets';
+import { Room } from '../../types/locations';
 
 export function StudentRoomAssetsPage() {
   const navigate = useNavigate();
   const [roomAssets, setRoomAssets] = useState<Asset[]>([]);
-  const [roomCode, setRoomCode] = useState('A101');
-  const [buildingCode, setBuildingCode] = useState('A');
+  const [room, setRoom] = useState<Room | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [keyword, setKeyword] = useState('');
   const debouncedKeyword = useDebounce(keyword, 400);
@@ -46,8 +47,7 @@ export function StudentRoomAssetsPage() {
       try {
         const roomData = await studentsApi.getMyRoom();
         if (roomData) {
-          setRoomCode(roomData.roomCode);
-          setBuildingCode(roomData.floor?.building?.code || 'A');
+          setRoom(roomData);
         }
         
         const assets = await studentsApi.getMyRoomAssets();
@@ -73,6 +73,7 @@ export function StudentRoomAssetsPage() {
 
   const totalPages = Math.ceil(filteredAssets.length / pageSize) || 1;
   const paginatedAssets = filteredAssets.slice((page - 1) * pageSize, page * pageSize);
+  const buildingCode = room?.floor?.building?.code ?? '--';
 
   if (isLoading) {
     return (
@@ -86,6 +87,27 @@ export function StudentRoomAssetsPage() {
             <SkeletonTable rows={8} cols={6} />
           </div>
         </Card>
+      </div>
+    );
+  }
+
+  if (!room) {
+    return (
+      <div className="space-y-6 mx-auto max-w-7xl pb-10">
+        <PageHeader
+          title="Thiết bị trong phòng"
+          breadcrumbs={[
+            { label: 'Trang chủ', href: '/student/dashboard' },
+            { label: 'Thiết bị trong phòng' },
+          ]}
+        />
+        <EmptyState
+          icon={<Door size={48} weight="duotone" />}
+          title="Chưa được phân phòng"
+          description="Tài khoản của bạn hiện chưa có phân phòng đang hoạt động, nên chưa thể xem danh sách thiết bị trong phòng."
+          actionLabel="Xem thông tin phòng"
+          onAction={() => navigate('/student/room')}
+        />
       </div>
     );
   }
@@ -109,7 +131,7 @@ export function StudentRoomAssetsPage() {
             </div>
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">Phòng</p>
-              <p className="text-2xl font-bold text-foreground">{roomCode}</p>
+              <p className="text-2xl font-bold text-foreground">{room.roomCode}</p>
             </div>
           </div>
           <div className="flex items-center gap-4 px-4">

@@ -81,14 +81,28 @@ export class StudentsService {
     });
 
     return assets.map((a) => ({
-      id: String(a.id),
+      id: a.id,
+      categoryId: a.categoryId,
+      roomId: a.roomId,
       assetCode: a.assetCode,
       assetName: a.assetName,
       categoryCode: a.category?.code ?? '',
       categoryName: a.category?.name ?? '',
       status: a.status,
+      yearInUse: a.yearInUse,
       description: a.description ?? null,
       createdAt: a.createdAt.toISOString(),
+      updatedAt: a.updatedAt.toISOString(),
+      category: a.category
+        ? {
+            id: a.category.id,
+            code: a.category.code,
+            name: a.category.name,
+            description: a.category.description,
+            createdAt: a.category.createdAt.toISOString(),
+            updatedAt: a.category.updatedAt.toISOString(),
+          }
+        : undefined,
     }));
   }
 }

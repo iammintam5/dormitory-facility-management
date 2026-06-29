@@ -16,6 +16,7 @@ export class AssetCategoriesService {
       name: c.name,
       description: c.description,
       unit: null as string | null,
+      _count: c._count,
       createdAt: c.createdAt.toISOString(),
       updatedAt: c.updatedAt.toISOString(),
     }));
@@ -38,6 +39,7 @@ export class AssetCategoriesService {
       name: cat.name,
       description: cat.description,
       unit: null as string | null,
+      _count: { assets: 0 },
       createdAt: cat.createdAt.toISOString(),
       updatedAt: cat.updatedAt.toISOString(),
     };
@@ -55,13 +57,18 @@ export class AssetCategoriesService {
     if (payload.name !== undefined) data.name = payload.name;
     if (payload.description !== undefined) data.description = payload.description;
 
-    const updated = await this.prisma.assetCategory.update({ where: { id }, data });
+    const updated = await this.prisma.assetCategory.update({
+      where: { id },
+      data,
+      include: { _count: { select: { assets: true } } },
+    });
     return {
       id: String(updated.id),
       code: updated.code,
       name: updated.name,
       description: updated.description,
       unit: null as string | null,
+      _count: updated._count,
       createdAt: updated.createdAt.toISOString(),
       updatedAt: updated.updatedAt.toISOString(),
     };

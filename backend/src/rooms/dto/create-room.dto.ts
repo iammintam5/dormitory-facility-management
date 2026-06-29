@@ -17,6 +17,19 @@ export class CreateRoomDto {
 
   @IsOptional()
   @IsString()
+  roomType?: string | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  areaM2?: number | null;
+
+  @IsOptional()
+  @IsString()
+  condition?: string | null;
+
+  @IsOptional()
+  @IsString()
   note?: string;
 }
 
@@ -30,6 +43,19 @@ export class UpdateRoomDto {
   @Min(1)
   @Type(() => Number)
   capacity?: number;
+
+  @IsOptional()
+  @IsString()
+  roomType?: string | null;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  areaM2?: number | null;
+
+  @IsOptional()
+  @IsString()
+  condition?: string | null;
 
   @IsOptional()
   @IsString()

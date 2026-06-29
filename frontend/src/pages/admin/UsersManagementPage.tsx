@@ -145,6 +145,11 @@ export function UsersManagementPage() {
     return { totalUsers, totalAdmins, totalManagers, totalStudents, lockedUsers };
   }, [total, users]);
 
+  const selectedRole = useMemo(
+    () => roles.find((role) => role.id === form.roleId) ?? null,
+    [form.roleId, roles],
+  );
+
   const openCreateModal = () => {
     setEditingUser(null);
     setForm(emptyForm);
@@ -177,6 +182,20 @@ export function UsersManagementPage() {
       return;
     }
 
+    if (form.password.trim() && form.password.trim().length < 6) {
+      showToast('Mật khẩu phải có ít nhất 6 ký tự.', 'error');
+      return;
+    }
+
+    if (selectedRole?.code === 'STUDENT' && !form.studentCode.trim()) {
+      showToast('Vui lòng nhập mã sinh viên cho tài khoản Sinh viên.', 'error');
+      return;
+    }
+
+    const normalizedStudentCode = selectedRole?.code === 'STUDENT'
+      ? form.studentCode.trim().toUpperCase()
+      : null;
+
     setIsSubmitting(true);
     try {
       if (editingUser) {
@@ -186,7 +205,7 @@ export function UsersManagementPage() {
           username: form.username.trim(),
           email: form.email.trim() || null,
           phone: form.phone.trim() || null,
-          studentCode: form.studentCode.trim() || null,
+          studentCode: normalizedStudentCode,
           password: form.password.trim() || undefined,
         });
 
@@ -206,7 +225,7 @@ export function UsersManagementPage() {
           password: form.password.trim(),
           email: form.email.trim() || undefined,
           phone: form.phone.trim() || undefined,
-          studentCode: form.studentCode.trim() || undefined,
+          studentCode: normalizedStudentCode ?? undefined,
         });
 
         if (form.status === 'LOCKED') {
@@ -529,7 +548,14 @@ export function UsersManagementPage() {
               <label className="mb-1.5 block text-sm font-medium text-foreground">Vai trò *</label>
               <Select
                 value={form.roleId}
-                onChange={(e) => setForm((current) => ({ ...current, roleId: e.target.value }))}
+                onChange={(e) => {
+                  const nextRole = roles.find((role) => role.id === e.target.value);
+                  setForm((current) => ({
+                    ...current,
+                    roleId: e.target.value,
+                    studentCode: nextRole?.code === 'STUDENT' ? current.studentCode : '',
+                  }));
+                }}
               >
                 <option value="">Chọn vai trò</option>
                 {roles.map((role) => (
@@ -592,7 +618,9 @@ export function UsersManagementPage() {
               <label className="mb-1.5 block text-sm font-medium text-foreground">Mã sinh viên</label>
               <Input 
                 value={form.studentCode} 
-                onChange={(e) => setForm((current) => ({ ...current, studentCode: e.target.value }))} 
+                onChange={(e) => setForm((current) => ({ ...current, studentCode: e.target.value.toUpperCase() }))}
+                disabled={selectedRole?.code !== 'STUDENT'}
+                placeholder={selectedRole?.code === 'STUDENT' ? 'VD: N21DCCN001' : 'Chỉ dùng cho Sinh viên'}
               />
             </div>
             
