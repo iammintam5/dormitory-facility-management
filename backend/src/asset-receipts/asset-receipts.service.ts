@@ -120,7 +120,7 @@ export class AssetReceiptsService {
           }
         }
         return receipt;
-      });
+      }, { timeout: 30000 });
       return result;
     } catch (error) {
       if (error instanceof BadRequestException) {
