@@ -49,6 +49,7 @@ export function StudentDamageReportsHistoryPage() {
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
   
   const [assets, setAssets] = useState<any[]>([]);
+  const [hasAssignedRoom, setHasAssignedRoom] = useState<boolean | null>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
@@ -109,9 +110,25 @@ export function StudentDamageReportsHistoryPage() {
   }, [loadReports]);
 
   useEffect(() => {
-    studentsApi.getMyRoomAssets()
-      .then(res => setAssets(res))
-      .catch(() => setAssets([]));
+    async function loadStudentRoomContext() {
+      try {
+        const room = await studentsApi.getMyRoom();
+        setHasAssignedRoom(Boolean(room));
+
+        if (!room) {
+          setAssets([]);
+          return;
+        }
+
+        const res = await studentsApi.getMyRoomAssets();
+        setAssets(res);
+      } catch {
+        setHasAssignedRoom(false);
+        setAssets([]);
+      }
+    }
+
+    void loadStudentRoomContext();
   }, []);
 
   useEffect(() => {
@@ -176,7 +193,21 @@ export function StudentDamageReportsHistoryPage() {
           { label: 'Báo hỏng' }
         ]}
         actions={
-          <Button onClick={() => setShowCreateModal(true)} className="gap-2">
+          <Button
+            onClick={() => {
+              if (hasAssignedRoom === false) {
+                showToast('Bạn chưa được phân phòng nên chưa thể tạo báo hỏng.', 'error');
+                return;
+              }
+              if (assets.length === 0) {
+                showToast('Phòng hiện chưa có thiết bị để báo hỏng.', 'error');
+                return;
+              }
+              setShowCreateModal(true);
+            }}
+            disabled={hasAssignedRoom === null}
+            className="gap-2"
+          >
             <Plus size={16} weight="bold" />
             Tạo báo hỏng mới
           </Button>

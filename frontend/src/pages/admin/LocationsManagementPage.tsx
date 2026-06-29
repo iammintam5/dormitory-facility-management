@@ -45,7 +45,7 @@ const locationSchema = z.object({
   code: z.string().min(1, 'Nhập mã khu nhà.'),
   name: z.string().min(1, 'Nhập tên khu nhà.'),
   floors: z.coerce.number().min(1, 'Nhập số tầng.'),
-  rooms: z.coerce.number().min(0, 'Nhập số phòng.'),
+  rooms: z.coerce.number().min(1, 'Nhập số phòng, tối thiểu 1.'),
   defaultCapacity: z.coerce.number().min(1, 'Sức chứa tối thiểu 1.').default(4),
   defaultRoomType: z.string().optional(),
   defaultAreaM2: z.coerce.number().min(0).optional(),
@@ -96,7 +96,7 @@ export function LocationsManagementPage() {
       code: '',
       name: '',
       floors: 1,
-      rooms: 0,
+      rooms: 1,
       defaultCapacity: 4,
       defaultRoomType: '',
       defaultAreaM2: undefined,
@@ -130,7 +130,7 @@ export function LocationsManagementPage() {
       code: '',
       name: '',
       floors: 1,
-      rooms: 0,
+      rooms: 1,
       defaultCapacity: 4,
       defaultRoomType: '',
       defaultAreaM2: undefined,
@@ -267,8 +267,16 @@ export function LocationsManagementPage() {
 
   const totalBuildings = filteredBuildings.length;
   const totalRooms = filteredBuildings.reduce((sum, building) => sum + building.rooms, 0);
-  const totalDevices = filteredBuildings.reduce((sum, building) => sum + building.rooms * 28, 0);
-  const totalStudents = filteredBuildings.reduce((sum, building) => sum + building.rooms * 5, 0);
+  const visibleBuildingIds = new Set(filteredBuildings.map((building) => building.id));
+  const visibleRawBuildings = rawBuildings.filter((building) => visibleBuildingIds.has(building.id));
+  const totalDevices = visibleRawBuildings.reduce(
+    (sum, building) => sum + building.rooms.reduce((roomSum, room) => roomSum + (room.assetCount ?? 0), 0),
+    0,
+  );
+  const totalStudents = visibleRawBuildings.reduce(
+    (sum, building) => sum + building.rooms.reduce((roomSum, room) => roomSum + (room.currentStudents ?? room.assignments.length), 0),
+    0,
+  );
 
   return (
     <div className="space-y-6 mx-auto max-w-7xl pb-10">
@@ -695,7 +703,7 @@ export function LocationsManagementPage() {
                       {rooms.map((room) => (
                         <label
                           key={room.id}
-                          className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                          className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                             selectedRoomIds.has(room.id)
                               ? 'border-slate-900 bg-slate-900/5 ring-1 ring-slate-900'
                               : 'border-slate-200 hover:border-slate-300'
@@ -707,7 +715,12 @@ export function LocationsManagementPage() {
                             onChange={() => toggleSelectRoom(room.id)}
                             className="rounded border-slate-300"
                           />
-                          <span className="font-medium">{room.code}</span>
+                          <span className="flex min-w-0 flex-col">
+                            <span className="font-medium">{room.code}</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {room.currentStudents}/{room.capacity} SV · {room.assetCount ?? 0} TB
+                            </span>
+                          </span>
                         </label>
                       ))}
                     </div>

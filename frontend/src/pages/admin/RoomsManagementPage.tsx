@@ -57,6 +57,7 @@ type RoomRecord = {
   currentStudents: number;
   roomType: string | null;
   areaM2: number | null;
+  note: string | null;
   status: string;
   statusLabel: string;
   condition: string;
@@ -157,12 +158,11 @@ export function RoomsManagementPage() {
 
   const selectedBuildingCode = form.watch('buildingCode');
 
-  // Derive unique floors for the selected building
+  // Derive real floor ids for the selected building
   const selectedBuilding = buildings.find(b => b.code === selectedBuildingCode);
   const availableFloors = useMemo(() => {
     if (!selectedBuilding) return [];
-    const floors = new Set(selectedBuilding.rooms.map(r => r.floorNumber));
-    return Array.from(floors).sort((a, b) => a - b);
+    return [...selectedBuilding.floors].sort((a, b) => a.floorNumber - b.floorNumber);
   }, [selectedBuilding]);
 
   useEffect(() => {
@@ -173,7 +173,7 @@ export function RoomsManagementPage() {
     try {
       const data = await getBuildings();
       setBuildings(data);
-    } catch {
+    } catch (error) {
       // Non-critical
     }
   }
@@ -233,6 +233,7 @@ export function RoomsManagementPage() {
 
   const openEditModal = (room: RoomRecord) => {
     setSelectedRoom(room);
+    const roomBuilding = buildings.find((building) => building.code === room.buildingCode);
     form.reset({
       buildingCode: room.buildingCode,
       code: room.code,
@@ -240,11 +241,11 @@ export function RoomsManagementPage() {
       type: room.roomType || 'Phòng thường',
       capacity: room.capacity,
       currentStudents: room.currentStudents,
-      floor: room.floorNumber.toString(),
+      floor: roomBuilding?.floors.find((floor) => floor.floorNumber === room.floorNumber)?.id ?? '',
       area: room.areaM2?.toString() || '25',
       condition: room.condition,
       status: room.status === 'Đang sử dụng' ? 'Đang sử dụng' : 'Còn trống',
-      description: ''
+      description: room.note ?? ''
     });
     setIsModalOpen(true);
   };
@@ -256,6 +257,9 @@ export function RoomsManagementPage() {
         await updateRoom(Number(selectedRoom.id), {
           roomCode: data.code,
           capacity: data.capacity,
+          roomType: data.type || null,
+          areaM2: data.area ? Number(data.area) : null,
+          condition: data.condition || null,
           note: data.description || undefined,
         });
         showToast('Cập nhật phòng thành công.', 'success');
@@ -264,6 +268,9 @@ export function RoomsManagementPage() {
           roomCode: data.code,
           floorId: Number(data.floor),
           capacity: data.capacity,
+          roomType: data.type || null,
+          areaM2: data.area ? Number(data.area) : null,
+          condition: data.condition || null,
           note: data.description || undefined,
         });
         showToast('Thêm phòng thành công.', 'success');
@@ -288,8 +295,8 @@ export function RoomsManagementPage() {
       setRooms(prev => prev.filter(r => r.id !== deleteTarget.id));
       setDeleteTarget(null);
       showToast('Xóa phòng thành công.', 'success');
-    } catch {
-      showToast('Xóa phòng thất bại.', 'error');
+    } catch (error) {
+      showToast(getApiErrorMessage(error, 'Xóa phòng thất bại.'), 'error');
     }
   };
 
@@ -730,7 +737,7 @@ export function RoomsManagementPage() {
               <Select {...form.register('floor')} error={!!form.formState.errors.floor}>
                 <option value="">Chọn tầng</option>
                 {availableFloors.map(f => (
-                  <option key={f} value={f}>Tầng {f}</option>
+                  <option key={f.id} value={f.id}>Tầng {f.floorNumber}</option>
                 ))}
               </Select>
               {form.formState.errors.floor && (

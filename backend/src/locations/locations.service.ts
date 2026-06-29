@@ -13,6 +13,7 @@ export class LocationsService {
           include: {
             rooms: {
               include: {
+                assets: { select: { id: true } },
                 roomStudentAssignments: {
                   where: { isActive: true },
                   select: { id: true },
@@ -31,12 +32,25 @@ export class LocationsService {
       name: b.name,
       genderZone: null as string | null,
       status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
-      description: b.name,
+      description: null as string | null,
+      floors: b.floors.map((f) => ({
+        id: String(f.id),
+        floorNumber: f.floorNumber,
+        name: f.name,
+      })),
       rooms: b.floors.flatMap((f) =>
         f.rooms.map((r) => ({
           id: String(r.id),
           code: r.roomCode,
+          floorId: String(f.id),
           floorNumber: f.floorNumber,
+          capacity: r.capacity ?? 4,
+          currentStudents: r.roomStudentAssignments.length,
+          assetCount: r.assets.length,
+          roomType: r.roomType,
+          areaM2: r.areaM2,
+          condition: r.condition,
+          note: r.note,
           beds: [{ id: String(r.id * 10 + 1), bedLabel: 'Giường 1' }],
           assignments: r.roomStudentAssignments.map((a) => ({ id: String(a.id) })),
         })),
@@ -71,6 +85,7 @@ export class LocationsService {
     // Auto-create floors and rooms if specified
     const numFloors = payload.floors ?? 0;
     const numRooms = payload.rooms ?? 0;
+    const floorsData: any[] = [];
     const roomsData: any[] = [];
 
     if (numFloors > 0 && numRooms > 0) {
@@ -81,6 +96,11 @@ export class LocationsService {
             name: `Tầng ${floorNum}`,
             buildingId: building.id,
           },
+        });
+        floorsData.push({
+          id: String(floor.id),
+          floorNumber: floor.floorNumber,
+          name: floor.name,
         });
 
         for (let roomNum = 1; roomNum <= numRooms; roomNum++) {
@@ -99,6 +119,14 @@ export class LocationsService {
           roomsData.push({
             id: String(room.id),
             code: room.roomCode,
+            floorId: String(floor.id),
+            capacity: room.capacity ?? 4,
+            currentStudents: 0,
+            assetCount: 0,
+            roomType: room.roomType,
+            areaM2: room.areaM2,
+            condition: room.condition,
+            note: room.note,
             floorNumber: floorNum,
             beds: [{ id: String(room.id * 10 + 1), bedLabel: 'Giường 1' }],
             assignments: [],
@@ -114,6 +142,7 @@ export class LocationsService {
       genderZone: null as string | null,
       status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
       description: payload.description ?? null,
+      floors: floorsData,
       rooms: roomsData,
     };
   }
@@ -145,6 +174,7 @@ export class LocationsService {
           include: {
             rooms: {
               include: {
+                assets: { select: { id: true } },
                 roomStudentAssignments: {
                   where: { isActive: true },
                   select: { id: true },
@@ -163,11 +193,24 @@ export class LocationsService {
       genderZone: null as string | null,
       status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
       description: payload.description ?? null,
+      floors: fullBuilding!.floors.map((f) => ({
+        id: String(f.id),
+        floorNumber: f.floorNumber,
+        name: f.name,
+      })),
       rooms: fullBuilding!.floors.flatMap((f) =>
         f.rooms.map((r) => ({
           id: String(r.id),
           code: r.roomCode,
+          floorId: String(f.id),
           floorNumber: f.floorNumber,
+          capacity: r.capacity ?? 4,
+          currentStudents: r.roomStudentAssignments.length,
+          assetCount: r.assets.length,
+          roomType: r.roomType,
+          areaM2: r.areaM2,
+          condition: r.condition,
+          note: r.note,
           beds: [{ id: String(r.id * 10 + 1), bedLabel: 'Giường 1' }],
           assignments: r.roomStudentAssignments.map((a) => ({ id: String(a.id) })),
         })),
@@ -176,9 +219,53 @@ export class LocationsService {
   }
 
   async deleteBuilding(id: number) {
-    const building = await this.prisma.dormBuilding.findUnique({ where: { id } });
+    const building = await this.prisma.dormBuilding.findUnique({
+      where: { id },
+      include: {
+        floors: {
+          include: {
+            rooms: {
+              include: {
+                assets: { take: 1, select: { id: true } },
+                damageReports: { take: 1, select: { id: true } },
+                roomStudentAssignments: { take: 1, select: { id: true } },
+              },
+            },
+          },
+        },
+      },
+    });
     if (!building) throw new NotFoundException('Building not found');
-    await this.prisma.dormBuilding.delete({ where: { id } });
+
+    const rooms = building.floors.flatMap((floor) => floor.rooms);
+    const roomWithHistory = rooms.find(
+      (room) =>
+        room.assets.length > 0 ||
+        room.damageReports.length > 0 ||
+        room.roomStudentAssignments.length > 0,
+    );
+
+    if (roomWithHistory) {
+      throw new ConflictException(
+        `Không thể xóa khu nhà ${building.code} vì phòng ${roomWithHistory.roomCode} đã phát sinh dữ liệu nghiệp vụ. Vui lòng ngừng sử dụng thay vì xóa.`,
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const roomIds = rooms.map((room) => room.id);
+      const floorIds = building.floors.map((floor) => floor.id);
+
+      if (roomIds.length > 0) {
+        await tx.room.deleteMany({ where: { id: { in: roomIds } } });
+      }
+
+      if (floorIds.length > 0) {
+        await tx.floor.deleteMany({ where: { id: { in: floorIds } } });
+      }
+
+      await tx.dormBuilding.delete({ where: { id } });
+    });
+
     return { message: 'Deleted' };
   }
 
@@ -277,6 +364,7 @@ export class LocationsService {
         currentStudents: activeStudents.length,
         roomType: r.roomType,
         areaM2: r.areaM2,
+        note: r.note,
         status: activeStudents.length > 0 ? 'Đang sử dụng' : 'Còn trống',
         statusLabel: activeStudents.length > 0 ? 'Đang sử dụng' : 'Còn trống',
         condition: r.condition ?? 'Tốt',
