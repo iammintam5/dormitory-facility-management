@@ -52,7 +52,6 @@ const locationSchema = z.object({
   defaultCondition: z.string().default('Tốt'),
   defaultNote: z.string().optional(),
   status: z.string().default('Đang hoạt động'),
-  description: z.string().optional(),
 });
 
 type LocationFormValues = z.infer<typeof locationSchema>;
@@ -103,7 +102,6 @@ export function LocationsManagementPage() {
       defaultCondition: 'Tốt',
       defaultNote: '',
       status: 'Đang hoạt động',
-      description: '',
     },
   });
 
@@ -137,7 +135,6 @@ export function LocationsManagementPage() {
       defaultCondition: 'Tốt',
       defaultNote: '',
       status: 'Đang hoạt động',
-      description: '',
     });
     setIsModalOpen(true);
   }
@@ -150,7 +147,6 @@ export function LocationsManagementPage() {
       floors: building.floors,
       rooms: building.rooms,
       status: building.status,
-      description: building.description ?? '',
     });
     setIsModalOpen(true);
   }
@@ -162,7 +158,6 @@ export function LocationsManagementPage() {
           code: data.code,
           name: data.name,
           status: data.status === 'Đang hoạt động' ? 'ACTIVE' : 'INACTIVE',
-          description: data.description || null,
         });
         showToast('Cập nhật khu nhà thành công.', 'success');
       } else {
@@ -170,7 +165,6 @@ export function LocationsManagementPage() {
           code: data.code,
           name: data.name,
           status: data.status === 'Đang hoạt động' ? 'ACTIVE' : 'INACTIVE',
-          description: data.description || null,
           floors: data.floors,
           rooms: data.rooms,
           defaultCapacity: data.defaultCapacity,
@@ -385,7 +379,7 @@ export function LocationsManagementPage() {
                           <TableHead>Tên khu nhà</TableHead>
                           <TableHead className="text-center">Số tầng</TableHead>
                           <TableHead className="text-center">Số phòng</TableHead>
-                          <TableHead>Mô tả</TableHead>
+                          <TableHead>Tổng quan</TableHead>
                           <TableHead className="text-center">Trạng thái</TableHead>
                           <TableHead className="w-24 text-center">Thao tác</TableHead>
                         </TableRow>
@@ -451,7 +445,7 @@ export function LocationsManagementPage() {
                       >
                         <DataLabel label="Số tầng" value={String(building.floors)} />
                         <DataLabel label="Số phòng" value={String(building.rooms)} />
-                        <DataLabel label="Mô tả" value={building.description || '-'} />
+                        <DataLabel label="Tổng quan" value={building.description || '-'} />
                       </MobileDataCard>
                     ))}
                   </div>
@@ -569,15 +563,6 @@ export function LocationsManagementPage() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-foreground">Mô tả</label>
-            <textarea 
-              {...form.register('description')} 
-              placeholder="Nhập mô tả..." 
-              rows={4} 
-              className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 resize-none"
-            />
-          </div>
-          <div>
             <label className="mb-1.5 block text-sm font-medium text-foreground">Trạng thái</label>
             <Select {...form.register('status')}>
               <option value="Đang hoạt động">Đang hoạt động</option>
@@ -608,7 +593,7 @@ export function LocationsManagementPage() {
         >
           <div className="space-y-5 py-4">
             {/* Batch edit form */}
-            <div className="grid grid-cols-2 gap-4 rounded-xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-200/50">
+            <div className="grid grid-cols-2 gap-4 rounded-xl bg-muted/30 p-4 ring-1 ring-inset ring-border/60">
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-muted-foreground">
                   Sức chứa mới
@@ -617,7 +602,7 @@ export function LocationsManagementPage() {
                   type="number"
                   value={batchCapacity}
                   onChange={(e) => setBatchCapacity(Number(e.target.value))}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                   min={1}
                   placeholder="4"
                 />
@@ -627,7 +612,7 @@ export function LocationsManagementPage() {
                 <select
                   value={batchRoomType}
                   onChange={(e) => setBatchRoomType(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                 >
                   <option value="">Giữ nguyên</option>
                   <option value="Phòng thường">Phòng thường</option>
@@ -641,7 +626,7 @@ export function LocationsManagementPage() {
                   step="0.5"
                   value={batchAreaM2}
                   onChange={(e) => setBatchAreaM2(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                   placeholder="VD: 25"
                 />
               </div>
@@ -650,7 +635,7 @@ export function LocationsManagementPage() {
                 <select
                   value={batchCondition}
                   onChange={(e) => setBatchCondition(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                 >
                   <option value="">Giữ nguyên</option>
                   <option value="Tốt">Tốt</option>
@@ -662,7 +647,7 @@ export function LocationsManagementPage() {
                 <input
                   value={batchNote}
                   onChange={(e) => setBatchNote(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-slate-500 focus:ring-1 focus:ring-slate-500"
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring focus:ring-1 focus:ring-ring"
                   placeholder="VD: Phòng 4 người"
                 />
               </div>
@@ -672,13 +657,13 @@ export function LocationsManagementPage() {
             </div>
 
             {/* Room list header */}
-            <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-3 border-b border-border pb-3">
               <label className="flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
                   checked={buildingRooms.length > 0 && selectedRoomIds.size === buildingRooms.length}
                   onChange={toggleSelectAll}
-                  className="rounded border-slate-300"
+                  className="rounded border-input"
                 />
                 <span className="font-medium text-foreground">Chọn tất cả</span>
               </label>
@@ -705,15 +690,15 @@ export function LocationsManagementPage() {
                           key={room.id}
                           className={`flex cursor-pointer items-start gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
                             selectedRoomIds.has(room.id)
-                              ? 'border-slate-900 bg-slate-900/5 ring-1 ring-slate-900'
-                              : 'border-slate-200 hover:border-slate-300'
+                              ? 'border-primary bg-primary/10 ring-1 ring-primary'
+                              : 'border-border hover:border-primary/50'
                           }`}
                         >
                           <input
                             type="checkbox"
                             checked={selectedRoomIds.has(room.id)}
                             onChange={() => toggleSelectRoom(room.id)}
-                            className="rounded border-slate-300"
+                            className="rounded border-input"
                           />
                           <span className="flex min-w-0 flex-col">
                             <span className="font-medium">{room.code}</span>

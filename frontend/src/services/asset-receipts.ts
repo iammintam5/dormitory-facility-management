@@ -1,4 +1,4 @@
-import { apiClient } from '../lib/api-client';
+import { apiClient, unwrapApiResponse } from '../lib/api-client';
 
 export type AssetReceiptItemRecord = {
   id: string;
@@ -34,30 +34,30 @@ export type AssetReceiptRecord = {
 
 export async function createImportReceipt(payload: any): Promise<AssetReceiptRecord> {
   const response = await apiClient.post<AssetReceiptRecord>('/asset-receipts', payload);
-  return response.data;
+  return unwrapApiResponse<AssetReceiptRecord>(response.data);
 }
 
 export async function createHandoverReceipt(payload: { targetRoomId: number, assetIds: number[], note?: string, receiptDate?: string }): Promise<AssetReceiptRecord> {
   const response = await apiClient.post<AssetReceiptRecord>('/asset-receipts/handover', payload);
-  return response.data;
+  return unwrapApiResponse<AssetReceiptRecord>(response.data);
 }
 
 export async function createReclaimReceipt(payload: { fromRoomId: number, assetIds: number[], note?: string, receiptDate?: string }): Promise<AssetReceiptRecord> {
   const response = await apiClient.post<AssetReceiptRecord>('/asset-receipts/reclaim', payload);
-  return response.data;
+  return unwrapApiResponse<AssetReceiptRecord>(response.data);
 }
 
 export async function createExportReceipt(payload: any): Promise<AssetReceiptRecord> {
   const response = await apiClient.post<AssetReceiptRecord>('/asset-receipts/export', payload);
-  return response.data;
+  return unwrapApiResponse<AssetReceiptRecord>(response.data);
 }
 
 export async function getAssetReceipts(params?: Record<string, any>): Promise<AssetReceiptRecord[]> {
   const response = await apiClient.get<AssetReceiptRecord[]>('/asset-receipts', { params });
-  return response.data;
+  return unwrapApiResponse<AssetReceiptRecord[]>(response.data);
 }
 
 export async function getAssetReceipt(id: string): Promise<AssetReceiptRecord> {
   const response = await apiClient.get<AssetReceiptRecord>(`/asset-receipts/${id}`);
-  return response.data;
+  return unwrapApiResponse<AssetReceiptRecord>(response.data);
 }

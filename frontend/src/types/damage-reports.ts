@@ -8,7 +8,8 @@ export type DamageReportStatus =
   | 'APPROVED'
   | 'REJECTED'
   | 'IN_PROGRESS'
-  | 'COMPLETED';
+  | 'COMPLETED'
+  | 'CANCELLED';
 
 export type DamageReportPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
