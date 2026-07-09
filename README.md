@@ -1,5 +1,4 @@
 # Hệ thống Quản lý Cơ sở Vật chất Ký túc xá - PTIT HCM
-https://github.com/iammintam5/dormitory-facility-management
 
 Ứng dụng web quản lý tài sản, thiết bị, phòng ở, phân bổ sinh viên và toàn bộ các nghiệp vụ vận hành vòng đời cơ sở vật chất tại Ký túc xá PTIT HCM.
 
